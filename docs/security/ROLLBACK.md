@@ -15,3 +15,12 @@ Reverse only the reviewed source patch in an isolated checkout, or restore `cust
 6. After rollback independently verify HA status, HACS version, MCP tools, tunnel health, recovery access and HA repair logs. Network isolation has its own independently tested reversal sequence.
 
 **Security exception:** Do not downgrade solely to hide failed authentication without a separately approved risk acceptance. A rollback of a security fix can re-enable credential leakage, so a secure-disabled remote-admin state is preferable until recovery.
+
+
+## Phase 2 refinement: availability and rollback dependencies
+
+The integration's child-process watcher sets an exit status when the binary terminates unexpectedly; source inspection does not show an automatic restart. The health-URL-file sentinel does not prove request-level reachability. Phase 3 must add independent health checks and isolated restart/cold-boot/failed-update fault injection **before** a change window.
+
+A future network restriction should be scheduled on the HA host rather than relying solely on inter-VLAN rules, because same-Home subnet peers do not necessarily traverse UniFi's routed firewall. Before changing anything: verify loopback backend routing from the HA Core/tunnel network namespace; establish a separate local console/HA UI path; inventory IPv6, local bind and NAT/UPnP; capture the exact listener configuration; and prepare a one-change reversible policy with a timed automatic revert. Abandon a change if independent recovery cannot be demonstrated.
+
+The development patch also tightens `redact_mcp_url` for legacy authority userinfo; this must be included in the exact future manifest. No production change is authorized merely by adding these instructions.
