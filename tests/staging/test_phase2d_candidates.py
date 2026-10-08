@@ -97,7 +97,10 @@ def test_unexpected_listener_initialization_exception_fails_startup(env, monkeyp
 
 def test_failure_bubbles_through_actual_server_initialization(env):
     stub = server_stub()
-    stub.mcp.add_middleware.side_effect = RuntimeError("synthetic_initialization_failure")
+    def fail_only_policy(middleware):
+        if isinstance(middleware, PolicyMiddleware):
+            raise RuntimeError("synthetic_initialization_failure")
+    stub.mcp.add_middleware.side_effect = fail_only_policy
     stub._apply_tool_security_policies = lambda: attach(stub)
     with pytest.raises(RuntimeError, match="Required MCP policy middleware registration failed"):
         HomeAssistantSmartMCPServer._initialize_server(stub)
