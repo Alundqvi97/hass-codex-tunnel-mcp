@@ -50,12 +50,14 @@ def launch_guest():
     disk=WORK/"haos_ova-18.3.qcow2"
     if not disk.exists():
         raise FileNotFoundError("verified guest disk not prepared")
-    fw=pathlib.Path("/usr/share/OVMF/OVMF_CODE.fd")
-    if not fw.exists():
-        raise FileNotFoundError("standard UEFI firmware missing")
+    fw=pathlib.Path("/usr/share/OVMF/OVMF_CODE_4M.fd")
+    vars_file=WORK/"OVMF_VARS_4M.fd"
+    if not fw.exists() or not vars_file.exists():
+        raise FileNotFoundError("matching UEFI firmware pair missing")
     cmd=["sudo","-u","phase2hvm","qemu-system-x86_64",
          "-machine","q35,accel=kvm","-cpu","host","-smp","2","-m","4096",
          "-drive",f"if=pflash,format=raw,readonly=on,file={fw}",
+         "-drive",f"if=pflash,format=raw,file={vars_file}",
          "-drive",f"if=virtio,file={disk},format=qcow2",
          "-netdev",("user,id=net0,hostfwd=tcp:127.0.0.1:18123-:8123,"
                     "hostfwd=tcp:127.0.0.1:18124-:80,"
