@@ -45,3 +45,8 @@ The pinned HA-MCP source, not a custom evaluator, ran in 38 passing staged tests
 **Important:** This policy model implements allow/approval-required, not irrevocable hard-deny/RBAC. In default `require_approval` mode, unmatched calls run. In `allow` mode, unmatched calls require approval (not permanent deny). Only a stronger hard-deny/visibility guard or independent privilege boundary can enforce “never execute Class 3.” See `POLICY_FAIL_CLOSED_REVIEW.md`.
 
 Neither the stage's synthetic bypass nor its middleware initialization test proves which rules are in force on the user's production add-on; effective rules remain blocked behind HTTP 403. Mandatory policy initialization must fail closed in a separate **upstream** remediation and be staged with independent recovery before deployment.
+
+
+## Phase 2D proposed strict baseline (not configured)
+
+See `phase2d/POLICY_BASELINE.md` for per-operation classes and alternative routes. The candidate strict startup mode is only available in a reviewed upstream source patch, not live 8.6.0. It enforces **nonempty allow-list + middleware initialization** and per-request strict policy revalidation. Existing engine only supports allow vs approval-required; hard-deny of privileged writes needs a server-side canonical action guard, removed tool registration, or separate least-privileged backend.
