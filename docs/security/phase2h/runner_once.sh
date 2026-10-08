@@ -27,11 +27,11 @@ cleanup() {
     sudo ip6tables -w 5 -F PHASE2H_GUEST6 >/dev/null 2>&1
     sudo ip6tables -w 5 -X PHASE2H_GUEST6 >/dev/null 2>&1
   fi
+  [[ -z "$(pgrep -u "$GUEST_USER" qemu-system-x86_64 2>/dev/null)" ]] && echo "PHASE2H_GUEST_PROCESS_CLEANUP=PASS" || echo "PHASE2H_GUEST_PROCESS_CLEANUP=NOT_VERIFIED"
   sudo setfacl -x "u:$GUEST_USER" /dev/kvm >/dev/null 2>&1 || true
   sudo userdel "$GUEST_USER" >/dev/null 2>&1 || true
   sudo rm -rf -- "$WORK"
   [[ ! -e "$WORK" ]] && echo "PHASE2H_TEMPORARY_VM_FILES_REMOVED=PASS" || echo "PHASE2H_TEMPORARY_VM_FILES_REMOVED=FAIL"
-  [[ -z "$(pgrep -u "$GUEST_USER" qemu-system-x86_64 2>/dev/null)" ]] && echo "PHASE2H_GUEST_PROCESS_CLEANUP=PASS" || echo "PHASE2H_GUEST_PROCESS_CLEANUP=NOT_VERIFIED"
   echo "PHASE2H_PUBLIC_ARTIFACT_OR_CACHE_UPLOAD=NONE"
   echo "PHASE2H_EXIT_STATUS=$exit_code"
   exit "$exit_code"
