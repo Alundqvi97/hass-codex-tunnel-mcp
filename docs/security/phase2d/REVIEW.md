@@ -48,3 +48,12 @@ Independent tests and all rollback results must be recorded from GitHub Actions 
 Actual deployed image digest and effective policy rules; upstream add-on packaging/entrypoint compatibility; backend native inbound bearer; hosted attachment authorization; unrestricted generic tool paths; startup logging from third-party FastMCP/uvicorn and Supervisor; IPv6/LAN ingress and end-to-end reboot/update rollback.
 
 **Deployment decision: NO-GO.** No running system, credentials, router, OpenAI apps, Auth0, or Control Plane modified.
+
+
+## Final engineering test receipt
+
+[GitHub Actions #37840801696](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37840801696) **SUCCESS**. Exact original v8.6.0 baseline: 38 passed. Independent policy candidate: 14 passed, 5 deselected. Independent logging candidate: 5 passed, 14 deselected. Both changes combined: 19 passed. Selected pinned upstream tests: 20 passed. The workflow performed independent reverse application and exact source Git blob comparison, followed by combined reverse application and byte-exact restoration.
+
+A sanitized top-level policy initialization wrapper was added after the earlier combined-candidate green run; the final run above includes this additional protection. All tests use synthetic inputs and the real pinned code without a live HA connection. No claim of packaged add-on, Supervisor, hosted OpenAI or production readiness is made.
+
+**Phase 2D offline engineering acceptance: COMPLETE; deployment: NO-GO.**
