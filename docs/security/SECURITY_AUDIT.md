@@ -61,3 +61,14 @@ Sources: https://developers.openai.com/api/docs/guides/secure-mcp-tunnels ; http
 **MEDIUM — HA-15: secret URL and settings exposure.** Standard-mode URL secret is the primary access credential, and startup implementation logs it intentionally. Neither extra bearer nor an unauthenticated-looking connector UI implies per-user backend isolation. Avoid exporting/logging server startup output or secret MCP path.
 
 **Remaining tests:** real pinned server with mock HA, v0.0.15 tunnel-client, hosted attachment, policy coverage, IPv6 and rollback are all NOT VERIFIED in staging. No new confirmed exploit of OpenAI hosted tunnel is claimed.
+
+
+## Phase 2C verified staging findings (2026-10-08)
+
+**HIGH — HA-13 upgraded to VERIFIED STAGING for genuine pinned transport:** The correct synthetic secret endpoint accepted real JSON-RPC `initialize`, `tools/list` and read-only `tools/call` with missing/wrong/arbitrary/malformed bearer. Wrong URL path rejected. A configured tunnel-side Authorization header adds no server-enforced authentication in standard mode. Running Supervisor image digest remains unverified.
+
+**HIGH — HA-14 upgraded to VERIFIED STAGING for pinned policy setup:** Real `HomeAssistantSmartMCPServer._apply_tool_security_policies` tests forced import and registration failure. It logged loss of security gating and returned without raising; middleware not installed. In contrast, corrupt policy after installed gate rejects the call. An empty rules file allows calls under default policy. Synthetic direct-name rule allowed equivalent `ha_call_service` call: action-wide authorization must cover all routes.
+
+**HIGH conditional — HA-15 startup secret disclosure reproduced with synthetic data:** Real pinned add-on `log_info` prints the synthetic secret path when called using the same interpolated startup format; source includes unconditional path logging. Production log/backup reachability to lesser-privileged accounts not tested.
+
+See `ACTUAL_HA_MCP_STAGING.md`, `POLICY_FAIL_CLOSED_REVIEW.md`, `SECRET_LOGGING_REVIEW.md`. **This is not evidence of a successful hosted tunnel attack.** Phase 3 remains NO-GO.
