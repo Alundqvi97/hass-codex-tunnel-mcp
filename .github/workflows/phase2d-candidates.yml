@@ -48,6 +48,30 @@ jobs:
           HOMEASSISTANT_TOKEN: synthetic-unused-token
         run: |
           ha_mcp_pinned/.venv/bin/python -m pytest -q -rs -x tests/staging/test_real_ha_mcp_860.py
+      - name: Exercise policy candidate alone and verify independent reverse
+        env:
+          PYTHONPATH: ha_mcp_pinned/src
+          HOMEASSISTANT_URL: http://127.0.0.1:1
+          HOMEASSISTANT_TOKEN: synthetic-unused-token
+        run: |
+          python docs/security/phase2d/patch_candidates.py policy --apply
+          ha_mcp_pinned/.venv/bin/python -m pytest -q -rs -x tests/staging/test_phase2d_candidates.py -k 'not secret_'
+          git -C ha_mcp_pinned diff -- src/ha_mcp/server.py > /tmp/phase2d-policy-only.patch
+          git -C ha_mcp_pinned apply --check -R /tmp/phase2d-policy-only.patch
+          git -C ha_mcp_pinned apply -R /tmp/phase2d-policy-only.patch
+          test "$(git -C ha_mcp_pinned hash-object src/ha_mcp/server.py)" = bf848dcec8345eba603295933768fca6724c913b
+      - name: Exercise logging candidate alone and verify independent reverse
+        env:
+          PYTHONPATH: ha_mcp_pinned/src
+          HOMEASSISTANT_URL: http://127.0.0.1:1
+          HOMEASSISTANT_TOKEN: synthetic-unused-token
+        run: |
+          python docs/security/phase2d/patch_candidates.py logging --apply
+          ha_mcp_pinned/.venv/bin/python -m pytest -q -rs -x tests/staging/test_phase2d_candidates.py -k 'secret_'
+          git -C ha_mcp_pinned diff -- homeassistant-addon/start.py > /tmp/phase2d-log-only.patch
+          git -C ha_mcp_pinned apply --check -R /tmp/phase2d-log-only.patch
+          git -C ha_mcp_pinned apply -R /tmp/phase2d-log-only.patch
+          test "$(git -C ha_mcp_pinned hash-object homeassistant-addon/start.py)" = 88e926a59f568dc9a9bf7bcd719b518b42f52baa
       - name: Apply independently scoped SHA-guarded candidates
         run: |
           python docs/security/phase2d/patch_candidates.py policy --apply
