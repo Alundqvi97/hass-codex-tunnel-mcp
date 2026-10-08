@@ -38,3 +38,7 @@ A safe automatic actuator should instead be a purpose-built, registered, typed w
 ## Status and user action
 
 Source-level tests of this proposal should be evaluated against genuine 8.6.0 `Policy`/`evaluate` implementation. No actual household action was permitted or tried. No production policy changed. A future convenience expansion requires separate code review and exact entity IDs from authorized read-only inventory, not guesses.
+
+## Executed policy proposal acceptance
+
+[CI #37849095384](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37849095384) **39 passed** using actual pinned `Policy` and `evaluate`: exact synthetic read targets and service catalogue domains automatically allowed; security/read state, mixed targets, generic control/backup/admin and future tools require approval. An intentionally tempting `ha_call_service` whitelist accepts an extra nested `data` field in the evaluator, so that rule is NOT safe for automatic device changes. Neither actual HA backend nor real entity IDs were used. The proposal is not yet accepted by Phase 2F's strict runtime whitelist and must not be imported.
