@@ -38,3 +38,18 @@ Date: 2026-10-08. **No production mutation.** All newly introduced tests run wit
 ## Tooling limitations
 
 Current connected GitHub tooling can read/write fork and view Actions; it cannot run OpenAI-hosted adversarial identity tests. HA and UniFi tools allow passive configuration inspection but do not expose a reliable packet-filter simulator or a complete live authorization-policy audit. Do not infer the missing results.
+
+
+## Phase 2B evidence additions (2026-10-08)
+
+| Item | Classification | Result |
+|---|---|---|
+| P2B-01 HA-MCP exact tag | VERIFIED SOURCE | `v8.6.0` annotated ref maps to `fc54437a804858732e4bc927add98e202d879a09`; running image digest not attested |
+| P2B-02 backend bearer | VERIFIED SOURCE | Add-on standard HTTP ingress path secret, no incoming bearer middleware registered by add-on startup; `SUPERVISOR_TOKEN` exported for outbound HA API |
+| P2B-03 policy default | VERIFIED SOURCE | Default require-approval policy allows unmatched tools; initialization can log an error and leave policy middleware unregistered |
+| P2B-04 live effective rules | BLOCKED | Read-only ingress GET `/api/policy/config` returned 403; effective rules still unverified |
+| P2B-05 exact runtime MCP POST | UNVERIFIED | No isolated real HA-MCP server booted; prior mock POST tests do not apply to actual backend |
+| P2B-06 hosted authorization | BLOCKED | No disposable tunnel or additional identity created; billing unknown |
+| P2B-07 crash recovery | VERIFIED SOURCE | Existing subprocess watcher records exit without starting replacement; bounded recovery design isolated from PR #1 |
+
+No new Phase 2B code-level tests were run in an environment containing actual HA-MCP 8.6.0 dependencies. GitHub PR CI results apply to tunnel integration's source/tests; they **do not** establish backend authentication. Do not reuse historical mock pass count as if it verified this source.
