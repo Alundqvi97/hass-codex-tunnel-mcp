@@ -110,6 +110,10 @@ def smoke_case(label, state, expected_ready, option_enabled=True):
                 time.sleep(0.7)
             if expected_ready:
                 if not ready:
+                    state = json.loads(run("docker", "inspect", cid).stdout)[0]["State"]
+                    print("packaged startup state=", state["Status"],
+                          "exit=", state["ExitCode"], "error_type=",
+                          state.get("Error", "")[:80])
                     raise AssertionError("packaged healthy startup failed: " + label)
             else:
                 if ready:
