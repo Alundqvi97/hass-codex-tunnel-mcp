@@ -83,6 +83,25 @@ def run_once(data,label,ready_expected):
         output=logs.stdout+logs.stderr
         for variant in (SECRET,quote(SECRET,safe=""),SECRET.replace("/","\\/"),FAKE):
             assert variant not in output, "PACKAGED_SYNTHETIC_SECRET_LEAK"
+        if ready!=ready_expected:
+            # Only emit static diagnostic categories. Never emit raw log
+            # lines, URLs, environment, Supervisor tokens or endpoints.
+            categories = (
+                "Mandatory policy startup preflight rejected configuration",
+                "Strict MCP policy unavailable or invalid",
+                "Required MCP policy initialization failed",
+                "Mandatory policy marker",
+                "PermissionError",
+                "ModuleNotFoundError",
+                "Traceback",
+                "ValueError",
+                "RuntimeError",
+            )
+            print("phase2f_failure_categories=",
+                  {category:(category in output) for category in categories},
+                  "marker_exists=",
+                  (Path(data)/"strict_policy_required.v1.json").exists(),
+                  "running=",not stopped)
         assert ready==ready_expected,(label,"readiness mismatch",stopped)
         if not ready_expected:assert stopped,(label,"did not fail startup")
         print(label, "READY" if ready else "REFUSED", "synthetic-log-scan=PASS")
