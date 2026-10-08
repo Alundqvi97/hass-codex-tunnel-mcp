@@ -12,12 +12,11 @@ FILE="src/ha_mcp/policy/middleware.py"
 BLOB="5b431906fe7a37bbc19e466ca92a34b491289298"
 
 def patch(source:str)->str:
-    old='''            ):
-                return await call_next(context)
-            # Another waiter on this shared entry consumed the approval
+    old='''        if pending.decision == "approved":
+            if self._claim_approval(
 '''
-    new='''            ):
-                # Approval is not permission to use a stale or broken policy.
+    new='''        if pending.decision == "approved":
+            # Approval is not permission to use a stale or broken policy.
                 # The wait above yielded control: policy edits or corruption
                 # may have occurred while the request was in the queue.
                 try:
@@ -51,8 +50,7 @@ def patch(source:str)->str:
                             "current rules.",
                         )
                     )
-                return await call_next(context)
-            # Another waiter on this shared entry consumed the approval
+            if self._claim_approval(
 '''
     if source.count(old)!=1:raise RuntimeError("UPSTREAM_CONTEXT_NOT_EXACT")
     return source.replace(old,new,1)
