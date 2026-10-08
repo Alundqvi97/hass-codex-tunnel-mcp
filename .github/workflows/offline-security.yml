@@ -25,6 +25,6 @@ jobs:
       - name: Syntax validation
         run: python -m compileall -q custom_components tests
       - name: Full upstream and security test suite
-        run: python -m pytest -q tests
+        run: python -m pytest -q -rs tests
       - name: Check no non-loopback test sockets
-        run: python -c "from pathlib import Path; p=Path('tests/test_security_hardening.py').read_text(); assert '127.0.0.1' in p and 'ThreadingHTTPServer' in p"
+        run: python -c "from pathlib import Path; p=Path('tests/test_security_hardening.py').read_text(); assert '127.0.0.1' in p and 'ThreadingHTTPServer' in p; q=Path('tests/test_phase2_protocol_contract.py').read_text(); assert 'ThreadingHTTPServer((\"127.0.0.1\"' in q"
