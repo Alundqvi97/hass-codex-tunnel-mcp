@@ -26,6 +26,7 @@ def patch(source:str)->str:
                     "Security policy unavailable before approved dispatch; "
                     "refusing to execute"
                 )
+                self._queue.remove(pending.token)
                 raise_tool_error(
                     create_error_response(
                         ErrorCode.POLICY_LOAD_FAILED,
@@ -42,6 +43,7 @@ def patch(source:str)->str:
                     "Tool security rules changed while approval was pending; "
                     "refusing stale approved dispatch"
                 )
+                self._queue.remove(pending.token)
                 raise_tool_error(
                     create_error_response(
                         ErrorCode.USER_APPROVAL_REQUIRED,
