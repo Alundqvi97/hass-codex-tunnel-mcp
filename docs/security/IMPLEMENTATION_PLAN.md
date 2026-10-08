@@ -250,3 +250,32 @@ No phase promotion implies merge or deployment. Keep stacked PR #2 draft, with P
 - No additional screenshot is required for the **mode**, which is now established. Do not solicit secrets, PINs or raw policy config. Next best engineering gate is isolated Supervisor/HAOS configuration roundtrip/recovery **with explicit approval and independence from the tunnel**.
 
 **After this documentation update, recheck CI for final HEAD. No merge/deployment authorized.**
+
+
+## Phase 2G — Supervisor feasibility, real middleware enforcement, convenience, recovery (2026-10-08)
+
+**Phase 2G status: PARTIAL / explicitly blocked at genuine Supervisor staging, full nested backend and restore. Overall Phase 2 PARTIAL/BLOCKED; Phase 3 NO-GO; Phase 4 no authorization.** No production changes or PR merge.
+
+### Completed within authorized review scope
+
+1. Verified final baseline at `befb3c8c97ba3bcfa5d8286826602fa787b5bcfe`: [Phase 2F #37846837038](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37846837038), [Phase 2E #37846837067](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37846837067), and two Phase 2D push/PR tests all SUCCESS. PR #1 draft, unmerged, unchanged; PR #2 draft and stacked against #1 branch.
+2. Ran [read-only GitHub hosted VM feasibility #37847835408](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37847835408): ephemeral runner 4 vCPU, 15.6 GiB RAM and 87 GiB observed root free; `/dev/kvm` exists but inaccessible, QEMU/OVMF not preinstalled. Real HAOS VM would require separate authorization for a new VM, runner privilege/package modifications and pinned guest image download. **No guest, Supervisor, host change or external resource created.** See `phase2g/SUPERVISOR_FEASIBILITY.md`.
+3. Inspected pinned actual `PolicyMiddleware`, `ApprovalQueue`, `CategorizedSearchTransform`, policy handlers and developer-mode approval guard. Added genuine in-process FastMCP synthetic final dispatch and proxy tests. **Found a real source bug:** after waiting, an approved synthetic action could execute even though policy file had become corrupt. Reproduced with failing regression [#37848286990](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37848286990) (11 passed/1 failed by design). Review-only narrow patch `phase2g/middleware_revalidation.py` revalidates current policy immediately before the approved request reaches the terminal tool. [Passing acceptance #37848485823](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37848485823): 196 baseline upstream policy tests; 13 new synthetic FastMCP tests; 194 patched applicable upstream tests with two intentional incompatible historical cases deselected; exact original middleware Git blob rollback. **The two excluded historical tests must be rewritten before upstream merge.**
+4. Prepared separately scoped, synthetic, conservative everyday-read proposal in `phase2g/CONVENIENCE_POLICY.md` and evaluator tests `tests/staging/test_phase2g_convenience.py`. Auto-allow only status/selected non-sensitive read operations after review, not generic actuator tools. A general `ha_call_service` light-turn-on rule accepts additional uncontrolled `data` keys in the evaluator; no safe generic automatic operation permission claimed. Check the latest Phase 2G CI for actual convenience pass count.
+5. Read-only production backup metadata: 39 backup records; latest October 8 protected Core+DB entry labels 2026.9.4 even though Core currently 2026.10.0. Official Supervisor source confirms field is the Core version recorded in the backed-up Home Assistant section, *not backup format*. Add-on/tunnel inclusion cannot be inferred from list; local+Google Drive are locations, not verified separately restorable archives. No backup opened, downloaded or modified. Recovery drill design: `phase2g/RECOVERY_BACKUPS.md`.
+6. Created `phase2g/RELEASE_MANIFEST.md` for source/image/tunnel revisions, update hazards, rollout/rollback triggers and missing authorization. Production HA-MCP metadata `auto_update=true` remains unchanged: a future automatic add-on update could overwrite a custom hardened image or ignore mandatory policy marker; needs supported pinning/update procedure during an explicitly approved deployment window.
+
+### Security decision
+
+- Tested candidate default strict list remains exactly `ha_get_overview`; no automatic generic service, bulk, restarts, locks, security camera privacy or add-on/backup changes.
+- Genuine hard deny does not exist in the current policy evaluator. Use tool removal, scoped backend identity or separately reviewed server-side final-operation enforcement for irrevocable prohibitions.
+- Approval management developer tool requires developer-mode registration and a separate default-off policy-access flag for approve/deny; actual production registration status is not independently known.
+- Middleware revalidation happens immediately before tool dispatch but is not an atomic Home Assistant-side authorization across future asynchronous operations.
+
+### Blockers / next gate
+
+**Priority:** explicit approval, if wanted, for a temporary GitHub-runner-only KVM permission change, QEMU/UEFI package/image download and isolated HAOS VM creation. This is the first environment capable of proving Supervisor schema, boot, watchdog, local access and full add-on rollback. No need to use the home-infra server or production HAOS host.
+
+Other blockers: final real backend nested-dispatch/HA tool classification, actual middleware registration, hosted unauthorized attachment with separate cost approval, IPv4/IPv6 network isolation, full current-version backup/restore and independent local HA admin access.
+
+**No software deployment, OpenClaw invocation, production restart/restore, firewall, credential, Auth0 or Control Plane change occurred.**
