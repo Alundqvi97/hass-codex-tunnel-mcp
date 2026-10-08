@@ -118,14 +118,19 @@ def test_addon(ws):
         "enable_tool_search":False,
     }}
     ws.supervisor_api("/store/reload",method="post",timeout=100)
+    store=ws.supervisor_api("/store",timeout=90)
+    if not any(a.get("slug")==SLUG for a in store.get("addons",[])):
+        report("SUPERVISOR_LOCAL_ADDON_DISCOVERY","BLOCKED_NOT_IN_STORE")
+        return
+    report("SUPERVISOR_LOCAL_ADDON_DISCOVERY","PASS")
+    ws.supervisor_api(f"/store/addons/{SLUG}/install",method="post",timeout=850)
+    report("CANDIDATE_ADDON_INSTALL","PASS")
     info=ws.supervisor_api(f"/addons/{SLUG}/info",timeout=90)
     schema=info.get("schema",{})
     if "require_strict_tool_policy" not in str(schema):
         report("SUPERVISOR_RECOGNIZES_STRICT_OPTION","FAIL")
         return
     report("SUPERVISOR_RECOGNIZES_STRICT_OPTION","PASS")
-    ws.supervisor_api(f"/addons/{SLUG}/install",method="post",timeout=850)
-    report("CANDIDATE_ADDON_INSTALL","PASS")
     ws.supervisor_api(f"/addons/{SLUG}/options",method="post",data=data,timeout=90)
     observed=ws.supervisor_api(f"/addons/{SLUG}/info",timeout=60)
     option=observed.get("options",{})
