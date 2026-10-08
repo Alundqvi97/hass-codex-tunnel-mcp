@@ -101,3 +101,14 @@ class TestProbeSecurity(TestCase):
         result = mcp_url.redact_mcp_url(self.url + "/fake-secret?key=fake")
         self.assertNotIn("fake-secret", result)
         self.assertNotIn("key=fake", result)
+
+    def test_redaction_never_repeats_legacy_url_userinfo(self):
+        result = mcp_url.redact_mcp_url("http://fake-user:fake-password@127.0.0.1:9583/private")
+        self.assertNotIn("fake-user", result)
+        self.assertNotIn("fake-password", result)
+        self.assertIn("127.0.0.1:9583", result)
+
+    def test_redaction_handles_malformed_port_without_disclosure(self):
+        result = mcp_url.redact_mcp_url("http://fake-user:fake-password@localhost:bad/private")
+        self.assertEqual(result, "**REDACTED**")
+
