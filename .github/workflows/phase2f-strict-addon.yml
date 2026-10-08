@@ -33,6 +33,19 @@ jobs:
         run: |
           python docs/security/phase2d/patch_candidates.py policy --apply
           python docs/security/phase2d/patch_candidates.py logging --apply
+      - name: Install pinned upstream dependencies
+        run: |
+          python -m pip install --disable-pip-version-check 'uv==0.12.20'
+          cd ha_mcp_pinned
+          uv sync --locked --no-dev --python 3.13
+          uv pip install --python .venv/bin/python 'pytest==8.4.2' 'pytest-asyncio==1.4.0' 'pytest-timeout==2.4.0'
+      - name: Preserve and validate original Phase 2D behavior before stricter opt-in
+        env:
+          PYTHONPATH: ha_mcp_pinned/src
+          HOMEASSISTANT_URL: http://127.0.0.1:1
+          HOMEASSISTANT_TOKEN: synthetic-do-not-use
+        run: |
+          ha_mcp_pinned/.venv/bin/python -m pytest -q -rs -x tests/staging/test_phase2d_candidates.py
       - name: Apply supported-schema / marker candidate
         run: |
           python docs/security/phase2f/strict_addon_candidate.py --apply
@@ -41,12 +54,6 @@ jobs:
           test "$(git -C ha_mcp_pinned diff --name-only | wc -l)" -eq 3
           git -C ha_mcp_pinned diff > /tmp/phase2f-combined.patch
           git -C ha_mcp_pinned apply --check -R /tmp/phase2f-combined.patch
-      - name: Install pinned upstream dependencies
-        run: |
-          python -m pip install --disable-pip-version-check 'uv==0.12.20'
-          cd ha_mcp_pinned
-          uv sync --locked --no-dev --python 3.13
-          uv pip install --python .venv/bin/python 'pytest==8.4.2' 'pytest-asyncio==1.4.0' 'pytest-timeout==2.4.0'
       - name: Test real pinned policy evaluator / supported option
         env:
           PYTHONPATH: ha_mcp_pinned/src
@@ -57,7 +64,6 @@ jobs:
           ALL_PROXY: http://127.0.0.1:9
         run: |
           ha_mcp_pinned/.venv/bin/python -m pytest -q -rs -x tests/staging/test_phase2f_migration.py
-          ha_mcp_pinned/.venv/bin/python -m pytest -q -rs -x tests/staging/test_phase2d_candidates.py
           ha_mcp_pinned/.venv/bin/python -m pytest -q -rs -x ha_mcp_pinned/tests/src/unit/test_server_policy_wiring.py ha_mcp_pinned/tests/addon/test_server_config.py
       - name: Build actual pinned Dockerfile
         env: {DOCKER_BUILDKIT: '1'}
