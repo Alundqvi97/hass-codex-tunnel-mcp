@@ -37,7 +37,7 @@ jobs:
           python -m pip install --disable-pip-version-check 'uv==0.12.20'
           cd ha_mcp_pinned
           uv sync --locked --no-dev --python 3.13
-          uv pip install --python .venv/bin/python 'pytest==8.4.2'
+          uv pip install --python .venv/bin/python 'pytest==8.4.2' 'pytest-asyncio==1.4.0'
       - name: Verify unchanged upstream baseline behavior
         env:
           PYTHONPATH: ha_mcp_pinned/src
