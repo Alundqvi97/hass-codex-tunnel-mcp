@@ -34,7 +34,7 @@ jobs:
           assert 'hostfwd=tcp:127.0.0.1:18123-' in py
           assert "report_sanitized_serial_milestones" in py
           assert "serial.read_bytes()[:4_000_000].lower()" in py
-          assert "QEMU" not in sh.split("trap cleanup EXIT")[0] # no run before cleanup registered
+          assert sh.index("trap cleanup EXIT") < sh.index("sudo apt-get update")
           assert "workflow_dispatch" not in Path(".github/workflows/phase2h-haos-vm-once.yml").read_text()
           print("PHASE2H_OFFLINE_HARNESS_STATIC_CHECKS_PASS")
           PY
