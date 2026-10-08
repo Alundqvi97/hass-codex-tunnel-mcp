@@ -329,3 +329,22 @@ def test_secret_logging_filter_has_no_real_secrets_in_fixture():
         assert SECRET not in stream.getvalue()
     finally:
         logger.removeHandler(handler)
+
+
+def test_secret_late_created_logging_handler_is_redacted():
+    start = load_addon_start()
+    original = logging.getLogRecordFactory()
+    try:
+        start.install_secret_path_log_filter(SECRET)
+        late = logging.StreamHandler(io.StringIO())
+        logger = logging.getLogger("phase2e.late_handler")
+        logger.setLevel(logging.INFO)
+        logger.addHandler(late)
+        try:
+            logger.warning("Synthetic startup URL http://localhost:9583%s", SECRET)
+            assert SECRET not in late.stream.getvalue()
+            assert "[MCP_SECRET_REDACTED]" in late.stream.getvalue()
+        finally:
+            logger.removeHandler(late)
+    finally:
+        logging.setLogRecordFactory(original)
