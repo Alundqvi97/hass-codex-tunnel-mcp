@@ -80,7 +80,12 @@ async def test_real_fastmcp_blocks_all_unmatched_operations(name,args):
         assert result.is_error, (name, result)
         assert "USER_APPROVAL_REQUIRED" in result.content[0].text
         assert dispatched == []
-        assert len(q.list_pending()) == 1
+        if name == "ha_bulk_control" and "selector" in args:
+            # Dynamic selectors bind to a single waiting invocation.
+            # With wait_seconds=0, the token is deliberately removed.
+            assert q.list_pending() == []
+        else:
+            assert len(q.list_pending()) == 1
 
 
 @pytest.mark.asyncio
