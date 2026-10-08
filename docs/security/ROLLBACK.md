@@ -34,3 +34,10 @@ A HACS-only source rollback does not reconfigure the HA-MCP backend's standard-m
 ## Phase 2C evidence-driven rollback boundary
 
 Real pinned-source staging shows an additional tunnel bearer header is not validated in standard HA-MCP mode; rolling back a HACS tunnel source patch cannot fix backend recipient authentication. A later upstream HA-MCP fail-closed change may intentionally prevent startup when the policy guard fails: **ensure independent LAN/console recovery before installing**, and preserve the exact prior add-on image/version, data/config, and tested rollback method. Do not weaken security gates to restore convenience without an explicit exception. Stop and fail closed on policy init errors; don't attempt auto-repair using an admin tool that is protected by the failed gate. Treat the startup-log path as a credential in backups and diagnostic archives.
+
+
+## Phase 2D isolated candidate reversal
+
+Review-only: run candidate builder against upstream **fc54437a804858732e4bc927add98e202d879a09**, and capture `git diff` from the two modified files. `git apply --check -R` followed by `git apply -R`, `git diff --exit-code` and exact `git hash-object` comparison must restore `server.py` blob `bf848dcec8345eba603295933768fca6724c913b` and `start.py` blob `88e926a59f568dc9a9bf7bcd719b518b42f52baa`. Dedicated CI also reverses candidates separately.
+
+**No production rollback procedure has been exercised.** A policy startup abort may deliberately stop remote MCP while Home Assistant remains operable; rollback MUST use independent local HA/Supervisor/console access, not ChatGPT tunnel tools. Preserve prior HA-MCP add-on image, data and source; ensure the known stored secret path is not rotated or revealed in logs. Stage platform boot and error recovery before approval.
