@@ -33,15 +33,35 @@ def cmd(*args,check=True,timeout=30):
     return subprocess.run(args,encoding="utf8",capture_output=True,
                           timeout=timeout,check=check)
 
+def write_synthetic(data, filename, value):
+    # A real add-on migration may rewrite its policy file as root:root.
+    # Emulate an authorized local/Supervisor-side repair in a separate
+    # network-isolated root container. Do not relax actual file permissions.
+    target=Path(data)/filename
+    try:
+        target.write_text(value)
+    except PermissionError:
+        assert filename in ("options.json","tool_policy.json")
+        tool=("import pathlib,sys; "
+              "pathlib.Path('/data/"+filename+"').write_text(sys.stdin.read())")
+        result=subprocess.run(
+            ["docker","run","--rm","-i","--network","none",
+             "--cap-drop","ALL","--security-opt","no-new-privileges",
+             "-v",str(data)+":/data:rw","--entrypoint","python3",IMAGE,
+             "-c",tool],
+            input=value,text=True,capture_output=True,timeout=30)
+        assert result.returncode==0, "synthetic local repair failed"
+
+
 def config(data,strict=True,state="valid",engine=True):
     data=Path(data);data.mkdir(exist_ok=True);data.chmod(0o777)
     options=data/"options.json"
     if state=="missing-options":
         options.unlink(missing_ok=True)
     elif state=="corrupt-options":
-        options.write_text("{synthetic-corrupt")
+        write_synthetic(data,"options.json","{synthetic-corrupt")
     else:
-        options.write_text(json.dumps({
+        write_synthetic(data,"options.json",json.dumps({
            "require_strict_tool_policy":strict,
            "enable_tool_security_policies":engine,
            "secret_path":SECRET,
@@ -51,12 +71,12 @@ def config(data,strict=True,state="valid",engine=True):
         }))
     policy=data/"tool_policy.json"
     if state=="missing-policy": policy.unlink(missing_ok=True)
-    elif state=="corrupt-policy": policy.write_text("{synthetic-corrupt")
+    elif state=="corrupt-policy": write_synthetic(data,"tool_policy.json","{synthetic-corrupt")
     else:
         names = (["ha_config_remove_automation"] if state=="old-policy"
                  else ["ha_get_overview"])
         effect = "require_approval" if state=="old-policy" else "allow"
-        policy.write_text(json.dumps({"rule_effect":effect,
+        write_synthetic(data,"tool_policy.json",json.dumps({"rule_effect":effect,
              "rules":[{"tool_name":t,"when":[],"remember_minutes":0}
                         for t in names]}))
 
