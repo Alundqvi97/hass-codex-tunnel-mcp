@@ -41,18 +41,26 @@ _STRICT_AUTO_ALLOWED_NAMES = frozenset({"ha_get_overview"})
 
 
 def _validate_strict_policy_for_boot(data_dir: Path) -> None:
-    from ha_mcp.policy.persistence import load_policy
+    # Deliberately use only the standard library before the add-on exports
+    # HOMEASSISTANT_TOKEN / ENABLE_TOOL_SECURITY_POLICIES. Importing ha_mcp
+    # here can initialize global configuration too early. The genuine Policy
+    # model is validated again after the runtime settings have been exported,
+    # and the provider repeats validation for every tool call.
     policy_file = data_dir / "tool_policy.json"
     if not policy_file.is_file() or policy_file.is_symlink():
         raise ValueError("mandatory policy file unavailable")
-    policy = load_policy(data_dir)
-    if policy.rule_effect != "allow" or not policy.rules:
+    raw = json.loads(policy_file.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("mandatory policy must be an object")
+    rules = raw.get("rules")
+    if raw.get("rule_effect") != "allow" or not isinstance(rules, list) or not rules:
         raise ValueError("mandatory policy is not a nonempty allow-list")
-    # The installed policy engine has only allow/approval-required, no
-    # irreversible deny. During initial opt-in, reject all write/control
-    # auto-allows rather than attempting unsafe argument recognition.
-    for rule in policy.rules:
-        if rule.tool_name not in _STRICT_AUTO_ALLOWED_NAMES or rule.when:
+    for rule in rules:
+        if (
+            not isinstance(rule, dict)
+            or rule.get("tool_name") not in _STRICT_AUTO_ALLOWED_NAMES
+            or rule.get("when", []) != []
+        ):
             raise ValueError("mandatory policy contains unreviewed automatic access")
 
 
