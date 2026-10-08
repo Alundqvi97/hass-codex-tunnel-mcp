@@ -126,3 +126,10 @@ Evidence: exact implementation links and risks in `BACKEND_AUTH_VERIFICATION.md`
 - **Required approvals:** Any new hosted test identity/tunnel or spending, any production config/network/service change, or a new HA-MCP upstream fork/patch PR. Nothing needed to keep draft PR and current HA system unchanged.
 
 **Minimum safe next step:** Before production install, establish independent local HA/console recovery and a sanitized effective tool-policy read through a supported authenticated admin interface, then plan approved hosted attachment negative tests. The verified bearer non-enforcement and policy initialization fail-open remain high-priority hardening decisions.
+
+### Final Phase 2C CI receipt after action-SHA pinning
+
+- [GitHub Actions run #37838837823](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37838837823), commit `abc06640a6846b00abffdb27bc23177a28b43dc8`: both `pinned-ha-mcp-staging` and `offline-tests` completed **SUCCESS**. Pinned real HA-MCP **38 passed, 0 failed, 0 skipped in 2.72s**; tunnel suite **57 passed, 0 failed, 1 skipped, 2 subtests passed in 5.01s**.
+- SHA pins were independently resolved through GitHub metadata: `actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683` (v4.2.2) and `actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065` (v5.6.0); staging upstream source SHA and runtime dependency lock remain pinned.
+- The skipped original config-flow test requires `homeassistant.helpers.selector` not installed in lightweight integration runner. It does not invalidate tested standard-mode FastMCP authentication and policy behavior. Testing the installed Supervisor image remains a separate acceptance criterion.
+- This documentation-only commit will itself trigger CI; check its status independently rather than assuming it passed. **No permission to merge or deploy is implied.**
