@@ -179,3 +179,33 @@ async def test_corruption_after_pending_approval_never_reaches_final_action(tmp_
             worker.cancel()
             try:await worker
             except asyncio.CancelledError:pass
+
+
+@pytest.mark.asyncio
+async def test_modified_policy_during_pending_approval_requires_fresh_decision():
+    state=[APPROVAL]
+    queue=ApprovalQueue()
+    mw=PolicyMiddleware(policy_provider=lambda: state[0],queue=queue,wait_seconds=4)
+    context=MagicMock()
+    context.message.name="ha_restart"
+    context.message.arguments={}
+    context.fastmcp_context=None
+    dispatch=AsyncMock(return_value="synthetic-only")
+    worker=asyncio.create_task(mw.on_call_tool(context,dispatch))
+    try:
+        for _ in range(150):
+            if queue.list_pending():break
+            await asyncio.sleep(.01)
+        assert len(queue.list_pending())==1
+        state[0]=Policy(rule_effect="allow",rules=[
+            Rule(tool_name="ha_get_overview"),
+            Rule(tool_name="ha_list_services")])
+        assert queue.approve(queue.list_pending()[0].token)
+        with pytest.raises(ToolError):
+            await asyncio.wait_for(worker,3)
+        dispatch.assert_not_awaited()
+    finally:
+        if not worker.done():
+            worker.cancel()
+            try:await worker
+            except asyncio.CancelledError:pass
