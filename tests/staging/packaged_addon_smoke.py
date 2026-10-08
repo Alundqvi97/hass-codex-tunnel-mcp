@@ -29,9 +29,19 @@ req=urllib.request.Request(url,data=body,headers={
   "Authorization":"Bearer arbitrary-synthetic"
 },method="POST")
 try:
-  with urllib.request.urlopen(req,timeout=2) as response:
-    obj=json.loads(response.read())
-    assert response.status==200 and obj["id"]==5 and "result" in obj
+  with urllib.request.urlopen(req,timeout=3) as response:
+    assert response.status==200
+    content_type=response.headers.get("Content-Type","")
+    if "text/event-stream" in content_type:
+      obj=None
+      for _ in range(20):
+        line=response.readline()
+        if line.startswith(b"data: "):
+          obj=json.loads(line[6:])
+          break
+    else:
+      obj=json.loads(response.read())
+    assert obj and obj["id"]==5 and "result" in obj
 except Exception as exc:
   print(type(exc).__name__)
   sys.exit(1)
