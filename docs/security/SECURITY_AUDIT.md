@@ -50,3 +50,14 @@ See `IMPLEMENTATION_PLAN.md`, `THREAT_MODEL.md`, and `ROLLBACK.md`.
 The production-stated tunnel-client version is v0.0.15 but the actual binary's redirect, proxy, credential forwarding and revocation behavior has **not been independently tested**. The Python `mcp_url.py` patch cannot establish those properties. A successful 200/400/405/406 GET probe is evidence of reachability only, not credential validity. The new local JSON-RPC backend test is deliberately a **representative fixture, not real HA-MCP**.
 
 Sources: https://developers.openai.com/api/docs/guides/secure-mcp-tunnels ; https://github.com/homeassistant-ai/ha-mcp/blob/master/SECURITY.md ; https://github.com/homeassistant-ai/ha-mcp/blob/master/homeassistant-addon/DOCS.md ; `AUTHENTICATION_ARCHITECTURE.md`, `NETWORK_EXPOSURE.md`, `PHASE2_TEST_EVIDENCE.md`.
+
+
+## Phase 2B source-established findings — 2026-10-08
+
+**HIGH — HA-13: extra backend bearer is not recipient-validated in standard mode.** The pinned `ha-mcp@fc54437a804858732e4bc927add98e202d879a09` add-on `start.py` resolves the path secret and mounts streamable HTTP on it. It exports Supervisor token for **outbound** HA communication and does not configure an inbound bearer validator. Treat the configured extra backend bearer as non-enforcing. A client with the path and network reachability may invoke unrestricted policy-allowed tools. See `BACKEND_AUTH_VERIFICATION.md`.
+
+**HIGH — HA-14: policy enablement can silently fail open.** In pinned `server.py::_apply_tool_security_policies`, missing imports or `add_middleware` failure logs `TOOL SECURITY GATING IS NOT ACTIVE` but continues. Even when registered, default `require_approval` policy allows unmatched tools, and the actual effective rules were not readable (read-only `GET /api/policy/config` returned 403). See `TOOL_POLICY_MATRIX.md`.
+
+**MEDIUM — HA-15: secret URL and settings exposure.** Standard-mode URL secret is the primary access credential, and startup implementation logs it intentionally. Neither extra bearer nor an unauthenticated-looking connector UI implies per-user backend isolation. Avoid exporting/logging server startup output or secret MCP path.
+
+**Remaining tests:** real pinned server with mock HA, v0.0.15 tunnel-client, hosted attachment, policy coverage, IPv6 and rollback are all NOT VERIFIED in staging. No new confirmed exploit of OpenAI hosted tunnel is claimed.
