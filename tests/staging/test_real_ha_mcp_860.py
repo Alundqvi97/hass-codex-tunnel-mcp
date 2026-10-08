@@ -205,11 +205,9 @@ def make_server_stub(monkeypatch, tmp_path):
 def test_actual_server_attaches_policy_middleware(monkeypatch, tmp_path):
     stub = make_server_stub(monkeypatch, tmp_path)
     HomeAssistantSmartMCPServer._apply_tool_security_policies(stub)
-    assert any(
-        isinstance(args[0], PolicyMiddleware)
-        for args, _ in (call for call in [x for x in [c for c in
-          [(c.args, c.kwargs) for c in stub.mcp.add_middleware.call_args_list]]])
-    )
+    assert stub.mcp.add_middleware.call_count == 1
+    middleware = stub.mcp.add_middleware.call_args.args[0]
+    assert isinstance(middleware, PolicyMiddleware)
 
 
 def test_actual_server_registration_exception_leaves_gate_absent(
