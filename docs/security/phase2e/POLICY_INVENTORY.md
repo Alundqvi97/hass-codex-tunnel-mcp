@@ -64,3 +64,14 @@ Therefore **never flip the existing production rule_effect to allow without rebu
 - No user should provide secret URL, keys, policy file raw content or system PIN for further review.
 
 **Disposition:** Configured list documented. Actual effective authorization for administrative operations remains **PARTIAL/BLOCKED**. No rules were changed.
+
+
+## Phase 2F mode confirmation and safe-migration result
+
+The subsequently supplied official administrator screenshot shows **Require approval** selected. This resolves the earlier **policy-mode visibility** gap, but does not establish whether the configured middleware loaded successfully.
+
+All 18 captured unconditional rules therefore require approval for their exact names under the documented current mode; any unmatched names may run without approval under pinned evaluator semantics. Broad `ha_call_service`, `ha_bulk_control`, `ha_restart`, backup, add-on and integration routes absent from the pictured rules need immediate future coverage review. Do not infer no other saved rules exist beyond the screenshots.
+
+The actual pinned 8.6.0 evaluator regression tested the complete 18-rule names. A naive `require_approval`→`allow` mode toggle automatically allows **all 18 destructive/configuration names**, and is explicitly prohibited. New replacement policy has only `ha_get_overview` as an automatic allow; all 18 old names and unknown tools now require approval. See `../phase2f/POLICY_MIGRATION.md` and `../phase2f/STRICT_MODE_TEST_RESULTS.md`.
+
+No production setting, policy file or middleware was modified.
