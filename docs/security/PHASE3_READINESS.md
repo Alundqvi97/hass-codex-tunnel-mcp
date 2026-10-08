@@ -96,3 +96,10 @@ Security-code regression [#37851968013](https://github.com/Alundqvi97/hass-codex
 Real HAOS VM first preflight #37851700140 FAILED before any guest/image was used due old OVMF firmware name, cleanup PASS. Actual authorized one-guest run #37851915146 **IN PROGRESS** as of this note; its Supervisor start/configuration, watchdog, policy corruption/deny, host reboot, complete rollback and recovery are NOT VERIFIED unless independently documented in the final run log.
 
 Even if a guest boots, Phase 3 stays **NO-GO** until the full 16 acceptance cases, hosted attachment boundary, independent production restore, auth and direct LAN/IPv6 exposure gates pass; no production changes, merge, Auth0 or router settings authorized.
+
+
+### Phase 2H FINAL gate disposition: REAL HAOS ACCEPTANCE BLOCKED
+
+One authorized GitHub-hosted HAOS VM [#37851915146](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37851915146) downloaded and verified official image SHA256, staged review-only local add-on files into guest disk, configured loopback host forwards and one rootless QEMU guest. **PASS:** image hash, QEMU KVM ACL, staged source, guest teardown and private files removal. **BLOCKED:** observer not seen, Home Assistant HTTP timed out after 780s; no real Supervisor login/install/options/policy/recovery. **NOT VERIFIED:** kernel boot completion, actual add-on image, log secret-path behavior, host reboot, watchdog and real restore. Do not claim Docker equivalence.
+
+Full actual-middleware source [#37851968013](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37851968013): 196 original tests and **211 revised/patched passing without exclusions**, original file rollback PASS. The actual guest does not validate these runtime invariants. Static harness improvement [#37853632264](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37853632264) PASS only for Bash/Python syntax and hostforward firewall-rule ordering. Last guest experiment authorization exhausted; no further VM without a new approval. All high-impact deployment gates remain outstanding: **PRODUCTION NO-GO**.

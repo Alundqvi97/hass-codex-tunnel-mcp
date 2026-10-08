@@ -60,3 +60,10 @@ No new paid service is needed for source and Docker CI. Public standard GitHub-h
 - No Docker-only assertion substitutes for real Supervisor. No serial logs, disk images, sensitive settings, synthetic secrets or user production data to be uploaded.
 - Required production release gates remain current full add-on-inclusive restore, independent admin, actual host reboot, unapproved hosted attachment tests, direct TCP 9583/IPv6 isolation, signed image provenance/update pin, final-action authorization, real deployment compatibility.
 - Scope of private responsible disclosure: use upstream SECURITY.md private advisory process with verified minimal synthetic reproduction and no real secret. **Do not submit until explicitly approved.**
+
+
+### Phase 2H actual completion and pinning receipt
+
+Official image HAOS 18.3 `haos_ova-18.3.qcow2.xz`, compressed 510014132 bytes, SHA256 `fae6a728768cc10aff60d4820bfcd40d64cd77fab82c8bd92af13b3d9d414090` verified at actual download in [#37851915146](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37851915146). Source pinned `fc54437a804858732e4bc927add98e202d879a09`. Ubuntu runner used official apt QEMU/OVMF, KVM ACL temporary. QEMU launched one guest but neither observer nor HA Core HTTP became reachable in bounded 780s, so actual guest OS/Supervisor/Core version, schema option, add-on image digest and restore ability **not verified**. Strict source policy remained outside production. Cleanup guest/directory PASS, no artifacts; exact policy source tests 196+211 PASS no excluded cases, static-only hostforward remediation syntax PASS. **DO NOT INSTALL; Phase 3 NO-GO.**
+
+Potential test-harness loopback firewall conflict is an untested hypothesis, not a reason to weaken RFC1918/home-network blocks. Prepared established-connection-only localhost return exception and Boolean-only serial indicators for any future separately authorized guest. A full guest run would still need to prove Supervisor, true secret-path redaction, watchdog, complete restore, host reboot, and independently approved production-compatible image strategy.
