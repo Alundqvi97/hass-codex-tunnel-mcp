@@ -13,6 +13,7 @@ COMMIT = "fc54437a804858732e4bc927add98e202d879a09"
 BLOBS = {
  "homeassistant-addon/config.yaml": "0079f23fd040651892a2dc2b2652b64af0e0a3d4",
  "homeassistant-addon/start.py": "88e926a59f568dc9a9bf7bcd719b518b42f52baa",
+ "src/ha_mcp/server.py": "bf848dcec8345eba603295933768fca6724c913b",
 }
 MARKER = "strict_policy_required.v1.json"
 SAFE_READ_TOOLS = ("ha_get_overview",)
@@ -140,6 +141,20 @@ def configure_supported_strict_policy(
     s=once(s,old,new)
     return s
 
+def server_patch(s: str) -> str:
+    return once(
+        s,
+        '''                    or any(rule.tool_name == "*" and not rule.when
+                           for rule in policy.rules)
+''',
+        '''                    or any(
+                        rule.tool_name not in {"ha_get_overview"} or rule.when
+                        for rule in policy.rules
+                    )
+''',
+    )
+
+
 def main() -> None:
     parser=argparse.ArgumentParser()
     parser.add_argument("--root",type=Path,default=Path("ha_mcp_pinned"))
@@ -157,7 +172,8 @@ def main() -> None:
     if 'install_secret_path_log_filter(secret_path)' not in source or 'HA_MCP_REQUIRE_STRICT_POLICY' in source:
         raise RuntimeError("PHASE2D_PREREQUISITE_MISSING_OR_DUPLICATE")
     paths=[("homeassistant-addon/config.yaml",config_patch),
-           ("homeassistant-addon/start.py",addon_patch)]
+           ("homeassistant-addon/start.py",addon_patch),
+           ("src/ha_mcp/server.py",server_patch)]
     outputs=[]
     for path,fn in paths:
         old=(root/path).read_text()
