@@ -92,3 +92,20 @@ Authorized: fork development branch, CI, documentation, draft PR, offline tests.
 4. **Phase 3 hardening:** plan pinning, backoff/recovery, tested multi-layer redaction and independent local console before any production rollout.
 
 **Security recommendation:** Continue Phase 2 offline planning and retain the PR as draft; do not merge or deploy. Phase 3 production readiness is **NO-GO**. Treat OpenAI association as documented behavior and the HA-MCP secret URL as a credential; neither substitutes for negative authorization evidence. Keep the Home Infra Control Plane separate.
+
+
+## Phase 2B pinned-source verification — 2026-10-08
+
+**Current phase:** Phase 2 PARTIALLY COMPLETE/BLOCKED. **Phase 3 deployment: NO-GO.** No live test or host/network mutation authorized.
+
+- Source of exact HA-MCP v8.6.0 release tag: annotated `v8.6.0` → commit `fc54437a804858732e4bc927add98e202d879a09`. Running image digest has **not** been compared to the tag.
+- **VERIFIED SOURCE:** standard-mode add-on URL secret path is its inbound access credential. `start.py` exports the Supervisor token for outbound Home Assistant API calls; it does not install incoming backend bearer validation. Extra tunnel header is not a verified independent security boundary.
+- **VERIFIED SOURCE:** `Policy.rule_effect` defaults to `require_approval`, whose unmatched calls run without approval. A corrupt policy fails closed only when the middleware is registered. If policy middleware import or registration fails, `server.py` logs its absence and continues **without gating**.
+- **VERIFIED LIVE:** read-only attempt to inspect effective policy over add-on's `GET /api/policy/config` returned HTTP 403. No policy rules were extracted. Do not claim the live rules are effective based solely on `enable_tool_security_policies=true`.
+- Network: v8.6.0 `start.py` binds `MCP_HOST` or default `0.0.0.0`; actual production listener and IPv6/whether loopback-only is possible without breaking Supervisor ingress are not established.
+- Four Phase 2B artifacts: `BACKEND_AUTH_VERIFICATION.md`, `TOOL_POLICY_MATRIX.md`, `HOSTED_AUTH_TEST_PLAN.md`, `RECOVERY_DESIGN.md`. Separate recovery source work from narrow auth hardening.
+- **Blocked:** actual isolated 8.6.0 server MCP POST test, hosted unauthorized negative test requiring explicit approval and possible billing, effective tool policy read, out-of-band recovery verification, and staged crash/update simulations.
+- **Cost:** no resources created or charged. Tunnel/test-account costs have **not been verified**; any future hosted testing requires user-approved budget and exact permissions.
+- **Decision:** Do not merge/deploy PR #1. Prioritize out-of-band policy read, isolated true HA-MCP transport behavior, and then approved disposable hosted validation. A synthetic fixture cannot substitute for the real implementation.
+
+Evidence: exact implementation links and risks in `BACKEND_AUTH_VERIFICATION.md`, `TOOL_POLICY_MATRIX.md`, and `PHASE2_TEST_EVIDENCE.md`. No Phase 2B end-to-end tests are claimed passed.
