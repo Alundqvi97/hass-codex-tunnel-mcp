@@ -105,7 +105,12 @@ def patch(source:str)->str:
         '''        existing = self._queue.find(name, args_hash)
         if existing is None:
             return False
-        if getattr(existing, "_phase2h_gate_key", None) != gate_key:
+        recorded_key = getattr(existing, "_phase2h_gate_key", None)
+        # The original legacy block-list API permits explicit in-memory
+        # test pre-approvals. Strict allow-list NEVER trusts an unbound token.
+        if recorded_key != gate_key and (
+            gate_key[0] == "allow" or recorded_key is not None
+        ):
             self._queue.remove(existing.token)
             return False
         if existing.decision == "approved":''')
