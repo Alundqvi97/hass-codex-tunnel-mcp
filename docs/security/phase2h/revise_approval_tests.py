@@ -34,12 +34,12 @@ def patch(src):
     section=replace_once(section,before,after)
     # Synchronize on the actual pending entry, not a sleep that may race.
     section=replace_once(section,
-        '        await anyio.sleep(0.05)\\n        pol[0] = Policy(rule_effect="allow", rules=[Rule(tool_name="ha_get_state")])',
-        '        for _ in range(100):\\n'
-        '            if queue.list_pending():\\n'
-        '                break\\n'
-        '            await anyio.sleep(0.01)\\n'
-        '        assert queue.list_pending(), "pending not created"\\n'
+        '        await anyio.sleep(0.05)\n        pol[0] = Policy(rule_effect="allow", rules=[Rule(tool_name="ha_get_state")])',
+        '        for _ in range(100):\n'
+        '            if queue.list_pending():\n'
+        '                break\n'
+        '            await anyio.sleep(0.01)\n'
+        '        assert queue.list_pending(), "pending not created"\n'
         '        pol[0] = Policy(rule_effect="allow", rules=[Rule(tool_name="ha_get_state")])')
     src=src[:a]+section+src[b:]
     c=src.index("async def test_a_waiter_under_an_allow_list_does_not_ride_the_winners_window")
