@@ -25,6 +25,50 @@ jobs:
       - name: Syntax validation
         run: python -m compileall -q custom_components tests
       - name: Full upstream and security test suite
-        run: python -m pytest -q -rs tests
+        run: python -m pytest -q -rs tests --ignore=tests/staging
       - name: Check no non-loopback test sockets
         run: python -c "from pathlib import Path; p=Path('tests/test_security_hardening.py').read_text(); assert '127.0.0.1' in p and 'ThreadingHTTPServer' in p; q=Path('tests/test_phase2_protocol_contract.py').read_text(); assert 'ThreadingHTTPServer((\"127.0.0.1\"' in q"
+
+  pinned-ha-mcp-staging:
+    # No production credentials/secrets or service containers.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout investigation branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout exact HA-MCP v8.6.0 source
+        uses: actions/checkout@v4
+        with:
+          repository: homeassistant-ai/ha-mcp
+          ref: fc54437a804858732e4bc927add98e202d879a09
+          path: ha_mcp_pinned
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify immutable source provenance
+        run: |
+          test "$(git -C ha_mcp_pinned rev-parse HEAD)" = "fc54437a804858732e4bc927add98e202d879a09"
+          python -c "from pathlib import Path; assert 'version = \"8.6.0\"' in Path('ha_mcp_pinned/pyproject.toml').read_text()"
+      - name: Install pinned HA-MCP runtime dependencies
+        run: |
+          python -m pip install --disable-pip-version-check 'uv==0.12.20'
+          cd ha_mcp_pinned
+          uv sync --locked --no-dev --python 3.13
+          uv pip install --python .venv/bin/python 'pytest==8.4.2'
+      - name: Actual pinned implementation security staging
+        env:
+          PYTHONPATH: ha_mcp_pinned/src
+          # Network fetches for public build dependencies finish before this step.
+          # In-process ASGI transport is used; guard rejects external IP sockets.
+          HTTP_PROXY: http://127.0.0.1:9
+          HTTPS_PROXY: http://127.0.0.1:9
+          ALL_PROXY: http://127.0.0.1:9
+          HOMEASSISTANT_URL: http://127.0.0.1:1
+          HOMEASSISTANT_TOKEN: synthetic-unused-token
+        run: |
+          ha_mcp_pinned/.venv/bin/python -m pytest -q -rs -x tests/staging/test_real_ha_mcp_860.py
