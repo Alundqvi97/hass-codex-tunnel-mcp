@@ -258,6 +258,17 @@ def logging_patch(s: str) -> str:
     )
     s = replace_exact(
         s,
+        '        mcp.run(\n            transport="http",',
+        '        mcp.run(\n            show_banner=False,\n            transport="http",',
+    )
+    s = replace_exact(
+        s,
+        '{"log_config": _get_timestamped_uvicorn_log_config(), "ws": "none"},',
+        '{"log_config": _get_timestamped_uvicorn_log_config(), "ws": "none", '
+        '"access_log": False},',
+    )
+    s = replace_exact(
+        s,
         '''    install_sdk_log_filters()
 
     # fastmcp's DNS-rebinding guard''',
