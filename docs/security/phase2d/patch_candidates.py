@@ -29,6 +29,18 @@ def policy_patch(s: str) -> str:
     s = replace_exact(s, "import logging\nfrom pathlib import Path", "import logging\nimport os\nfrom pathlib import Path")
     s = replace_exact(
         s,
+        "        self._apply_tool_security_policies()\n",
+        """        try:
+            self._apply_tool_security_policies()
+        except Exception:
+            # Guard the entire server construction path, including errors
+            # raised before the optional middleware constructor is reached.
+            logger.error("Required policy initialization failed; MCP is not serving")
+            raise RuntimeError("Required MCP policy initialization failed") from None
+""",
+    )
+    s = replace_exact(
+        s,
         "        if not self.settings.enable_tool_security_policies:\n            return\n\n        try:\n",
         """        strict = os.environ.get("HA_MCP_REQUIRE_STRICT_POLICY", "").lower() in {
             "1", "true", "yes"
