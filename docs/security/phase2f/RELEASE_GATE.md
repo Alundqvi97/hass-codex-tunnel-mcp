@@ -37,3 +37,14 @@ If one thing is needed from the operator now: evidence that Tool Security Polici
 - [Draft PR #2](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/pull/2): review-only HA-MCP pinned source patch generators, tests and tracking; base is PR #1's branch, not main. New HA-MCP source modifications belong upstream in `homeassistant-ai/ha-mcp` **only after separate authorization**. No new forks, upstream PR or public vulnerability disclosure.
 
 **Never deploy from this repository's patch builder directly.** It is an offline candidate that first needs code review, upstream integration, full Supervisor support and an approved production manifest.
+
+
+## Phase 2G release-gate addendum (2026-10-08)
+
+**NO-GO.** Read-only VM feasibility [#37847835408](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37847835408): KVM present but inaccessible; QEMU/UEFI absent; no VM installed. Genuine HAOS/Supervisor acceptance needs separate permission for ephemeral runner modifications/VM creation; normal Docker image tests do not qualify.
+
+**New in-process finding and fix candidate:** Real `PolicyMiddleware` let a waiting and later-approved fake admin action reach dispatch after the policy file became corrupt. Original reproduction failed intentionally [#37848286990](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37848286990). Separate review-only middleware revalidation patch passed [#37848485823](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37848485823): 196 original pinned tests, 13 new scenarios, 194 applicable upstream tests with 2 intentionally changed-semantics tests excluded, exact patch rollback. Upstream requires new matching assertions for changed approval-on-policy-update semantics. No production changes.
+
+The separate convenience proposal keeps generic service/bulk writes gated. Explicit whitelist policy rules for `ha_call_service` cannot constrain all nested `data` keys via ordinary predicates; require typed operation-aware execution control for real automatic lights/media/blinds. See `phase2g/CONVENIENCE_POLICY.md`.
+
+Backups: `homeassistant_version` comes from backed-up Core metadata. Core+DB recovery point exists in inventory but add-on `/data`, HACS tunnel integration and local restoreability unverified. Update pin and manifest details in `phase2g/RECOVERY_BACKUPS.md` and `RELEASE_MANIFEST.md`. Phase 3 remains **NO-GO**.
