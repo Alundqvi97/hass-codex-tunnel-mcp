@@ -204,3 +204,19 @@ The CI result above predates this documentation-only receipt and must not be rep
 ### CI integrity
 
 Phase 2D historical final: [run 37840980382](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37840980382) successful. Additional Phase 2E workflow: `.github/workflows/phase2e-packaged.yml`. Earlier packaged negative log test FAILED by detecting synthetic credential; *never claim this gate passed unless a later exact-head run reports success.* Read final run jobs/logs after final commit before assigning any acceptance.
+
+
+### Phase 2E final offline/package receipt (2026-10-08)
+
+**Phase 2E authorized engineering scope: COMPLETE. Overall Phase 2 PARTIAL/BLOCKED; Phase 3 deployment NO-GO.**
+
+- User-provided official HA-MCP UI screenshots: 18 visible named unconditional approval rules, approval retention 0 min; broad service/bulk/admin methods absent from photographed rule list. Effect mode / actual middleware runtime still not independently shown. See `phase2e/POLICY_INVENTORY.md`.
+- Verified pinned Docker build and real installed `/start.py` at 8.6.0 with `--network none`, dummy Supervisor credential, synthetic options/policy and no published ports: [packaged CI #37843820868](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37843820868) SUCCESS. Seven scenario outcomes: 2 healthy (normal valid and same-volume restored), 5 fail-closed (missing, empty, corrupt, disabled-engine and invalid-on-same-volume). All seven passed synthetic-path negative log scans.
+- Real source and independent candidate checks: [CI #37843820900](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37843820900) SUCCESS; 38 baseline passed, 18 policy passed, 8 logging passed, 26 combined passed, 20 selected upstream passed; code patches reversed separately and together to exact original Git blobs. These counts are test groups, not 110 unique independent tests.
+- Initial packaged logging FAIL found synthetic path leak beyond the first logger filter. Reviewed pinned FastMCP transport logging and revised candidate with banner/access-log suppression plus late-handler-safe record-factory scrubbing. The final packaged log tests passed within collected synthetic-run scope; no Supervisor-wide claim.
+- Backups (read-only): 39 recorded, newest labeled HA 2026.9.4 versus running 2026.10.0; no compatible current-version restore established. Add-on auto-start/watchdog and admin UI are observed, but independent local console restore unverified.
+- **Strict enablement remains NOT DEPLOYABLE**: stable Supervisor add-on schema lacks the mandatory policy option, no durable marker prevents a corrupt options fallback, and toggling existing approval rules to allow would invert destructive rules. `phase2e/STRICT_OPTION_DESIGN.md` documents a future supported implementation and migration. No production changes.
+- Network host binding, direct TCP/9583 isolation, IPv6, actual hosted-identity denial, HAOS packaged boot/recovery, third-party log sinks and policy middleware production initialization remain additional gates.
+- Exact source and packaged results, limits and earlier failed tests are in `phase2e/PACKAGED_STAGING.md`. No hosted resources or real credentials accessed.
+
+No phase promotion implies merge or deployment. Keep stacked PR #2 draft, with PR #1 unchanged. After this documentation commit, verify GitHub CI again before claiming latest HEAD passed.
