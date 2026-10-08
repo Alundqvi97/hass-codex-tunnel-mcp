@@ -34,7 +34,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check 'websockets==15.0.1'
-      - name: ONE bounded guest and sanitized no-artifact results
+      - name: ONE bounded guest using Ubuntu Noble 4MiB OVMF and sanitized no-artifact results
         shell: bash
         timeout-minutes: 41
         run: bash docs/security/phase2h/runner_once.sh
