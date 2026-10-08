@@ -33,3 +33,12 @@ The current policy engine's outcomes are **allow automatically** for matching al
 5. Confirm manual/local HA access before enabling mandatory fail-fast behavior. Never rely solely on the same tunnel for recovery.
 
 **Policy status in production: UNVERIFIED.** Live metadata establishes `enable_tool_security_policies=true` and `read_only_mode=false`, not the persisted rules or whether middleware successfully registered.
+
+
+## Phase 2E actual policy screenshot and mode inversion finding
+
+Two private Home Assistant administrator UI captures establish 18 visible unconditional, single-shot approval rules for named configuration/deletion tools (no argument predicates shown). Full sanitized tool list and risk coverage: `../phase2e/POLICY_INVENTORY.md`. Generic service/bulk/admin routes are not listed. Rule-effect mode and middleware initialization status are **not** shown.
+
+**Do not convert these 18 rules in place to `rule_effect=allow`.** Source-level evaluator testing confirms the inversion: `ha_config_remove_automation` requires approval in `require_approval` mode, but with the same rule would be automatically allowed under `allow` mode. Strict allow lists must be reconstructed from positive reviewed permissions, not migrated by a toggle.
+
+Additional Phase 2E candidate guards reject malformed strict flag values, failed ANY-match policy migration when strict, and an unconditional `*` blanket-allow rule. These guard against obvious weak strict-mode configurations but do **not** prevent all dangerous explicit allow rules; migration review remains mandatory.
