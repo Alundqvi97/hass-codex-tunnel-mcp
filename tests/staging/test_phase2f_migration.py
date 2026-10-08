@@ -187,15 +187,16 @@ def test_dangerous_auto_rule_not_allowed_at_opt_in(stage,tool):
 def test_allow_policy_cannot_be_widened_after_enable(stage):
     m=start_module();p=options(stage);safe(stage)
     assert m.configure_supported_strict_policy(stage,p)
-    save_policy(stage,Policy(rule_effect="allow",rules=[Rule(tool_name="ha_call_service")]))
-    # Preflight rejects on restart.
-    with pytest.raises(ValueError,match="unreviewed"):
-        m.configure_supported_strict_policy(stage,p)
-    # Real server-side policy provider validates every request.
+    # Register middleware with a known-good policy first.
     stub=MagicMock()
     stub.settings.enable_tool_security_policies=True
     HomeAssistantSmartMCPServer._apply_tool_security_policies(stub)
     middleware=stub.mcp.add_middleware.call_args.args[0]
+    save_policy(stage,Policy(rule_effect="allow",rules=[Rule(tool_name="ha_call_service")]))
+    # Preflight rejects on restart.
+    with pytest.raises(ValueError,match="unreviewed"):
+        m.configure_supported_strict_policy(stage,p)
+    # The already-installed middleware also rejects a widened policy.
     with pytest.raises(ValueError):
         middleware._policy_provider()
 
