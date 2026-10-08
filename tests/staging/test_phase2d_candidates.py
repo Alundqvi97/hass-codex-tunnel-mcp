@@ -95,15 +95,16 @@ def test_unexpected_listener_initialization_exception_fails_startup(env, monkeyp
         attach(server_stub())
 
 
-def test_failure_bubbles_through_actual_server_initialization(env):
+def test_failure_bubbles_through_actual_server_initialization(env, caplog):
     stub = server_stub()
     def fail_only_policy(middleware):
         if isinstance(middleware, PolicyMiddleware):
-            raise RuntimeError("synthetic_initialization_failure")
+            raise RuntimeError("synthetic_initialization_failure_" + SECRET)
     stub.mcp.add_middleware.side_effect = fail_only_policy
     stub._apply_tool_security_policies = lambda: attach(stub)
-    with pytest.raises(RuntimeError, match="Required MCP policy middleware registration failed"):
+    with pytest.raises(RuntimeError, match="Required MCP policy initialization failed") as error:
         HomeAssistantSmartMCPServer._initialize_server(stub)
+    assert SECRET not in str(error.value) + caplog.text
     stub.mcp.http_app.assert_not_called()
     stub.mcp.run.assert_not_called()
     # A partially registered object has not escaped into a serving transport.
