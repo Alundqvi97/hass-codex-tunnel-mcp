@@ -24,3 +24,8 @@ The integration's child-process watcher sets an exit status when the binary term
 A future network restriction should be scheduled on the HA host rather than relying solely on inter-VLAN rules, because same-Home subnet peers do not necessarily traverse UniFi's routed firewall. Before changing anything: verify loopback backend routing from the HA Core/tunnel network namespace; establish a separate local console/HA UI path; inventory IPv6, local bind and NAT/UPnP; capture the exact listener configuration; and prepare a one-change reversible policy with a timed automatic revert. Abandon a change if independent recovery cannot be demonstrated.
 
 The development patch also tightens `redact_mcp_url` for legacy authority userinfo; this must be included in the exact future manifest. No production change is authorized merely by adding these instructions.
+
+
+## Phase 2B additional gates
+
+A HACS-only source rollback does not reconfigure the HA-MCP backend's standard-mode authentication. A stronger ingress credential layer must be independently deployed and tested before any operator assumes an extra bearer provides security. Policy startup must **fail closed** when a configured policy gate cannot load, or a verified out-of-band control must prevent sensitive tools. Any fix requires a separate staged rollback that tests both policy enforcement and administrative recovery; never test it by restarting the existing HA-MCP add-on during Phase 2B.
