@@ -107,8 +107,10 @@ def supervisor_verify(h,base):
 
 def test_addon(ws):
     # No actual HA devices or external model connections are possible here.
+    synthetic_capability="/_phase2h_synthetic_"+secrets.token_hex(20)
     data={"options":{
         "backup_hint":"normal",
+        "secret_path":synthetic_capability,
         "enable_tool_security_policies":True,
         "require_strict_tool_policy":True,
         "enable_security_policy_tool":False,
@@ -164,8 +166,7 @@ def test_addon(ws):
     try:
         logs=ws.supervisor_api(f"/addons/{SLUG}/logs",timeout=30)
         generated=str(logs)
-        policy_sentinel="phase2h-synthetic"
-        report("SYNTHETIC_LOG_REDACTION","PASS" if policy_sentinel not in generated else "FAIL")
+        report("SYNTHETIC_LOG_REDACTION","PASS" if synthetic_capability not in generated else "FAIL")
     except Exception:
         report("SYNTHETIC_LOG_REDACTION","NOT_VERIFIED")
     report("ADDON_RESTART_PERSISTENCE","PARTIAL")
