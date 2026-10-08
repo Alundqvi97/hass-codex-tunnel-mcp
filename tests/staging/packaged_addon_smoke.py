@@ -6,6 +6,7 @@ Uses fake options/policy files and real pinned /start.py installed by Dockerfile
 """
 from __future__ import annotations
 
+from contextlib import nullcontext
 import json
 import os
 import subprocess
@@ -104,8 +105,11 @@ def test_logs(container: str):
     return len(combined)
 
 
-def smoke_case(label, state, expected_ready, option_enabled=True):
-    with tempfile.TemporaryDirectory(prefix="phase2e-") as t:
+def smoke_case(label, state, expected_ready, option_enabled=True, volume=None):
+    # An optional stable synthetic /data volume proves recovery across
+    # separately failed and successful starts without reinitializing storage.
+    manager = tempfile.TemporaryDirectory(prefix="phase2e-") if volume is None else nullcontext(str(volume))
+    with manager as t:
         data = Path(t)
         prepare_data(data, option_enabled=option_enabled, policy_state=state)
         cid = launch(data, label)
@@ -169,7 +173,9 @@ def main():
     smoke_case("empty-policy", "empty", False)
     smoke_case("corrupt-policy", "invalid", False)
     smoke_case("disabled-engine", "valid", False, option_enabled=False)
-    smoke_case("restored-valid-policy", "valid", True)
+    with tempfile.TemporaryDirectory(prefix="phase2e-recovery-") as recover:
+        smoke_case("failed-config-same-volume", "invalid", False, volume=recover)
+        smoke_case("restored-valid-policy", "valid", True, volume=recover)
     print("PACKAGED SYNTHETIC ENTRYPOINT ACCEPTANCE PASSED")
 
 
