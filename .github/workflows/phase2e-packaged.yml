@@ -1,0 +1,49 @@
+name: Phase 2E - Disposable Packaged Addon Test
+on:
+  push:
+    branches: [security/ha-mcp-phase2d-candidates]
+permissions:
+  contents: read
+concurrency:
+  group: phase2e-packaged-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  package-and-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: homeassistant-ai/ha-mcp
+          ref: fc54437a804858732e4bc927add98e202d879a09
+          path: ha_mcp_pinned
+          persist-credentials: false
+          submodules: recursive
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.13'
+      - name: Verify source and test syntax
+        run: |
+          test "$(git -C ha_mcp_pinned rev-parse HEAD)" = fc54437a804858732e4bc927add98e202d879a09
+          python -m py_compile tests/staging/packaged_addon_smoke.py
+          python docs/security/phase2d/patch_candidates.py policy --apply
+          python docs/security/phase2d/patch_candidates.py logging --apply
+          python -m compileall -q ha_mcp_pinned/src ha_mcp_pinned/homeassistant-addon/start.py
+          git -C ha_mcp_pinned diff --check
+      - name: Build pinned real Dockerfile and installed add-on
+        env:
+          DOCKER_BUILDKIT: '1'
+        run: |
+          docker build --progress=plain --build-arg BUILD_VERSION=8.6.0 --build-arg BUILD_ARCH=amd64 -t ha-mcp-phase2e:local -f ha_mcp_pinned/homeassistant-addon/Dockerfile ha_mcp_pinned
+      - name: Verify real packaged entrypoint with synthetic Supervisor options
+        run: |
+          python tests/staging/packaged_addon_smoke.py
+      - name: No artifacts or retained services
+        if: always()
+        run: |
+          ids="$(docker ps -aq --filter label=phase2e)"
+          if [ -n "$ids" ]; then docker rm -f $ids >/dev/null; fi
+          docker image rm -f ha-mcp-phase2e:local >/dev/null 2>&1 || true
