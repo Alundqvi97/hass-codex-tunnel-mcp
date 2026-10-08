@@ -63,7 +63,7 @@ def redact_mcp_url(value: str) -> str:
         return "**REDACTED**"
     if not parsed.scheme or not parsed.netloc:
         return "**REDACTED**"
-    return urlunsplit((parsed.scheme, parsed.netloc, "/**REDACTED**", "", ""))
+        # A legacy/malformed saved URL might still contain userinfo even though\n    # normalize_mcp_url rejects new userinfo configurations.\n    host = parsed.hostname\n    if not host:\n        return "**REDACTED**"\n    safe_host = f"[{host}]" if ":" in host else host\n    try:\n        port = parsed.port\n    except ValueError:\n        return "**REDACTED**"\n    authority = safe_host + (f":{port}" if port is not None else "")\n    return urlunsplit((parsed.scheme, authority, "/**REDACTED**", "", ""))
 
 
 def assess_mcp_url(value: str) -> MCPUrlAssessment:
