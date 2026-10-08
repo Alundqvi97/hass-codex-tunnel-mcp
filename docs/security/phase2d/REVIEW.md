@@ -57,3 +57,16 @@ Actual deployed image digest and effective policy rules; upstream add-on packagi
 A sanitized top-level policy initialization wrapper was added after the earlier combined-candidate green run; the final run above includes this additional protection. All tests use synthetic inputs and the real pinned code without a live HA connection. No claim of packaged add-on, Supervisor, hosted OpenAI or production readiness is made.
 
 **Phase 2D offline engineering acceptance: COMPLETE; deployment: NO-GO.**
+
+
+## Phase 2E adverse review and packaged validation work
+
+Additional source defects identified while extending engineering:
+1. Before enhancement, malformed `HA_MCP_REQUIRE_STRICT_POLICY` values silently evaluated false. Candidate now rejects unknown values. Strict policy migration errors fail closed rather than continuing with inconsistent conditions. A global bare `*` rule is rejected in strict mode.
+2. Switching an existing bare approval rule to `allow` mode changes it into an automatic allow. Real source test records a destructive automation deletion rule inversion. Safe strict migration requires new positive rules and cannot be done by flipping current production mode.
+3. **FAILED PACKAGED STAGING, initial logging candidate:** Full pinned Dockerfile image built and real `/start.py` accepted synthetic MCP initialization; packaged stdout/stderr still contained a synthetic credential. The earlier source-only logger tests did not cover FastMCP's Rich startup banner/access logs. New logging candidate disables FastMCP server banner (`show_banner=False`) and Uvicorn HTTP access logging. Complete packaged rerun and log-negative verification required before granting a packaged pass.
+4. An initial packaged test failed due to synthetic runner-owned data directory permissions with a cap-drop container; addressed in fixture. No production involvement.
+
+No full Supervisor/HAOS VM has been started or restored. Container `--network none` only, no host port mapping, dummy Supervisor token, synthetic on-disk policy and harmless MCP initialize. Real add-on image built locally in a disposable GitHub runner but is not a Supervisor-managed installation.
+
+Pending proof: the latest packaged negative-log result, fail-start cases, and approved update/rollback behavior. Preserve distinction between a successful image build and a successful entire packaged acceptance matrix.
