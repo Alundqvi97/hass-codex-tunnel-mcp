@@ -49,3 +49,14 @@ OpenAI-hosted negative attachment and exact deployed add-on image digest still n
 ## Phase 2D readiness (review-only)
 
 **NO-GO** persists after successful isolated source tests: the candidate fail-fast policy can intentionally stop MCP startup, meaning the OpenAI tunnel cannot serve as its own repair route. Preserve and independently exercise local HA/Supervisor admin, pinned images and backups, plus a tested reversal before any upgrade. Confirm actual rule coverage and a strict-mode deployment mechanism; stage packaged HA-MCP boot and synthetic logging; hosted attachment negative tests and LAN/IPv6 isolation remain unverified. The tunnel crash/recovery design remains separate from HA-MCP policy/log patches.
+
+
+## Phase 2E gates — production still NO-GO
+
+The user supplied administrator UI screenshots of 18 approval rules; generic service, bulk, add-on/backup and HA restart tools are not listed in the visible rules. Source semantics and runtime middleware status still need to be correlated before claiming effective protection. Most critical is that switching these rules unchanged to allow-list mode would automatically allow destructive named operations.
+
+A disposable pinned add-on Docker image has been built and exercised with fake Supervisor token. Initial packaged acceptance detected startup log disclosure of a synthetic secret despite the first redaction patch; suppressing the actual FastMCP banner/HTTP access logger is now being retested. This is not full Supervisor/HAOS validation.
+
+Existing backup list shows 39 snapshots, but newest backups are labeled HA 2026.9.4 while running Core reports 2026.10.0. Require a verified protected current-version backup and independently tested recovery before any update.
+
+The strict-mode option is NOT implemented in stable Supervisor schema, does not survive add-on reboot reliably under a supported path, and could silently disappear if configuration defaults. `phase2e/STRICT_OPTION_DESIGN.md` identifies a durable opt-in and migration marker requirement. **No deployment approval.**
