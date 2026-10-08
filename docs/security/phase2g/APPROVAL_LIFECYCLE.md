@@ -8,7 +8,7 @@ Pinned genuine HA-MCP: `homeassistant-ai/ha-mcp@fc54437a804858732e4bc927add98e20
 
 [Patched approval CI #37848485823](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37848485823) **SUCCESS**:
 - Original unmodified upstream policy suites: **196 passed**.
-- Real FastMCP + new synthetic final dispatch scenarios: **13 passed** after patch.
+- Real FastMCP + new synthetic final dispatch scenarios: **15 passed** after patch.
 - Remaining upstream middleware/queue/allow-list/handler/overlap tests: **194 passed; 2 intentionally deselected**.
 - Exact `src/ha_mcp/policy/middleware.py` source Git blob `5b431906fe7a37bbc19e466ca92a34b491289298` restored using `git apply -R`.
 
@@ -49,3 +49,7 @@ Approval management through `ha_dev_manage_server` has a special middleware bypa
 The normal Settings UI approve/deny POST endpoints have separate ingress/session access controls, not per-user authorization from the MCP policy middleware itself. Real live authorization and possible approval misuse by a compromised session remain NOT VERIFIED.
 
 **Deployment: NO-GO; remediation not submitted upstream or deployed.**
+
+## Expanded final tested routes
+
+[Final code-equivalent receipt #37849095384](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37849095384): **196 original upstream**, **39 synthetic convenience evaluator**, **15 genuine FastMCP**, **194 patched upstream (two intentional exclusions)** and exact middleware source rollback all passed. Added genuine `ha_call_delete_tool` dispatch (approval required; one click one synthetic delete) and `ha_call_read_tool` refusal of a synthetic privileged write. No actual file was created/deleted. This closes tested read/write/delete proxy examples in-process, not all real installed service/backend variants.
