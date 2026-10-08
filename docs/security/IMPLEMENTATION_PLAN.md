@@ -279,3 +279,9 @@ No phase promotion implies merge or deployment. Keep stacked PR #2 draft, with P
 Other blockers: final real backend nested-dispatch/HA tool classification, actual middleware registration, hosted unauthorized attachment with separate cost approval, IPv4/IPv6 network isolation, full current-version backup/restore and independent local HA admin access.
 
 **No software deployment, OpenClaw invocation, production restart/restore, firewall, credential, Auth0 or Control Plane change occurred.**
+
+### Phase 2G updated code acceptance receipt
+
+[GitHub Actions #37849095384](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37849095384) SUCCESS: **196 original upstream policy tests passed**, **39 bounded convenience evaluator tests passed**, **15 real in-process FastMCP synthetic-control/replay/proxy tests passed**, **194 applicable patched upstream tests passed, 2 intentionally deselected**, exact middleware source rollback passed. New cases include nested write/delete proxy and read-proxy refusal. Generic light service `data` field limitation verified at evaluator only.
+
+No full HAOS/Supervisor, actual HA backend, hosted identity denial, live production policy change or backup restore tested. Final-head CI after documentation changes must be checked separately. Production NO-GO.
