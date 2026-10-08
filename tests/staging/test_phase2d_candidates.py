@@ -120,6 +120,42 @@ def test_strict_policy_requires_enabled_policy_engine(env, monkeypatch):
         attach(server_stub(False))
 
 
+def test_strict_unknown_setting_rejected_before_registration(env, monkeypatch):
+    monkeypatch.setenv("HA_MCP_REQUIRE_STRICT_POLICY", "tru")
+    with pytest.raises(RuntimeError, match="Invalid mandatory MCP policy setting"):
+        attach(server_stub())
+    # Mistyped opt-in must not silently mean non-strict.
+
+
+def test_strict_global_blanket_wildcard_is_rejected(env, monkeypatch):
+    enable_strict(monkeypatch)
+    save_policy(env, Policy(rule_effect="allow", rules=[Rule(tool_name="*")]))
+    with pytest.raises(RuntimeError, match="policy unavailable or invalid"):
+        attach(server_stub())
+
+
+def test_strict_failed_policy_migration_stops_startup(env, monkeypatch):
+    import ha_mcp.policy.persistence as persistence
+    enable_strict(monkeypatch)
+    save_policy(env, Policy(rule_effect="allow", rules=[Rule(tool_name="fixture_read")]))
+    def broken_migration(*args, **kwargs):
+        raise RuntimeError("synthetic_migration_problem")
+    monkeypatch.setattr(persistence, "migrate_policy_any_semantics", broken_migration)
+    with pytest.raises(RuntimeError, match="Required MCP policy migration failed"):
+        attach(server_stub())
+
+
+def test_switching_rule_effect_inverts_destructive_rule_meaning():
+    # Explicitly document why production's existing approval rules cannot
+    # be converted by toggling rule_effect to allow.
+    from ha_mcp.policy.evaluator import evaluate, Verdict
+    rules = [Rule(tool_name="ha_config_remove_automation")]
+    assert evaluate("ha_config_remove_automation", {},
+                    Policy(rule_effect="require_approval", rules=rules)) == Verdict.REQUIRE_APPROVAL
+    assert evaluate("ha_config_remove_automation", {},
+                    Policy(rule_effect="allow", rules=rules)) == Verdict.ALLOW
+
+
 def test_strict_missing_file_does_not_start(env, monkeypatch):
     enable_strict(monkeypatch)
     with pytest.raises(RuntimeError, match="policy unavailable or invalid"):
