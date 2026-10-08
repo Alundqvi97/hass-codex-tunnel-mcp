@@ -53,3 +53,20 @@ Current connected GitHub tooling can read/write fork and view Actions; it cannot
 | P2B-07 crash recovery | VERIFIED SOURCE | Existing subprocess watcher records exit without starting replacement; bounded recovery design isolated from PR #1 |
 
 No new Phase 2B code-level tests were run in an environment containing actual HA-MCP 8.6.0 dependencies. GitHub PR CI results apply to tunnel integration's source/tests; they **do not** establish backend authentication. Do not reuse historical mock pass count as if it verified this source.
+
+
+## Phase 2C executed real-source acceptance (2026-10-08)
+
+| ID | Evidence class | Observation |
+|---|---|---|
+| P2C-01 | VERIFIED STAGING | Real pinned `ha_mcp.http_transport.HttpTransportFastMCP` executed ASGI `initialize`, `tools/list`, `tools/call` with varied Authorization strings and correct/incorrect URL path |
+| P2C-02 | VERIFIED STAGING | Correct secret URL permits synthetic read-only tool without any bearer; additional wrong/malformed/expired-like bearer strings do not affect success. No expiry validation inferred |
+| P2C-03 | VERIFIED STAGING | Real `Policy`, evaluator and `PolicyMiddleware`: missing/empty policy allows unmatched tool, direct-name rule does not protect equivalent generic synthetic `ha_call_service` action, subsequent policy-file change affects future call |
+| P2C-04 | VERIFIED STAGING | Real `_apply_tool_security_policies` import failure and middleware-registration exception log-and-return without attaching guard; middleware already attached fails closed when policy provider raises `ValueError` |
+| P2C-05 | VERIFIED SOURCE + OFFLINE | Pinned add-on startup interpolates and logs path; real `log_info` sink prints only synthetic path in test |
+| P2C-06 | VERIFIED LIVE | Add-on v8.6.0 started, boot:auto, watchdog:true, auto_update:true, TCP/9583 published, host network:true; digest/IPv6 bind not exposed |
+| P2C-07 | VERIFIED STAGING CI | Run #37838397155 at SHA `ef86dfdb6752c5a40cbee88d32e809e5d04093f3`: pinned upstream **38 passed**; tunnel suite **57 passed, 1 skipped, 2 subtests passed** |
+
+The earlier *representative* protocol-contract mock test is still present and is NOT counted as actual HA-MCP evidence; the new staging job uses exact pinned upstream dependencies and code. One earlier staging run failed due to incorrect test import interception, later corrected. No production URLs/tokens or hosted endpoints were contacted.
+
+More detail: `ACTUAL_HA_MCP_STAGING.md`. **Remaining BLOCKED:** real packaged image, effective live policies, hosted cross-identity authorization, practical network access denial and independent recovery.
