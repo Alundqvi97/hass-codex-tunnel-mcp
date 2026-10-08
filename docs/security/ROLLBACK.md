@@ -41,3 +41,12 @@ Real pinned-source staging shows an additional tunnel bearer header is not valid
 Review-only: run candidate builder against upstream **fc54437a804858732e4bc927add98e202d879a09**, and capture `git diff` from the two modified files. `git apply --check -R` followed by `git apply -R`, `git diff --exit-code` and exact `git hash-object` comparison must restore `server.py` blob `bf848dcec8345eba603295933768fca6724c913b` and `start.py` blob `88e926a59f568dc9a9bf7bcd719b518b42f52baa`. Dedicated CI also reverses candidates separately.
 
 **No production rollback procedure has been exercised.** A policy startup abort may deliberately stop remote MCP while Home Assistant remains operable; rollback MUST use independent local HA/Supervisor/console access, not ChatGPT tunnel tools. Preserve prior HA-MCP add-on image, data and source; ensure the known stored secret path is not rotated or revealed in logs. Stage platform boot and error recovery before approval.
+
+
+## Phase 2E recovery addition
+
+A Git reverse patch restoring exact `server.py` and `start.py` blobs is **not** a Supervisor-installed rollback. Full packaged image and UI recovery remain separate tests. A fail-closed add-on with bad policy must not be repaired through the unavailable remote MCP path.
+
+Read-only backup metadata: 39 snapshots recorded; most recent snapshot metadata labels HA Core 2026.9.4 while running Core reports 2026.10.0. Verify current-version data/content compatibility and restore access using independent HA/Supervisor administration before any production mutation.
+
+Strict-mode rule-effect conversion of the current 18 configured approval rules is prohibited without a reviewed semantic migration: equivalent rules in allow mode would automatically allow destructive actions. Do not use rollback to re-enable unrestricted admin actions silently.
