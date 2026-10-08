@@ -220,3 +220,33 @@ Phase 2D historical final: [run 37840980382](https://github.com/Alundqvi97/hass-
 - Exact source and packaged results, limits and earlier failed tests are in `phase2e/PACKAGED_STAGING.md`. No hosted resources or real credentials accessed.
 
 No phase promotion implies merge or deployment. Keep stacked PR #2 draft, with PR #1 unchanged. After this documentation commit, verify GitHub CI again before claiming latest HEAD passed.
+
+
+## Phase 2F — Safe policy migration and supported strict-option engineering (2026-10-08)
+
+**Engineering status PARTIAL:** Real pinned-source and packaged tests PASSED, but nested dispatch, approval lifecycle, HAOS/real Supervisor and local recovery gates remain unverified. **Overall Phase 2 PARTIAL/BLOCKED, Phase 3 NO-GO, Phase 4 NOT AUTHORIZED.** No production changes, merge, resource creation, credentials or router changes.
+
+### Live security observation
+- New user-provided official policy-mode screenshot confirms **Require approval**. The 18 visible per-tool rules are unconditionally approval-required with 0-minute retention; actual middleware startup success remains unverified.
+- In require-approval mode, unmatched tools automatically run. Broad service, bulk, restart, backup and integration operations are not pictured among the approval rules. Do not treat absent screenshot rules as proved unprotected without full policy/runtime inventory.
+- The dangerous mode inversion has now been tested against all 18: those same rules in `allow` mode would automatically allow destructive calls. No in-place conversion is acceptable.
+
+### Changes added to PR #2 branch (not upstream or production)
+- `docs/security/phase2f/strict_addon_candidate.py`: source-SHA-guarded, separately reviewable extension to the prior Phase 2D candidates, targeting only `homeassistant-addon/config.yaml`, `start.py`, and `src/ha_mcp/server.py`.
+- Supported add-on boolean `require_strict_tool_policy` (default false); opt-in exported to runtime, original behavior retained when not enabled. First opt-in creates `/data/strict_policy_required.v1.json` atomically with mode 0600. Subsequent corrupted/missing settings, false option, invalid policy or failed security engine refuse startup.
+- Real server per-call provider rechecks strict read-only positive allow-list. Initial auto-allow list only `ha_get_overview`; all existing destructive and generic control routes are approval-required, not HARD DENIED. Future convenience rules need independent argument/schema tests. A trusted administrator capable of deleting both marker and options can defeat the marker; it is **not** TPM-style anti-rollback.
+- `tests/staging/test_phase2f_migration.py`: real evaluator and startup preflight; tests 18-rule inversion, unknown tools, broad routes, raw WS evaluator behavior, options/marker damage, restricted service calls and post-startup policy mutation.
+- `tests/staging/phase2f_packaged_smoke.py`: network-isolated real upstream Dockerfile, dummy Supervisor token, synthetic read-only requests. Root-owned 0600 marker inspected in a second read-only offline container; synthetic administrator recovery of root-owned policy via another isolated container.
+- `.github/workflows/phase2f-strict-addon.yml`: pinned source/dependencies and exact three-file reverse-patch restoration, no production secret or public listening port.
+
+### Verified executable evidence
+- [Phase 2F CI #37846398572](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37846398572), code commit `36a011523bc05fe1328a2b5f6fc1e4564865bb91`: **26 prior Phase 2D tests passed, 42 new migration tests passed, 20 selected upstream tests passed, 9 packaged scenarios passed**, synthetic path log scans passed, three exact upstream original Git blobs restored.
+- Intermediate candidate failures (test ordering, Phase 2D compatibility sequencing, early ha_mcp import at preflight, fixture root-owned marker/policy access) are documented in `phase2f/STRICT_MODE_TEST_RESULTS.md`; do not claim these runs passed.
+- [Safe replacement policy and full 18-rule comparison](phase2f/POLICY_MIGRATION.md), [test receipt](phase2f/STRICT_MODE_TEST_RESULTS.md), [release decision](phase2f/RELEASE_GATE.md).
+
+### Recovery/approval boundaries
+- Read-only backup inventory: 39 backups; newest October 8 protected automatic backup includes Home Assistant+database, version field `2026.9.4`, while Core reports `2026.10.0`. Backup metadata alone cannot certify a current-installation restore.
+- Actual local console/Supervisor access, full installed-image version provenance, HAOS update rollback, hosted OpenAI unauthorized attachment, direct LAN/IPv6 listener isolation, and production tool policy enforcement remain unverified.
+- No additional screenshot is required for the **mode**, which is now established. Do not solicit secrets, PINs or raw policy config. Next best engineering gate is isolated Supervisor/HAOS configuration roundtrip/recovery **with explicit approval and independence from the tunnel**.
+
+**After this documentation update, recheck CI for final HEAD. No merge/deployment authorized.**
