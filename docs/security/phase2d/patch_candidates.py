@@ -181,6 +181,29 @@ def logging_patch(s: str) -> str:
         for handler in logging.getLogger(name).handlers:
             handler.addFilter(filter_instance)
 
+    # FastMCP and Uvicorn can create handlers after startup. Filtering
+    # pre-existing handlers does not protect those future sinks. A record
+    # factory scrubs the message *before* any handler can receive it.
+    previous_factory = logging.getLogRecordFactory()
+
+    def safe_record_factory(*args, **kwargs):
+        record = previous_factory(*args, **kwargs)
+        try:
+            rendered = record.getMessage()
+        except Exception:
+            # An unsafe formatter can itself include untrusted arguments.
+            record.msg = "[MCP log formatting failed]"
+            record.args = ()
+            return record
+        for variant in variants:
+            if variant:
+                rendered = rendered.replace(variant, "[MCP_SECRET_REDACTED]")
+        record.msg = rendered
+        record.args = ()
+        return record
+
+    logging.setLogRecordFactory(safe_record_factory)
+
 
 '''+key
     )
