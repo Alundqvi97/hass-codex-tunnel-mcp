@@ -29,3 +29,8 @@ The development patch also tightens `redact_mcp_url` for legacy authority userin
 ## Phase 2B additional gates
 
 A HACS-only source rollback does not reconfigure the HA-MCP backend's standard-mode authentication. A stronger ingress credential layer must be independently deployed and tested before any operator assumes an extra bearer provides security. Policy startup must **fail closed** when a configured policy gate cannot load, or a verified out-of-band control must prevent sensitive tools. Any fix requires a separate staged rollback that tests both policy enforcement and administrative recovery; never test it by restarting the existing HA-MCP add-on during Phase 2B.
+
+
+## Phase 2C evidence-driven rollback boundary
+
+Real pinned-source staging shows an additional tunnel bearer header is not validated in standard HA-MCP mode; rolling back a HACS tunnel source patch cannot fix backend recipient authentication. A later upstream HA-MCP fail-closed change may intentionally prevent startup when the policy guard fails: **ensure independent LAN/console recovery before installing**, and preserve the exact prior add-on image/version, data/config, and tested rollback method. Do not weaken security gates to restore convenience without an explicit exception. Stop and fail closed on policy init errors; don't attempt auto-repair using an admin tool that is protected by the failed gate. Treat the startup-log path as a credential in backups and diagnostic archives.
