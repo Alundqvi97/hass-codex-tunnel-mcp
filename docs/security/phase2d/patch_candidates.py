@@ -41,17 +41,36 @@ def policy_patch(s: str) -> str:
     )
     s = replace_exact(
         s,
+        "        # One-time ANY-match schema migration (PR #1993) runs even when",
+        """        strict_value = os.environ.get("HA_MCP_REQUIRE_STRICT_POLICY", "").strip().lower()
+        if strict_value not in {"", "0", "false", "no", "1", "true", "yes"}:
+            raise RuntimeError("Invalid mandatory MCP policy setting")
+        strict = strict_value in {"1", "true", "yes"}
+
+        # One-time ANY-match schema migration (PR #1993) runs even when""",
+    )
+    s = replace_exact(
+        s,
         "        if not self.settings.enable_tool_security_policies:\n            return\n\n        try:\n",
-        """        strict = os.environ.get("HA_MCP_REQUIRE_STRICT_POLICY", "").lower() in {
-            "1", "true", "yes"
-        }
-        if strict and not self.settings.enable_tool_security_policies:
+        """        if strict and not self.settings.enable_tool_security_policies:
             raise RuntimeError("Required MCP policy enforcement is disabled")
         if not self.settings.enable_tool_security_policies:
             return
 
         try:
 """,
+    )
+    s = replace_exact(
+        s,
+        """        except Exception:
+            logger.error(
+                "tool_policy.json ANY-match migration failed; continuing. The """,
+        """        except Exception:
+            if strict:
+                logger.error("Required MCP policy migration failed; refusing startup")
+                raise RuntimeError("Required MCP policy migration failed") from None
+            logger.error(
+                "tool_policy.json ANY-match migration failed; continuing. The """,
     )
     s = replace_exact(
         s,
@@ -93,8 +112,10 @@ def policy_patch(s: str) -> str:
                     not (data_dir / POLICY_FILENAME).is_file()
                     or policy.rule_effect != "allow"
                     or not policy.rules
+                    or any(rule.tool_name == "*" and not rule.when
+                           for rule in policy.rules)
                 ):
-                    raise ValueError("Strict MCP policy requires a nonempty allow list")
+                    raise ValueError("Strict MCP policy requires a bounded allow list")
             return policy
 
         if strict:
