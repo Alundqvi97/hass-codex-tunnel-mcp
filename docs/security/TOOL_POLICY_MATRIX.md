@@ -24,3 +24,24 @@ Relevant exact files: [server.py](https://github.com/homeassistant-ai/ha-mcp/blo
 | 3 — Security/destructive | Deny by default, then brokered case-by-case explicit approval | Needs stronger server-side scope/RBAC or a separate privileged path; HA-MCP approval list does **not** implement unconditional irreversible deny | Door lock, camera privacy, restart, backup deletion/restoration, credentials, filesystem and network |
 
 Before setting policy: obtain sanitized effective rule names, rule-effect mode, bypass tool names, and audit log events; demonstrate negative calls against disposable HA mock. Protect policy editing UI separately. **Do not** call security-sensitive tools in production for this audit.
+
+
+## Phase 2C real-middleware evidence and bypass coverage
+
+The pinned HA-MCP source, not a custom evaluator, ran in 38 passing staged tests ([run](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37838397155)). These are synthetic administrative functions; no user devices were touched.
+
+| Protected operation | Direct entry point | Alternative routes | Source enforcement | Staging evidence / bypass |
+|---|---|---|---|---|
+| Lock/device security | `synthetic_lock_direct` / real `ha_call_service` | generic `ha_call_service`, `ha_bulk_control`, raw WS | Policy matches **name+args**, not underlying action | **VERIFIED STAGING:** direct-only rule gates direct call, equivalent generic synthetic call passes |
+| Light/blind/media controls | service domain/entity | bulk selectors, device controls, generic calls | evaluate each route and selector targets | **VERIFIED SOURCE** rules include selector special cases; production rule coverage **UNVERIFIED** |
+| Automations/scripts/YAML | dedicated editing tools | filesystem, script/config tools, generic WS | individual names/args | **UNVERIFIED** live; requires multi-route allow/approval in staging |
+| HA restart/host management | dedicated admin tool | generic service, add-on manager, WS, config action | per registered tool | **UNVERIFIED** effective rules; no production calls |
+| Backup/delete/restore | `ha_manage_backup` | add-on, filesystem, config | scope/action-level rule necessary | **UNVERIFIED** effective rules |
+| Policy administration | settings UI policy routes | potential management tool | separate HTTP ingress and Supervisor proxy | Read-only `GET /api/policy/config` returned 403; no bypass attempted |
+| Discoverability and proxy dispatch | search/proxy meta-tools | nested call to actual tool | some `PROXY_META_TOOLS` bypass outer gate | **VERIFIED SOURCE**, nested route validation NOT VERIFIED |
+| Guard import/registration | `_apply_tool_security_policies` | all tools when guard absent | startup wrapper catches exceptions | **VERIFIED STAGING: FAIL OPEN** |
+| Corrupt policy at call time | all calls routed by installed middleware | none under that middleware | `ValueError` causes `ToolError` | **VERIFIED STAGING: FAIL CLOSED** |
+
+**Important:** This policy model implements allow/approval-required, not irrevocable hard-deny/RBAC. In default `require_approval` mode, unmatched calls run. In `allow` mode, unmatched calls require approval (not permanent deny). Only a stronger hard-deny/visibility guard or independent privilege boundary can enforce “never execute Class 3.” See `POLICY_FAIL_CLOSED_REVIEW.md`.
+
+Neither the stage's synthetic bypass nor its middleware initialization test proves which rules are in force on the user's production add-on; effective rules remain blocked behind HTTP 403. Mandatory policy initialization must fail closed in a separate **upstream** remediation and be staged with independent recovery before deployment.
