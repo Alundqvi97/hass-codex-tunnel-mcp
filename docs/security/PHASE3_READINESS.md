@@ -76,3 +76,14 @@ This is **VERIFIED PACKAGED without Supervisor**, not HAOS/Supervisor integratio
 Current live rule effect confirmed `require_approval` by official administrator screenshot. Destructive bare rules would automatically allow operations if naively switched to `allow`; candidate instead constructs a fresh positive read-only allow-list. No hard-deny exists in original policy model, and nested proxy + approval expiry/replay remain separate tests.
 
 Production gates still block: real HAOS/Supervisor option persistence/recovery, current-version backup restore, least-privilege/risky route audit, middleware registration status, hosted unauthorized attachment, LAN/IPv6 isolation and tunnel-client crash recovery. The durable marker is not a guarantee against an administrator deleting both marker and options; trusted admin recovery must be independent of tunnel.
+
+
+### Phase 2G read-only feasibility and approval dispatch result
+
+Genuine Supervisor/HAOS staging is **BLOCKED**, not 'tested': public GitHub runner had /dev/kvm inaccessible and lacked QEMU/UEFI. New VM / ephemeral runner privilege changes require separate user authorization; no VM created. Verified [preflight #37847835408](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37847835408).
+
+Genuine FastMCP synthetic approval sequence uncovered a pinned upstream race: an approval pending before policy corruption could execute afterward. Separate single-file patch rechecks policy immediately before the privileged tool's `call_next`, stopping the tested race (13 new cases passed, 194 selected upstream after 2 intentional old-semantics exclusions, original 196 passed; exact reverse patch). [CI #37848485823](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37848485823). Must update excluded upstream expectations and perform final nested/real backend review before merge.
+
+A more convenient native policy only auto-allows verified bounded reads. Generic `ha_call_service` light rules do not reject additional data/target payloads, so writes stay approval-required. Neither per-tool approval nor server middleware is a universal hard deny. Full Supervisor, independent local restore, hosted unauthorized attachment, add-on update survival, backup integrity and IPv4/IPv6 boundaries remain **BLOCKED/NOT VERIFIED**.
+
+**Production NO-GO.** No production/service/router/credential change.
