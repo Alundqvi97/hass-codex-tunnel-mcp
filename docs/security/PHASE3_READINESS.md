@@ -60,3 +60,10 @@ A disposable pinned add-on Docker image has been built and exercised with fake S
 Existing backup list shows 39 snapshots, but newest backups are labeled HA 2026.9.4 while running Core reports 2026.10.0. Require a verified protected current-version backup and independently tested recovery before any update.
 
 The strict-mode option is NOT implemented in stable Supervisor schema, does not survive add-on reboot reliably under a supported path, and could silently disappear if configuration defaults. `phase2e/STRICT_OPTION_DESIGN.md` identifies a durable opt-in and migration marker requirement. **No deployment approval.**
+
+
+### Final Phase 2E packaged result and gating decision
+
+The real pinned 8.6.0 Dockerfile image passed seven synthetic network-isolated entrypoint scenarios including same-volume invalid-policy to valid-policy recovery and no synthetic path exposure in collected startup/request logs ([run #37843820868](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37843820868)). Selected source and rollback CI also passed ([#37843820900](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37843820900)).
+
+This is **VERIFIED PACKAGED without Supervisor**, not HAOS/Supervisor integration nor production restore. Strict startup now fails closed within the tested container. Automatic updates, independent host recovery, persistent strict option/marker, current-version backup, real permission coverage, hosted attachment authorization and IPv6/LAN ingress remain unverified or incomplete. Do not deploy or merge. Phase 3 remains **NO-GO**.
