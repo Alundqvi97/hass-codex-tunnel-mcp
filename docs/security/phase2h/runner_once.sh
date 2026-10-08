@@ -71,7 +71,8 @@ sudo apt-get update -qq >/dev/null
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -qq -y --no-install-recommends qemu-system-x86 qemu-utils ovmf acl xz-utils iptables >/dev/null
 command -v qemu-system-x86_64 >/dev/null
 command -v qemu-nbd >/dev/null
-test -r /usr/share/OVMF/OVMF_CODE.fd
+test -r /usr/share/OVMF/OVMF_CODE_4M.fd
+test -r /usr/share/OVMF/OVMF_VARS_4M.fd
 
 sudo useradd --system --no-create-home --shell /usr/sbin/nologin "$GUEST_USER"
 test -e /dev/kvm || { echo "PHASE2H_KVM_DEVICE=BLOCKED"; exit 4; }
@@ -161,6 +162,8 @@ fi
 export PHASE2H_LOCAL_ADDON_SEEDED="$GUEST_SEEDED"
 echo "PHASE2H_SUPERVISOR_LOCAL_ADDON_SOURCE_SEEDED=$GUEST_SEEDED"
 sudo chown "$GUEST_USER:$GUEST_USER" "$WORK/haos_ova-18.3.qcow2"
+cp /usr/share/OVMF/OVMF_VARS_4M.fd "$WORK/OVMF_VARS_4M.fd"
+sudo chown "$GUEST_USER:$GUEST_USER" "$WORK/OVMF_VARS_4M.fd"
 chmod 755 "$WORK"
 sudo touch "$WORK/serial-private.log"
 sudo chown "$GUEST_USER:$GUEST_USER" "$WORK/serial-private.log"
