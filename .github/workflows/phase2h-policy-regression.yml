@@ -2,7 +2,7 @@ name: Phase 2H - Full Approval Semantics Regression
 on:
   push:
     branches: [security/ha-mcp-phase2d-candidates]
-    paths: ['docs/security/phase2h/revise_approval_tests.py', 'docs/security/phase2g/middleware_revalidation.py', '.github/workflows/phase2h-policy-regression.yml']
+    paths: ['docs/security/phase2h/**', 'docs/security/phase2g/middleware_revalidation.py', 'docs/security/IMPLEMENTATION_PLAN.md', '.github/workflows/phase2h-policy-regression.yml']
 permissions: {contents: read}
 concurrency:
   group: phase2h-regression-${{ github.ref }}
