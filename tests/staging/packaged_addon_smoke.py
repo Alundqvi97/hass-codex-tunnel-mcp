@@ -126,7 +126,9 @@ def smoke_case(label, state, expected_ready, option_enabled=True):
                     sample = diagnostics.stdout + diagnostics.stderr
                     classes = ("Traceback", "ModuleNotFoundError", "ConnectionRefusedError",
                                "PermissionError", "ImportError", "RuntimeError",
-                               "MCP server crashed", "Required MCP policy")
+                               "MCP server crashed", "Required MCP policy",
+                               "Starting MCP server", "Application startup complete",
+                               "Uvicorn running", "Server startup", "FastMCP")
                     print("packaged log classifications=",
                           {label: label in sample for label in classes})
                     print("packaged last probe class=", last_probe)
