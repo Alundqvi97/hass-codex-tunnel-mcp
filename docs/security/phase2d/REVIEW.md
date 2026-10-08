@@ -70,3 +70,10 @@ Additional source defects identified while extending engineering:
 No full Supervisor/HAOS VM has been started or restored. Container `--network none` only, no host port mapping, dummy Supervisor token, synthetic on-disk policy and harmless MCP initialize. Real add-on image built locally in a disposable GitHub runner but is not a Supervisor-managed installation.
 
 Pending proof: the latest packaged negative-log result, fail-start cases, and approved update/rollback behavior. Preserve distinction between a successful image build and a successful entire packaged acceptance matrix.
+
+
+## Phase 2E final test correction
+
+The earlier failing packaged log test was reproduced as a genuine **synthetic path exposure** in the packaged image, despite a successful real MCP request. The pinned FastMCP transport logged its full URL after startup, independently of the banner. The isolated candidate was amended to disable that banner and Uvicorn access logging, and to install a future-handler-safe Python log-record scrubber. Final real packaged run [#37843820868](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37843820868) passed seven synthetic startup/negative-log cases and a same-volume policy-restoration test. Exact scope and limitations: `../phase2e/PACKAGED_STAGING.md`. No proof of the real Supervisor-packaged deployment or arbitrary direct stderr/proxy log redaction is claimed.
+
+Additional real policy tests reject malformed mandatory-mode values, strict migration failure and a blanket bare wildcard allow rule, and demonstrate rule-effect inversion of a destructive tool. No signed/approved policy migration or stable add-on strict option is implemented.
