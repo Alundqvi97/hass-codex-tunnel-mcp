@@ -67,3 +67,12 @@ The strict-mode option is NOT implemented in stable Supervisor schema, does not 
 The real pinned 8.6.0 Dockerfile image passed seven synthetic network-isolated entrypoint scenarios including same-volume invalid-policy to valid-policy recovery and no synthetic path exposure in collected startup/request logs ([run #37843820868](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37843820868)). Selected source and rollback CI also passed ([#37843820900](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37843820900)).
 
 This is **VERIFIED PACKAGED without Supervisor**, not HAOS/Supervisor integration nor production restore. Strict startup now fails closed within the tested container. Automatic updates, independent host recovery, persistent strict option/marker, current-version backup, real permission coverage, hosted attachment authorization and IPv6/LAN ingress remain unverified or incomplete. Do not deploy or merge. Phase 3 remains **NO-GO**.
+
+
+## Phase 2F gate decision (2026-10-08)
+
+**NO-GO remains.** Pinned source and isolated packaged Docker tests passed: initial legacy opt-out, strict-mode opt-in, fail-closed missing/corrupt options/policy, no silent downgrade after marker, same-volume recovery and no synthetic path in collected logs. Exact source reversal passed. See `phase2f/STRICT_MODE_TEST_RESULTS.md`.
+
+Current live rule effect confirmed `require_approval` by official administrator screenshot. Destructive bare rules would automatically allow operations if naively switched to `allow`; candidate instead constructs a fresh positive read-only allow-list. No hard-deny exists in original policy model, and nested proxy + approval expiry/replay remain separate tests.
+
+Production gates still block: real HAOS/Supervisor option persistence/recovery, current-version backup restore, least-privilege/risky route audit, middleware registration status, hosted unauthorized attachment, LAN/IPv6 isolation and tunnel-client crash recovery. The durable marker is not a guarantee against an administrator deleting both marker and options; trusted admin recovery must be independent of tunnel.
