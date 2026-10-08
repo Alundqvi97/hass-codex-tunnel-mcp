@@ -109,3 +109,20 @@ Authorized: fork development branch, CI, documentation, draft PR, offline tests.
 - **Decision:** Do not merge/deploy PR #1. Prioritize out-of-band policy read, isolated true HA-MCP transport behavior, and then approved disposable hosted validation. A synthetic fixture cannot substitute for the real implementation.
 
 Evidence: exact implementation links and risks in `BACKEND_AUTH_VERIFICATION.md`, `TOOL_POLICY_MATRIX.md`, and `PHASE2_TEST_EVIDENCE.md`. No Phase 2B end-to-end tests are claimed passed.
+
+
+## Phase 2C acceptance — 2026-10-08
+
+**Phase 2C scoped real-implementation staging: COMPLETE.** **Overall Phase 2: PARTIAL/BLOCKED. Phase 3 deployment: NO-GO.** No production, hosted tunnel, credential, router, HA/Supervisor, Auth0, Home Infra Control Plane or OpenClaw mutations.
+
+- Upstream HA-MCP v8.6.0 exact commit `fc54437a804858732e4bc927add98e202d879a09` executed in separate GitHub Actions job using Python 3.13, `uv==0.12.20`, upstream `uv.lock`, `pytest==8.4.2`, in-process Starlette ASGI and only synthetic read-only tools. Runner blocked outbound IPv4/v6 sockets. See `ACTUAL_HA_MCP_STAGING.md`.
+- [First complete 38-test real-source staging CI #37838397155](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37838397155) on commit `ef86dfdb6752c5a40cbee88d32e809e5d04093f3`: **38 passed, zero failed, zero skipped**; parallel tunnel job **57 passed, one skipped, two subtests**. Later documentation commits require fresh CI receipts. One previous test harness failure caused by an incorrect import monkeypatch was corrected; no production issue.
+- **CONFIRMED STAGING:** Genuine standard-mode FastMCP `initialize`, `tools/list`, synthetic `tools/call` all accept correct secret path with missing, incorrect, arbitrary, malformed and “expired-like” bearer values; wrong path rejects independent of header. Header is not an independently enforced authorization layer.
+- **CONFIRMED STAGING:** Pinned middleware/evaluator default missing/empty rules allow unmatched calls. A direct-tool approval rule does not cover generic alternatives. Raw `ha_call_service` and `ha_bulk_control` alternative tool names must be separately covered. Corrupt policy with middleware installed fails closed, while synthetic import/registration failures in server setup are swallowed and leave middleware absent.
+- **CONFIRMED SOURCE/OFFLINE:** Pinned add-on startup logs the complete secret path; synthetic secret reproduction through its actual `log_info` sink passed. Do not inspect/export real production logs.
+- **VERIFIED LIVE read-only:** Add-on 8.6.0 started, boot auto, watchdog enabled, auto-update true, host network true, TCP/9583 configured; authorized metadata did **not** expose container image digest or runtime bind address. The policy-read HTTP 403 from Phase 2B remains an explicit boundary.
+- **Unverified:** Full Supervisor add-on runtime/image digest, actual live effective policy rules, OpenAI hosted cross-account attachment negative tests, actual v0.0.15 binary transport, IPv6/VLAN negative reachability, outage/reboot/rollback, production per-tool behavior.
+- **Decision register:** Keep tunnel patch in draft PR #1; no HA-MCP source modification inside tunnel repo. Document upstream fail-closed proposal and startup redaction separately in `POLICY_FAIL_CLOSED_REVIEW.md`/`SECRET_LOGGING_REVIEW.md`. Keep self-healing work separately staged in `RECOVERY_DESIGN.md`.
+- **Required approvals:** Any new hosted test identity/tunnel or spending, any production config/network/service change, or a new HA-MCP upstream fork/patch PR. Nothing needed to keep draft PR and current HA system unchanged.
+
+**Minimum safe next step:** Before production install, establish independent local HA/console recovery and a sanitized effective tool-policy read through a supported authenticated admin interface, then plan approved hosted attachment negative tests. The verified bearer non-enforcement and policy initialization fail-open remain high-priority hardening decisions.
