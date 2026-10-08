@@ -267,3 +267,54 @@ def test_pinned_revision_marked_in_staging_receipt():
         capture_output=True, text=True, timeout=3, check=True,
     ).stdout.strip()
     assert sha == "fc54437a804858732e4bc927add98e202d879a09"
+
+
+@pytest.mark.anyio
+async def test_real_middleware_call_next_bypasses_direct_tool_specific_rule():
+    """Only synthetic functions: equivalent operation via another tool name is allowed."""
+    from ha_mcp._vendor.fastmcp.exceptions import ToolError
+
+    policy = Policy(rules=[Rule(tool_name="synthetic_lock_direct")])
+    gate = PolicyMiddleware(
+        policy_provider=lambda: policy, queue=ApprovalQueue(), wait_seconds=0
+    )
+    counter = {"runs": 0}
+
+    async def fake_underlying_tool(_context):
+        counter["runs"] += 1
+        return "SYNTHETIC_EFFECT_ONLY"
+
+    ctx = MagicMock()
+    ctx.message.name = "ha_call_service"
+    ctx.message.arguments = {"domain": "lock", "service": "unlock"}
+    assert await gate.on_call_tool(ctx, fake_underlying_tool) == "SYNTHETIC_EFFECT_ONLY"
+    assert counter["runs"] == 1
+
+    ctx.message.name = "synthetic_lock_direct"
+    ctx.message.arguments = {}
+    with pytest.raises(ToolError):
+        await gate.on_call_tool(ctx, fake_underlying_tool)
+    assert counter["runs"] == 1
+
+
+@pytest.mark.anyio
+async def test_actual_policy_file_update_changes_next_request(tmp_path):
+    gate = PolicyMiddleware(
+        policy_provider=lambda: load_policy(tmp_path),
+        queue=ApprovalQueue(), wait_seconds=0
+    )
+    counter = {"runs": 0}
+
+    async def fake_tool(_context):
+        counter["runs"] += 1
+        return "SYNTHETIC_EFFECT_ONLY"
+
+    ctx = MagicMock()
+    ctx.message.name = "synthetic_admin"
+    ctx.message.arguments = {}
+    assert await gate.on_call_tool(ctx, fake_tool) == "SYNTHETIC_EFFECT_ONLY"
+    save_policy(tmp_path, Policy(rules=[Rule(tool_name="synthetic_admin")]))
+    from ha_mcp._vendor.fastmcp.exceptions import ToolError
+    with pytest.raises(ToolError):
+        await gate.on_call_tool(ctx, fake_tool)
+    assert counter["runs"] == 1
