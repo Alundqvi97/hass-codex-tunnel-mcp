@@ -44,3 +44,8 @@ Require a real staged backend/authorization test (not the existing simulated fix
 Before any production deployment, require an upstream HA-MCP fail-closed policy initialization remediation (separate project), a secret-path logging remediation, authenticated operator-only policy inventory, a genuine least-privilege gate across every alternative admin tool, and an out-of-band recovery route. Existing HA-MCP add-on auto-update and watchdog being enabled does not independently guarantee tunnel-client crash recovery, source compatibility, or update rollback. A source-level watchdog design remains separate in `RECOVERY_DESIGN.md`.
 
 OpenAI-hosted negative attachment and exact deployed add-on image digest still need verification. Maintain the draft unmerged; do not restart, reconfigure or rotate production.
+
+
+## Phase 2D readiness (review-only)
+
+**NO-GO** persists after successful isolated source tests: the candidate fail-fast policy can intentionally stop MCP startup, meaning the OpenAI tunnel cannot serve as its own repair route. Preserve and independently exercise local HA/Supervisor admin, pinned images and backups, plus a tested reversal before any upgrade. Confirm actual rule coverage and a strict-mode deployment mechanism; stage packaged HA-MCP boot and synthetic logging; hosted attachment negative tests and LAN/IPv6 isolation remain unverified. The tunnel crash/recovery design remains separate from HA-MCP policy/log patches.
