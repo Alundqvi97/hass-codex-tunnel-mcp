@@ -111,6 +111,13 @@ def smoke_case(label, state, expected_ready, option_enabled=True):
             if expected_ready:
                 if not ready:
                     state = json.loads(run("docker", "inspect", cid).stdout)[0]["State"]
+                    diagnostics = run("docker", "logs", cid, timeout=15, check=False)
+                    sample = diagnostics.stdout + diagnostics.stderr
+                    classes = ("Traceback", "ModuleNotFoundError", "ConnectionRefusedError",
+                               "PermissionError", "ImportError", "RuntimeError",
+                               "MCP server crashed", "Required MCP policy")
+                    print("packaged log classifications=",
+                          {label: label in sample for label in classes})
                     print("packaged startup state=", state["Status"],
                           "exit=", state["ExitCode"], "error_type=",
                           state.get("Error", "")[:80])
