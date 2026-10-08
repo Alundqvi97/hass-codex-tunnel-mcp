@@ -91,6 +91,13 @@ sudo ip6tables -w 5 -N PHASE2H_GUEST6
 RULES_CONFIGURED=true
 sudo iptables -w 5 -I OUTPUT 1 -m owner --uid-owner "$GUEST_USER" -j PHASE2H_GUEST
 sudo ip6tables -w 5 -I OUTPUT 1 -m owner --uid-owner "$GUEST_USER" -j PHASE2H_GUEST6
+# Allow only return traffic on loopback TCP connections that the test host
+# initiated to QEMU's 127.0.0.1-bound forwarded ports. Without this, the
+# OUTPUT owner rule can block QEMU responses and make every health check
+# unreachable even if HAOS is healthy. NEW connections from QEMU to
+# loopback/private addresses remain rejected; no broad localhost allow.
+sudo iptables -w 5 -A PHASE2H_GUEST -o lo -d 127.0.0.1/32 -p tcp -m conntrack --ctstate ESTABLISHED -j ACCEPT
+echo "PHASE2H_LOOPBACK_REPLY_ONLY_RULE=CONFIGURED_NOT_LIVE_TESTED"
 for cidr in 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 224.0.0.0/4 240.0.0.0/4; do
   sudo iptables -w 5 -A PHASE2H_GUEST -d "$cidr" -j REJECT
 done
