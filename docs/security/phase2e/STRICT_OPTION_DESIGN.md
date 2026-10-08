@@ -24,3 +24,12 @@ The current Phase 2D source candidate recognizes `HA_MCP_REQUIRE_STRICT_POLICY` 
 - Full packaged add-on with fake Supervisor (distinct from genuine Supervisor boot).
 
 **Current state:** Design only. Patch candidate's environment flag works in isolated staging, but deployable supported option and durable mandatory marker are **BLOCKED**, not implemented.
+
+
+## Phase 2F actual supported-option candidate (not installed)
+
+Implemented as a reproducible, exact-source-checked review candidate: `docs/security/phase2f/strict_addon_candidate.py`. It adds a stable `require_strict_tool_policy: bool?` option with `false` default to pinned add-on `config.yaml`; `start.py` checks types/config via standard-library-only preflight (avoids early runtime imports), creates a durable root-only `strict_policy_required.v1.json` marker in existing `/data`, blocks missing/corrupt options or downgrade when marker is present, and exports the opt-in runtime flag. The patched `server.py` revalidates the positive allow-list at startup and per middleware policy check.
+
+**Design limit:** No unconditional hard-deny or per-user isolation is added. Initial strict list permits only `ha_get_overview` automatically; all writes/control remain approval-required. An administrator able to remove both marker and option can clear evidence of prior opt-in, so this is fail-closed configuration persistence for intact trusted storage, not tamper-proof anti-rollback. A supported offline-admin marker recovery/disable procedure needs real Supervisor/HAOS validation.
+
+Tested with real pinned source and isolated Docker entrypoint using synthetic data: [CI #37846398572](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37846398572), 42 new migration tests, 9 packaged cases, source rollback passed. **No production add-on option was changed.**
