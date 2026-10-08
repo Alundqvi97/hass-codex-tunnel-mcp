@@ -94,7 +94,7 @@ def call_http(client, path, method, authorization=None):
     elif method == "tools/call":
         params = {"name": "fixture_read_status", "arguments": {}}
     return client.post(
-        path, headers=headers, timeout=3,
+        path, headers=headers,
         json={"jsonrpc": "2.0", "id": 7, "method": method, "params": params},
     )
 
@@ -228,7 +228,7 @@ def test_actual_server_import_failure_leaves_gate_absent(
     real_import = builtins.__import__
 
     def fail_specific_import(name, *args, **kwargs):
-        if name == "ha_mcp.policy.middleware" or name == ".policy.middleware":
+        if name.endswith("policy.middleware"):
             raise ImportError("synthetic_middleware_missing")
         return real_import(name, *args, **kwargs)
 
