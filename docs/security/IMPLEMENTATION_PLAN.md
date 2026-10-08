@@ -145,3 +145,24 @@ The initial complete isolated candidate CI run, [37840487066](https://github.com
 Live read-only metadata confirms policy feature enabled and the HA-MCP add-on running, but does not expose the effective rule list. The prior documented settings API attempt returned 403 and remains respected. The authorized next route for review is the Home Assistant add-on's Open Web UI used by a local administrator; production policy enforcement is not yet verified.
 
 See `docs/security/phase2d/REVIEW.md`, `POLICY_BASELINE.md`, and `ARCHITECTURE_DECISION.md` for implementation, limitations and recommendations. Do not merge, deploy or alter network or credentials without explicit separate approval.
+
+
+### Phase 2D offline acceptance receipt — 2026-10-08
+
+**Phase 2D offline engineering: COMPLETE within pinned-source scope.** Overall Phase 2 remains PARTIAL/BLOCKED, Phase 3 production remains NO-GO.
+
+Latest independently verified code-and-doc CI: [run #37840801696](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37840801696) at `7422074212f74bd991aefb7c3c6adbe792e5b797`, **SUCCESS**:
+- Unmodified pinned HA-MCP real-source baseline: **38 passed**.
+- Policy candidate alone: **14 passed, 5 deselected**.
+- Logging candidate alone: **5 passed, 14 deselected**.
+- Both candidates combined: **19 passed**.
+- Selected upstream unit/add-on tests: **20 passed**.
+- Policy and logging changes reversed **independently** and together using `git apply -R`; restored exact upstream source Git blobs `bf848d...` and `88e926...`.
+
+Policy candidate now includes sanitized fail-fast at real `_initialize_server` gate boundary; tests demonstrate exception before server run or ASGI mount. Distinguish this from an unperformed full Supervisor boot and an unperformed real MCP admin call on an installed image.
+
+Correct source and test locations: `docs/security/phase2d/patch_candidates.py` and `tests/staging/test_phase2d_candidates.py`. New workflow: `.github/workflows/phase2d-candidates.yml`. Separate draft PR against the security branch; tunnel PR #1 unchanged. Earlier intermediate CI failures were resolved; full logs retained in GitHub.
+
+**Blocked for production:** effective policy rules (authorized API 403), packaged add-on/hosted attachment, host bind/IPv6, secret leakage through unexamined sinks, independent local recovery and deployment approval. No production change occurred.
+
+The CI result above predates this documentation-only receipt and must not be represented as the final HEAD CI until a later workflow run completes.
