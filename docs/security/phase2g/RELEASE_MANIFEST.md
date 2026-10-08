@@ -48,3 +48,15 @@ On trigger: **stop remote administrative MCP exposure; preserve HA local control
 No new paid service is needed for source and Docker CI. Public standard GitHub-hosted Actions runs are documented as free/unlimited; full nested HAOS staging is experimental, not yet approved, and would require VM creation, guest image download and ephemeral runner host changes. No paid cloud VM, hosting, Auth0 license or secondary OpenAI identity is permitted without a separate estimate and explicit approval.
 
 **Release status: NO-GO.** No actual deployment actions or firewall/credential changes have occurred.
+
+
+## Phase 2H one-guest staging manifest, pinned and review-only
+
+- GitHub: two unchanged relationship draft PRs (PR #1 tunnel/main, PR #2 upstream HA-MCP review on PR #1 branch); preserve no-merges/no production deployment.
+- Source: `homeassistant-ai/ha-mcp@fc54437a804858732e4bc927add98e202d879a09` + reviewed Phase2D logging/policy, Phase2F strict supported Supervisor option, Phase2H revised middleware; sources applied only in disposable checkout.
+- OS asset: official `home-assistant/operating-system` release **18.3** / `haos_ova-18.3.qcow2.xz`; asset SHA256 `fae6a728768cc10aff60d4820bfcd40d64cd77fab82c8bd92af13b3d9d414090`, reported size **510014132 bytes**. Guest Core/Supervisor exact running versions MUST be read from guest and cannot be assumed from production 2026.10.0.
+- Host: standard public GitHub runner `ubuntu-24.04`, 2vCPU/4GiB guest, finite job runtime, ephemeral local KVM permission, apt QEMU/OVMF package, official image checksum required before decompression.
+- CI full revised middleware [#37851968013](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37851968013): **196 baseline and 211 patched tests pass, no deselections, exact rollback**. Genuine [single HAOS VM #37851915146](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37851915146): result **PENDING at authoring time**; preserve test-level statuses, do not claim it installed/recovered an add-on.
+- No Docker-only assertion substitutes for real Supervisor. No serial logs, disk images, sensitive settings, synthetic secrets or user production data to be uploaded.
+- Required production release gates remain current full add-on-inclusive restore, independent admin, actual host reboot, unapproved hosted attachment tests, direct TCP 9583/IPv6 isolation, signed image provenance/update pin, final-action authorization, real deployment compatibility.
+- Scope of private responsible disclosure: use upstream SECURITY.md private advisory process with verified minimal synthetic reproduction and no real secret. **Do not submit until explicitly approved.**

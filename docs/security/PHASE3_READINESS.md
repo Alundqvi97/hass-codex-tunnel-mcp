@@ -87,3 +87,12 @@ Genuine FastMCP synthetic approval sequence uncovered a pinned upstream race: an
 A more convenient native policy only auto-allows verified bounded reads. Generic `ha_call_service` light rules do not reject additional data/target payloads, so writes stay approval-required. Neither per-tool approval nor server middleware is a universal hard deny. Full Supervisor, independent local restore, hosted unauthorized attachment, add-on update survival, backup integrity and IPv4/IPv6 boundaries remain **BLOCKED/NOT VERIFIED**.
 
 **Production NO-GO.** No production/service/router/credential change.
+
+
+## Phase 2H — actual acceptance and regression boundary
+
+Security-code regression [#37851968013](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37851968013) PASS: 196 original tests, 211 revised/patched tests with ZERO exclusions, exact original source and tests restored. The two old test expectations were actively rewritten for stricter no-stale-approval semantics. This proves in-process gate behavior only.
+
+Real HAOS VM first preflight #37851700140 FAILED before any guest/image was used due old OVMF firmware name, cleanup PASS. Actual authorized one-guest run #37851915146 **IN PROGRESS** as of this note; its Supervisor start/configuration, watchdog, policy corruption/deny, host reboot, complete rollback and recovery are NOT VERIFIED unless independently documented in the final run log.
+
+Even if a guest boots, Phase 3 stays **NO-GO** until the full 16 acceptance cases, hosted attachment boundary, independent production restore, auth and direct LAN/IPv6 exposure gates pass; no production changes, merge, Auth0 or router settings authorized.

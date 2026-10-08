@@ -53,3 +53,10 @@ The normal Settings UI approve/deny POST endpoints have separate ingress/session
 ## Expanded final tested routes
 
 [Final code-equivalent receipt #37849095384](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37849095384): **196 original upstream**, **39 synthetic convenience evaluator**, **15 genuine FastMCP**, **194 patched upstream (two intentional exclusions)** and exact middleware source rollback all passed. Added genuine `ha_call_delete_tool` dispatch (approval required; one click one synthetic delete) and `ha_call_read_tool` refusal of a synthetic privileged write. No actual file was created/deleted. This closes tested read/write/delete proxy examples in-process, not all real installed service/backend variants.
+
+
+## Phase 2H complete regression with revised legacy expectations
+
+[GitHub Actions #37851968013](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37851968013) **PASS**: unmodified pinned HA-MCP policy unit suites **196 passed**. After the separately reversible Phase2G middleware candidate and reworking the exact two prior incompatible upstream assertions through `docs/security/phase2h/revise_approval_tests.py`, the COMPLETE selected upstream policy + additional synthetic FastMCP suites **211 passed, ZERO deselections**, and exact reverse patch restored original test/source bytes. Earlier Phase2H CI failures are visible and not counted as successful.
+
+The updated middleware validates current policy **before** claiming approval, refuses corrupt/changed gates, clears stale tokens, and binds in-memory pending approvals to a snapshot of their policy rule-effect and rules. Under a changed gate, a new invocation can request a **fresh** token; a token minted for the previous rules cannot authorize it. In-process tests only; real HA authorization and Supervisor lifecycle remain a separate gate. Security issue reporting channel is upstream's **private** GitHub Security Advisories page: https://github.com/homeassistant-ai/ha-mcp/security/advisories/new. Do not submit a report or upstream PR without approval.

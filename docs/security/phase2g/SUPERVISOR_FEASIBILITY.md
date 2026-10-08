@@ -38,3 +38,10 @@ Home Assistant supports HAOS under KVM with a QCOW2 image, OVMF UEFI, 2 vCPU and
 **Alternative:** a pre-existing approved, disposable KVM or Supervisor test host could avoid VM creation, but no such host has been independently established here. Generic Docker startup tests are the strongest executed package evidence and are labelled **PACKAGED**, not **SUPERVISOR**.
 
 **Decision:** HAOS/Supervisor release gate remains BLOCKED until an explicitly approved VM or known isolated Supervisor host completes the full acceptance.
+
+
+## Phase 2H authorized extension — do not conflate stages
+
+The user explicitly authorized one disposable GitHub-hosted standard-runner HAOS virtual guest experiment (not production). [Preflight #37851700140](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37851700140) installed runner-only apt dependencies then stopped **before downloading or booting a guest** because the code assumed `/usr/share/OVMF/OVMF_CODE.fd`. Noble's actual OVMF uses `OVMF_CODE_4M.fd` and `OVMF_VARS_4M.fd`; the script was corrected. Preflight cleanup emitted `PHASE2H_GUEST_PROCESS_CLEANUP=PASS` and `PHASE2H_TEMPORARY_VM_FILES_REMOVED=PASS`. The actual single [VM run #37851915146](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37851915146) was **still running** when this paragraph was created, so no HAOS/real Supervisor acceptance conclusion is drawn.
+
+Isolated job design: standard public-repository `ubuntu-24.04` runner, official HAOS 18.3 x86_64 OVA QCOW2 asset, GitHub official asset SHA256 check after download, 2 guest vCPUs, 4 GiB RAM, private staged disk and logs, temporary KVM ACL; VM QEMU user-mode NAT with host forwarding bound to loopback only, UID-scoped iptables public web/DNS/NTP egress and private subnet blocking. **IP-only egress is broader than official-domain-only egress**; this is a residual risk, mitigated by disposable synthetic-only machine and no household route. Cleanup script removes temporary ACL/UID/firewall/image and guest processes. No artifact or cache is uploaded, no self-hosted or larger runner, and no paid resources created. Runtime efficacy awaits receipt.
