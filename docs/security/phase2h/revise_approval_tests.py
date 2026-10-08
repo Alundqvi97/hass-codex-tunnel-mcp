@@ -47,7 +47,19 @@ def patch(src):
     section=src[c:d]
     section=replace_once(section,
         '    assert sorted(outcomes, key=str) == ["ok", "pending"]\n    assert call_next.await_count == 1',
-        '    assert sorted(outcomes, key=str) == ["pending", "pending"]\n    assert call_next.await_count == 0\n    assert not queue.is_remembered("ha_call_service", compute_args_hash(args))')
+        '    assert sorted(outcomes, key=str) == ["ok", "pending"]\n    assert call_next.await_count == 1\n    assert not queue.is_remembered("ha_call_service", compute_args_hash(args))')
+    # The second caller under the new rules may receive a NEW approval,
+    # never the original rule's token. Assert a changed token explicitly.
+    section=replace_once(section,
+        '        await _wait_until_attached(attached, 1)\n        pol[0] =',
+        '        await _wait_until_attached(attached, 1)\n'
+        '        prior_token = queue.list_pending()[0].token\n'
+        '        pol[0] =')
+    section=replace_once(section,
+        '        assert len(pending) == 1\n        queue.approve(pending[0].token)',
+        '        assert len(pending) == 1\n'
+        '        assert pending[0].token != prior_token\n'
+        '        queue.approve(pending[0].token)')
     src=src[:c]+section+src[d:]
     return src
 
