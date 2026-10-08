@@ -9,7 +9,7 @@ import ipaddress
 import socket
 from urllib.error import HTTPError, URLError
 from urllib.parse import ParseResult, urlsplit, urlunsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 class MCPUrlError(ValueError):
@@ -72,6 +72,8 @@ def assess_mcp_url(value: str) -> MCPUrlAssessment:
     parsed = urlsplit(normalized)
     private = _is_private_or_local(parsed)
     warning = None
+    if not private and parsed.scheme == "http":
+        raise MCPUrlError("insecure_public_mcp_url")
     if not private:
         warning = "public_mcp_url"
     elif parsed.scheme == "https" and parsed.hostname not in _LOCAL_HOSTNAMES:
@@ -91,17 +93,35 @@ async def async_probe_mcp_url(
     await asyncio.to_thread(_probe_mcp_url, value, timeout, bearer_token)
 
 
+class _NoRedirects(HTTPRedirectHandler):
+    """Never forward backend bearer credentials to redirect destinations."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def _probe_mcp_url(value: str, timeout: float, bearer_token: str = "") -> None:
     headers = {"User-Agent": "hass-codex-tunnel-mcp"}
     if bearer_token:
         headers["Authorization"] = f"Bearer {bearer_token}"
     request = Request(value, method="GET", headers=headers)
+    # urllib's default redirect handler can follow the configured endpoint
+    # to an untrusted origin.  Never forward the backend Authorization header.
+    opener = build_opener(_NoRedirects())
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with opener.open(request, timeout=timeout) as response:
             _validate_probe_response(response)
     except HTTPError as err:
+        if 300 <= err.code < 400:
+            raise MCPUrlError("mcp_probe_redirect_rejected") from err
+        if bearer_token and err.code in (401, 403):
+            raise MCPUrlError("mcp_auth_rejected") from err
         if err.code == 404 or err.code >= 500:
             raise MCPUrlError("mcp_probe_failed") from err
+        # Without a bearer token, a 401 can be a valid challenge in the
+        # interactive OAuth setup.  For a GET probe, 400/405/406 can indicate
+        # an MCP endpoint that expects POST.  These are NOT proof of auth.
+        # Successful credential validation needs a separate MCP POST test.
     except (TimeoutError, OSError, URLError) as err:
         raise MCPUrlError("mcp_probe_failed") from err
 
