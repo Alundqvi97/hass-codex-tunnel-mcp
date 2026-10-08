@@ -1,0 +1,40 @@
+name: Phase 2H - Harness Syntax and Isolation Review Only
+on:
+  push:
+    branches: [security/ha-mcp-phase2d-candidates]
+    paths:
+      - docs/security/phase2h/runner_once.sh
+      - docs/security/phase2h/single_haos_guest.py
+      - .github/workflows/phase2h-harness-static.yml
+permissions: {contents: read}
+jobs:
+  offline-static-verification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - name: Check Python/Bash syntax and exact isolation guard order
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n docs/security/phase2h/runner_once.sh
+          python3 -m py_compile docs/security/phase2h/single_haos_guest.py
+          python3 - <<'PY'
+          from pathlib import Path
+          sh=Path("docs/security/phase2h/runner_once.sh").read_text()
+          py=Path("docs/security/phase2h/single_haos_guest.py").read_text()
+          assert "set -Eeuo pipefail" in sh
+          established=sh.index("-o lo -d 127.0.0.1/32 -p tcp -m conntrack --ctstate ESTABLISHED -j ACCEPT")
+          deny=sh.index("for cidr in 0.0.0.0/8")
+          assert established < deny
+          assert '-d "$cidr" -j REJECT' in sh
+          assert "sudo ip6tables -w 5 -A PHASE2H_GUEST6 -j REJECT" in sh
+          assert 'sudo iptables -w 5 -A PHASE2H_GUEST -j REJECT' in sh
+          assert 'hostfwd=tcp:127.0.0.1:18123-' in py
+          assert "report_sanitized_serial_milestones" in py
+          assert "serial.read_bytes()[:4_000_000].lower()" in py
+          assert "QEMU" not in sh.split("trap cleanup EXIT")[0] # no run before cleanup registered
+          assert "workflow_dispatch" not in Path(".github/workflows/phase2h-haos-vm-once.yml").read_text()
+          print("PHASE2H_OFFLINE_HARNESS_STATIC_CHECKS_PASS")
+          PY
