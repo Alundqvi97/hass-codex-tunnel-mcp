@@ -35,3 +35,12 @@ Do not merge repositories or share privileged broker identities during this phas
 **NO-GO remains.** Two newly source-confirmed high-priority findings now require explicit remediation: (1) HA-MCP standard-mode backend does not independently validate the extra bearer, and (2) policy middleware registration failure can leave administrative tools ungated while the server continues. Do not disable the current working remote path before proving an independent admin recovery path.
 
 Require a real staged backend/authorization test (not the existing simulated fixture), a read-only sanitized effective tool-policy inventory, hosted isolation tests with explicit approval and cost cap, exact v0.0.15 binary inspection, and a separately reviewed recovery implementation. See `RECOVERY_DESIGN.md` and `HOSTED_AUTH_TEST_PLAN.md`.
+
+
+## Phase 2C decision (2026-10-08)
+
+**Staging gate improved, overall NO-GO unchanged.** Tested exact v8.6.0 standard transport and policy functions successfully against 38 synthetic offline cases, including a confirmed startup policy fail-open and absence of additional incoming bearer validation. See `ACTUAL_HA_MCP_STAGING.md`.
+
+Before any production deployment, require an upstream HA-MCP fail-closed policy initialization remediation (separate project), a secret-path logging remediation, authenticated operator-only policy inventory, a genuine least-privilege gate across every alternative admin tool, and an out-of-band recovery route. Existing HA-MCP add-on auto-update and watchdog being enabled does not independently guarantee tunnel-client crash recovery, source compatibility, or update rollback. A source-level watchdog design remains separate in `RECOVERY_DESIGN.md`.
+
+OpenAI-hosted negative attachment and exact deployed add-on image digest still need verification. Maintain the draft unmerged; do not restart, reconfigure or rotate production.
