@@ -17,39 +17,39 @@ def patch(source:str)->str:
 '''
     new='''        if pending.decision == "approved":
             # Approval is not permission to use a stale or broken policy.
-                # The wait above yielded control: policy edits or corruption
-                # may have occurred while the request was in the queue.
-                try:
-                    current_policy = await run_in_thread(self._policy_provider)
-                except Exception:
-                    logger.error(
-                        "Security policy unavailable before approved dispatch; "
-                        "refusing to execute"
+            # The wait above yielded control: policy edits or corruption
+            # may have occurred while the request was in the queue.
+            try:
+                current_policy = await run_in_thread(self._policy_provider)
+            except Exception:
+                logger.error(
+                    "Security policy unavailable before approved dispatch; "
+                    "refusing to execute"
+                )
+                raise_tool_error(
+                    create_error_response(
+                        ErrorCode.POLICY_LOAD_FAILED,
+                        "Security policy could not be verified immediately "
+                        "before dispatch. Ask an administrator to repair it "
+                        "and submit a fresh request.",
                     )
-                    raise_tool_error(
-                        create_error_response(
-                            ErrorCode.POLICY_LOAD_FAILED,
-                            "Security policy could not be verified immediately "
-                            "before dispatch. Ask an administrator to repair it "
-                            "and submit a fresh request.",
-                        )
+                )
+            if (
+                current_policy.rule_effect != policy.rule_effect
+                or current_policy.rules != policy.rules
+            ):
+                logger.warning(
+                    "Tool security rules changed while approval was pending; "
+                    "refusing stale approved dispatch"
+                )
+                raise_tool_error(
+                    create_error_response(
+                        ErrorCode.USER_APPROVAL_REQUIRED,
+                        "Security policy changed during approval. Reissue "
+                        "this operation for a fresh decision under the "
+                        "current rules.",
                     )
-                if (
-                    current_policy.rule_effect != policy.rule_effect
-                    or current_policy.rules != policy.rules
-                ):
-                    logger.warning(
-                        "Tool security rules changed while approval was pending; "
-                        "refusing stale approved dispatch"
-                    )
-                    raise_tool_error(
-                        create_error_response(
-                            ErrorCode.USER_APPROVAL_REQUIRED,
-                            "Security policy changed during approval. Reissue "
-                            "this operation for a fresh decision under the "
-                            "current rules.",
-                        )
-                    )
+                )
             if self._claim_approval(
 '''
     if source.count(old)!=1:raise RuntimeError("UPSTREAM_CONTEXT_NOT_EXACT")
