@@ -305,3 +305,27 @@ def test_secret_recovery_path_remains_persisted(tmp_path):
     assert result == SECRET
     assert (tmp_path / "secret_path.txt").read_text() == SECRET
     assert start.get_or_create_secret_path(tmp_path) == SECRET
+
+
+def test_packaged_logging_disables_banner_and_access_log():
+    start = load_addon_start()
+    fake = MagicMock()
+    assert start._run_mcp_server(fake, "127.0.0.1", 9583, SECRET,
+                                 {"access_log": False}) == 0
+    assert fake.run.call_args.kwargs["show_banner"] is False
+    source = Path(start.__file__).read_text(encoding="utf8")
+    assert '"access_log": False' in source
+
+
+def test_logging_filter_has_no_real_secrets_in_fixture():
+    start = load_addon_start()
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    logger = logging.getLogger("fastmcp")
+    logger.addHandler(handler)
+    try:
+        start.install_secret_path_log_filter(SECRET)
+        logger.warning("Synthetic path passed through %s", SECRET)
+        assert SECRET not in stream.getvalue()
+    finally:
+        logger.removeHandler(handler)
