@@ -50,3 +50,14 @@ A Git reverse patch restoring exact `server.py` and `start.py` blobs is **not** 
 Read-only backup metadata: 39 snapshots recorded; most recent snapshot metadata labels HA Core 2026.9.4 while running Core reports 2026.10.0. Verify current-version data/content compatibility and restore access using independent HA/Supervisor administration before any production mutation.
 
 Strict-mode rule-effect conversion of the current 18 configured approval rules is prohibited without a reviewed semantic migration: equivalent rules in allow mode would automatically allow destructive actions. Do not use rollback to re-enable unrestricted admin actions silently.
+
+
+## Phase 2F supported strict mode and safe policy migration
+
+**Offline rollback verified:** `git apply -R` restored exact pinned original Git blobs of `server.py`, `start.py`, and `config.yaml` after Phase 2D+2F candidate application (CI #37846398572). That is NOT a real Home Assistant add-on uninstall/restore.
+
+**Safe policy migration precondition:** never replace the 18 current `require_approval` rules by toggling `rule_effect` to `allow`. All 18 would become auto-authorized destructive names. Build a new reviewed positive list, preserve the old policy under protected admin-only backup, and test all alternatives before any approved change.
+
+**Local recovery:** The mandatory marker intentionally prevents disabling security via a malformed/missing options file. In packaged synthetic recovery, an independent network-isolated root admin process restored the root-owned policy and restarted a valid container. Production needs supported local HA/Supervisor console/file or restore access, correct add-on image/data backup, plus a rollback drill before deploying; never attempt to repair a failed policy through the unavailable ChatGPT tunnel. Do not weaken marker permissions or expose the stored path in logs.
+
+Backup inventory: 39 existing backups. Most recent dated October 8 includes HA+database but reports `homeassistant_version=2026.9.4` while Core reports `2026.10.0`. Verify metadata/restore compatibility and an independent recovery point before changing any service. No backup was created or restored here.
