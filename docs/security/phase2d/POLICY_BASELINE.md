@@ -42,3 +42,14 @@ Two private Home Assistant administrator UI captures establish 18 visible uncond
 **Do not convert these 18 rules in place to `rule_effect=allow`.** Source-level evaluator testing confirms the inversion: `ha_config_remove_automation` requires approval in `require_approval` mode, but with the same rule would be automatically allowed under `allow` mode. Strict allow lists must be reconstructed from positive reviewed permissions, not migrated by a toggle.
 
 Additional Phase 2E candidate guards reject malformed strict flag values, failed ANY-match policy migration when strict, and an unconditional `*` blanket-allow rule. These guard against obvious weak strict-mode configurations but do **not** prevent all dangerous explicit allow rules; migration review remains mandatory.
+
+
+## Phase 2F executable conservative replacement
+
+The operator screenshot confirms `require_approval` mode. All 18 current unconditional tool rules are approval gates, not positive allows. **Do not flip their rule effect in place.** Complete 18-entry old/new table: `../phase2f/POLICY_MIGRATION.md`.
+
+New synthetic initial strict mode policy:
+```json
+{"schema_version":2,"rule_effect":"allow","rules":[{"tool_name":"ha_get_overview","when":[],"remember_minutes":0}]}
+```
+Pinned `Policy` serialization adds default operational fields. `ha_get_overview` is the only automatic allow; all other tools require approval, **not a HARD DENY**. Routine lighting/blind/media calls remain approval-required until full argument validation/negative testing supports careful additional allow rules. Model, policy provider, 18-rule inversion and packaged restart tests passed within isolated scope ([CI #37846398572](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37846398572)). No production changes.
