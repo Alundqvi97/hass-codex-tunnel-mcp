@@ -21,3 +21,10 @@ Actual pinned v8.6.0 process serving synthetic `initialize`, `tools/list`, `tool
 Construct pinned HA-MCP FastMCP `HttpTransportFastMCP` with synthetic `/private_example_only` route and one read-only echo tool. Use Starlette `TestClient`/httpx ASGITransport with *no external socket*; test correct path with missing/bad/good bearer, and incorrect path with correct bearer for `initialize`, `tools/list`, `tools/call`. Verify that all three bearers yield equivalent results at the correct path, wrong path returns 404, and no HA admin tools are registered. That test verifies FastMCP standard-mode transport in pinned code, not the full Supervisor-installed runtime.
 
 **Risk remediation:** Never count additional backend bearer as enforcement until actual recipient middleware validates it. Preserve secret-path secrecy, tighten inbound port 9583 after verifying local tunnel route and recovery, and implement distinct real token enforcement only if a supported architecture requires it.
+
+
+## Phase 2C STAGING VERIFIED — Supersedes earlier source-only status
+
+Real pinned upstream `HttpTransportFastMCP` and its bundled FastMCP JSON-RPC transport were executed in CI; full evidence and scope are in `ACTUAL_HA_MCP_STAGING.md`. On the correct synthetic endpoint all `initialize`, `tools/list` and harmless `tools/call` requests returned successful MCP results **regardless of whether incoming bearer header was absent, incorrect, arbitrary, malformed, or expired-like**. Requests on an incorrect path did not execute the tool. The term “expired-like” is only an inert string, not a verified expiry/revocation test because standard mode has no bearer validation provider configured.
+
+**Result:** secret-path capability governs access; the tunnel-side extra bearer has no independent enforcement at backend. The running Docker image digest is still unverified, and the tests do not exercise production admin tools, HA Supervisor or OpenAI hosted attachment.
