@@ -4,6 +4,7 @@ on:
     branches: [security/ha-mcp-phase2d-candidates]
     paths:
       - tests/staging/test_phase2g_approval_dispatch.py
+      - tests/staging/test_phase2g_convenience.py
       - docs/security/phase2g/**
       - .github/workflows/phase2g-approvals.yml
 permissions:
@@ -48,6 +49,13 @@ jobs:
             ha_mcp_pinned/tests/src/unit/policy/test_approval_overlap.py \
             ha_mcp_pinned/tests/src/unit/policy/test_allow_list.py \
             ha_mcp_pinned/tests/src/unit/policy/test_handlers.py
+      - name: Evaluate separate synthetic household convenience proposal
+        env:
+          PYTHONPATH: ha_mcp_pinned/src
+          HOMEASSISTANT_URL: http://127.0.0.1:1
+          HOMEASSISTANT_TOKEN: synthetic-not-real
+        run: |
+          ha_mcp_pinned/.venv/bin/python -m pytest -q -rs -x tests/staging/test_phase2g_convenience.py
       - name: Apply exact SHA-guarded final-dispatch hardening candidate
         run: |
           python docs/security/phase2g/middleware_revalidation.py --apply
