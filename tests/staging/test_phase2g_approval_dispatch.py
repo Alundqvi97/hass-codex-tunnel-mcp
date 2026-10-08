@@ -43,6 +43,12 @@ def fake_server(policy_provider=None):
         state.append(("ha_bulk_control", {"selector":selector,"action":action}))
         return {"fake_dispatch": True}
 
+
+    @m.tool(name="ha_delete_file", annotations={"readOnlyHint": False, "destructiveHint": True})
+    async def delete_file(path: str) -> dict:
+        state.append(("ha_delete_file", {"path":path}))
+        return {"fake_dispatch": True}
+
     @m.tool(name="ha_restart", annotations={"readOnlyHint": False, "destructiveHint": True})
     async def restart() -> dict:
         state.append(("ha_restart", {}))
@@ -209,3 +215,33 @@ async def test_modified_policy_during_pending_approval_requires_fresh_decision()
             worker.cancel()
             try:await worker
             except asyncio.CancelledError:pass
+
+
+@pytest.mark.asyncio
+async def test_genuine_delete_proxy_gates_final_synthetic_file_delete():
+    server,queue,dispatched=fake_server()
+    envelope={"name":"ha_delete_file","arguments":{"path":"/synthetic-do-not-create"}}
+    async with Client(server) as client:
+        first=await request(client,"ha_call_delete_tool",envelope)
+        assert first.is_error
+        assert "USER_APPROVAL_REQUIRED" in first.content[0].text
+        assert not dispatched and len(queue.list_pending())==1
+        token=queue.list_pending()[0].token
+        assert queue.approve(token)
+        success=await request(client,"ha_call_delete_tool",envelope)
+        assert not success.is_error
+        assert dispatched==[("ha_delete_file",{"path":"/synthetic-do-not-create"})]
+        replay=await request(client,"ha_call_delete_tool",envelope)
+        assert replay.is_error and len(dispatched)==1
+
+
+@pytest.mark.asyncio
+async def test_read_search_proxy_cannot_invoke_synthetic_write_action():
+    server,queue,dispatched=fake_server()
+    envelope={"name":"ha_call_service","arguments":{
+        "domain":"lock","service":"unlock","entity_id":"lock.synthetic"}}
+    async with Client(server) as client:
+        result=await request(client,"ha_call_read_tool",envelope)
+        assert result.is_error
+        assert dispatched==[]
+        assert queue.list_pending()==[]
