@@ -41,6 +41,10 @@ def run(*args: str, timeout=80, check=True) -> subprocess.CompletedProcess[str]:
 
 def prepare_data(path: Path, *, option_enabled=True, policy_state="valid"):
     path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    # The GitHub runner owns the temporary mount. The container drops ALL
+    # capabilities, including DAC_OVERRIDE, so root cannot traverse a 0700
+    # runner-owned directory. Only synthetic fixtures reside here.
+    path.chmod(0o777)
     (path / "options.json").write_text(json.dumps({
         "enable_tool_security_policies": option_enabled,
         "enable_security_policy_tool": False,
