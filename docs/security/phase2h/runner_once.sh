@@ -162,7 +162,8 @@ export PHASE2H_LOCAL_ADDON_SEEDED="$GUEST_SEEDED"
 echo "PHASE2H_SUPERVISOR_LOCAL_ADDON_SOURCE_SEEDED=$GUEST_SEEDED"
 sudo chown "$GUEST_USER:$GUEST_USER" "$WORK/haos_ova-18.3.qcow2"
 chmod 755 "$WORK"
-sudo -u "$GUEST_USER" touch "$WORK/serial-private.log"
+sudo touch "$WORK/serial-private.log"
+sudo chown "$GUEST_USER:$GUEST_USER" "$WORK/serial-private.log"
 echo "PHASE2H_VM_GUEST_LIMIT=ONE"
 # If a filesystem quota is hit, stop this guest; no retry on another host.
 (
