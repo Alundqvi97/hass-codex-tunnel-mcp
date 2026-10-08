@@ -64,3 +64,8 @@ The direct LAN route to TCP/9583 bypasses OpenAI boundary A/B/C and reaches boun
 ## Architecture recommendation (not deployed)
 
 Use the current working path until safe testing is approved. Do not assume the backend Authorization header adds another layer of security unless the receiving mode proves enforcement with real MCP POST. If hosted authorization does not meet requirements, design a separate narrow HA authorization proxy — *not* simply sharing the Home Infra Control Plane root privileges. Phase 5 Auth0 is an option for ingress authentication, not a substitute for per-tool access control.
+
+
+## Phase 2B correction to backend-auth boundary
+
+Pinned v8.6.0 source establishes that the add-on's standard HTTP mode is **secret-path authenticated**: `start.py` mounts the FastMCP server at the secret path and supplies `SUPERVISOR_TOKEN` as **outbound** `HOMEASSISTANT_TOKEN`. The extra bearer sent by fork `tunnel.py` is **not recipient-side validated in this standard mode**. Therefore replace “bearer enforcement unknown” in the earlier Phase 2 snapshot with **“backend bearer non-enforcement established from pinned source, but exact deployed image not attested and runtime POST not tested”**. See `BACKEND_AUTH_VERIFICATION.md`. Hosted association and workspace permissions remain DOCUMENTED ONLY, not VERIFIED HOSTED.
