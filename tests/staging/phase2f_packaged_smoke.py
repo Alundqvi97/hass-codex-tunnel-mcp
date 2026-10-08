@@ -124,8 +124,17 @@ def main():
         config(data,state="valid")
         run_once(data,"first-opt-in",True)
         marker=data/"strict_policy_required.v1.json"
-        assert json.loads(marker.read_text())=={"schema_version":1,"required":True}
+        assert marker.is_file()
         assert marker.stat().st_mode&0o777==0o600
+        # The CI runner does not own the root:root 0600 marker. Verify its
+        # synthetic content using the same packaged image, mounted read-only,
+        # without broadening permissions or exposing anything in stdout.
+        verify=cmd("docker","run","--rm","--network","none",
+                   "--cap-drop","ALL","--security-opt","no-new-privileges",
+                   "-v",str(data)+":/data:ro","--entrypoint","python3",
+                   IMAGE,"-c",
+                   'import json,pathlib; p=pathlib.Path("/data/strict_policy_required.v1.json"); '
+                   'assert json.loads(p.read_text())=={"schema_version":1,"required":True}')
         config(data,state="missing-options")
         run_once(data,"missing-options-with-marker",False)
         config(data,state="corrupt-options")
