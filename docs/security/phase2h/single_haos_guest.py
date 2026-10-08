@@ -70,12 +70,32 @@ def launch_guest():
     return subprocess.Popen(cmd,stdin=subprocess.DEVNULL,
                             stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 
+def report_sanitized_serial_milestones():
+    # Only Boolean fixed-string findings, NEVER any guest log lines or data.
+    # Serial console output cannot by itself prove the guest is healthy.
+    serial=WORK/"serial-private.log"
+    try:
+        data=serial.read_bytes()[:4_000_000].lower()
+    except OSError:
+        report("SERIAL_READABLE","NOT_VERIFIED")
+        return
+    report("SERIAL_READABLE","PASS")
+    for name,marker in (
+        ("LINUX_KERNEL_BANNER",b"linux version"),
+        ("HAOS_PLATFORM_MESSAGE",b"home assistant os"),
+        ("SUPERVISOR_BOOT_MESSAGE",b"supervisor"),
+        ("EMERGENCY_MODE",b"emergency mode"),
+    ):
+        report("SERIAL_"+name, "OBSERVED" if marker in data else "NOT_OBSERVED")
+
+
 def boot_wait(proc,secs=780):
     deadline=time.monotonic()+secs
     observer=False
     while time.monotonic()<deadline:
         if proc.poll() is not None:
             report("HAOS_GUEST","BLOCKED_QEMU_EXIT")
+            report_sanitized_serial_milestones()
             return None
         observer=observer or bool(fetch_status("http://127.0.0.1:14357/",2))
         for port in (18124,18123):
@@ -86,6 +106,7 @@ def boot_wait(proc,secs=780):
         time.sleep(5)
     report("HAOS_OBSERVER","REACHABLE" if observer else "NOT_OBSERVED")
     report("HAOS_CORE_HTTP","BLOCKED_TIMEOUT")
+    report_sanitized_serial_milestones()
     return None
 
 def supervisor_verify(h,base):
