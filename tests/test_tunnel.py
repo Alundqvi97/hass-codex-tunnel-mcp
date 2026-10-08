@@ -171,3 +171,39 @@ async def _run_tunnel_manager_cleans_up_stale_client(tmp_path: Path) -> None:
     assert stale.returncode is not None
 
     await manager.stop()
+
+
+def test_tunnel_manager_records_unexpected_exit_without_relaunch(tmp_path: Path) -> None:
+    """Source-level reliability baseline: an unexpectedly exited child is not restarted."""
+    asyncio.run(_run_unexpected_exit_test(tmp_path))
+
+
+async def _run_unexpected_exit_test(tmp_path: Path) -> None:
+    fake = tmp_path / "tunnel-client"
+    fake.write_text("#!/usr/bin/env python3\nimport sys\nsys.exit(17)\n", encoding="utf-8")
+    fake.chmod(0o755)
+    launches = 0
+
+    def provider(force):
+        nonlocal launches
+        launches += 1
+        return fake
+
+    manager = TunnelManager(provider, tmp_path / "run")
+    await manager.start({
+        CONF_TUNNEL_ID: "tunnel_0123456789abcdef0123456789abcdef",
+        CONF_API_KEY: "synthetic-platform-key",
+        CONF_HA_MCP_URL: "http://127.0.0.1:9/fixture-only",
+        CONF_HA_MCP_BEARER_TOKEN: "",
+        CONF_CONTROL_PLANE_BASE_URL: "",
+        CONF_CONTROL_PLANE_PATH: "",
+    })
+    for _ in range(60):
+        if manager.status.state == "exited":
+            break
+        await asyncio.sleep(0.05)
+    assert manager.status.state == "exited"
+    assert manager.status.returncode == 17
+    assert launches == 1
+    assert manager.status.healthy is False
+    await manager.stop()
