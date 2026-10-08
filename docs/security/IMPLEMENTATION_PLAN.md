@@ -166,3 +166,41 @@ Correct source and test locations: `docs/security/phase2d/patch_candidates.py` a
 **Blocked for production:** effective policy rules (authorized API 403), packaged add-on/hosted attachment, host bind/IPv6, secret leakage through unexamined sinks, independent local recovery and deployment approval. No production change occurred.
 
 The CI result above predates this documentation-only receipt and must not be represented as the final HEAD CI until a later workflow run completes.
+
+## Phase 2E execution — 2026-10-08
+
+**Overall:** Phase 2 PARTIAL / Phase 3 production NO-GO. All work on existing fork's stacked draft PR #2; PR #1 unchanged. No production or hosted-resource changes.
+
+### Production policy evidence (VERIFIED LIVE, user screenshots)
+
+- The two PDF captures of the supported HA-MCP 8.6.0 administrator policy UI show 18 distinct configured named-tool rules; all visibly set unconditional approval, zero-minute single-shot retention, and no argument predicates. Names and operation-class gaps: `phase2e/POLICY_INVENTORY.md`.
+- Important generic administrative routes `ha_call_service`, `ha_bulk_control`, `ha_manage_addon`, `ha_manage_backup`, `ha_restart` are **not among the pictured rules**. The connected connector lists 79 methods; this is not an independently verified complete deployed catalog.
+- Policy `rule_effect` selector and successful startup of middleware **not visible**; approval UI configuration is not runtime enforcement evidence. Earlier supported GET endpoint returned HTTP 403; respected without bypass.
+- **Critical migration finding:** the current named approval rules would turn into automatic ALLOW rules if `rule_effect` changed to `allow` while reusing the same entries. Exact pinned evaluator regression verifies this. Requires a new, reviewed positive allow-list and explicit safe migration.
+- No screenshots/private HA configuration/secret routes uploaded to GitHub.
+
+### Packaged-staging investigation (VERIFIED PACKAGED where explicitly noted)
+
+- Exact upstream v8.6.0 Dockerfile, pinned base image digests, `uv.lock`, start.py and installed package used in disposable GitHub Actions Docker build; runtime always `--network none` and has no published host port, only dummy Supervisor token and synthetic file fixtures.
+- **VERIFIED PACKAGED build** and real installed version = 8.6.0. Container startup and MCP initialize request succeeded in isolated smoke test; first logging-candidate package run then FAILED because collected logs still contained a synthetic secret. This was not detected by earlier source-only tests.
+- Source review identified FastMCP startup banner and Uvicorn access logger as additional potential disclosure paths. Logging candidate now disables banner and access logging; latest build+negative-log CI must pass before declaring leak remediated at packaged level.
+- Synthetic container fixture initially had a test-volume PermissionError because capabilities were dropped, fixed without weakening production. No Supervisor/HAOS instance or real production administrative tool was used.
+
+### Source quality changes and blocked supported configuration
+
+- Policy candidate now rejects unknown strict flag values, strict-mode failed policy migration and unconditional bare wildcard allow; test explicitly proves mode inversion. Full source tests and clean reverse patch remain required after latest candidate edits.
+- Stable Supervisor `config.yaml` has no supported `HA_MCP_REQUIRE_STRICT_POLICY` option; manually injecting env on production is not acceptable. Dedicated `phase2e/STRICT_OPTION_DESIGN.md` specifies durable opt-in, startup export, migration marker, validation and strict persistence across reboot. **Implementation not deployed or verified in Supervisor**.
+- Recovery: 39 backups appear in read-only snapshot list, but newest labels are 2026.9.4 vs Core 2026.10.0; a recent compatible recovery point and out-of-band restore have NOT been proved. Add-on boot/watchdog/ingress metadata confirmed read-only, not a restart test.
+- Network: host-network TCP/9583 exposure and Supervisor ingress dependencies mean binding solely to loopback may break the UI. See `phase2e/RECOVERY_AND_NETWORK.md`. No scans or firewall changes.
+
+### Approval-dependent gates
+
+1. Screenshot of policy mode and evidence of effective rule handling/approval flow through supported HA administrator UI, without secrets or user-specific PINs.
+2. Supported strict add-on option and safe new allow-list migration, packaged Supervisor/HAOS boot/recovery, synthetic log/error capture in complete startup/requests.
+3. Independent local recovery and verified current-version backup before any upgrade.
+4. Hosted OpenAI unauthorized-attachment testing with separately approved cost/budget and test identities. No hosted resources created.
+5. Explicit approval for any change to actual HA, add-on, tunnel, UniFi, Auth0 or Home Infra Control Plane.
+
+### CI integrity
+
+Phase 2D historical final: [run 37840980382](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37840980382) successful. Additional Phase 2E workflow: `.github/workflows/phase2e-packaged.yml`. Earlier packaged negative log test FAILED by detecting synthetic credential; *never claim this gate passed unless a later exact-head run reports success.* Read final run jobs/logs after final commit before assigning any acceptance.
