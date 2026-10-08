@@ -7,8 +7,8 @@ Updated 2026-10-08. Repository: Alundqvi97/hass-codex-tunnel-mcp. This work is i
 | Phase | Status | Evidence / promotion requirements |
 |---|---|---|
 | 0 — Audit and baseline | Completed (prior audit) | Source at `def1d7235018745b880b573a944925352dea85a5`, original `mcp_url.py` blob `ad0afdc1d2aaec61390be0a108c8d6a18c853a57`; see SECURITY_AUDIT.md |
-| 1 — GitHub and offline validation | In progress | Fork verified; regression patch and reverse application passed; original isolated suite 14/14 passed; integrated isolated security tests 12/12 passed in local reconstructed source-only environment. Full upstream suite and CI must pass before promotion. |
-| 2 — Authentication and network security verification | Pending | Test valid/missing/invalid/expired/revoked backend bearer and real MCP POST; unauthorized hosted tunnel attachment; direct port 9583 access by VLAN |
+| 1 — GitHub and offline validation | **COMPLETED** | Fork/ancestry verified, draft PR opened; baseline 14/14, integration source tests and combined upstream suite passed GitHub CI (see 2026-10-08 receipts below). |
+| 2 — Authentication and network security verification | **PARTIALLY COMPLETE / BLOCKED** | Architecture and read-only network inventory documented; isolated representative protocol fixture and synthetic regression tests passed; real HA-MCP POST and approved hosted negative-attachment tests NOT PERFORMED. |
 | 3 — Production-ready hardening and rollback | Pending | Independent review, full staging compatibility/upgrade/restart/rollback drill, signed or pinned artifacts, sensitive log audit |
 | 4 — Explicitly approved deployment | Pending approval | Backup, restoration copy, change window, authorized exact deployment, automated health gates, rollback rehearsed |
 | 5 — Auth0 / Control Plane relationship | Pending | Separate design, no implied shared identity, no deployment coupling |
@@ -23,7 +23,7 @@ Authorized: fork development branch, CI, documentation, draft PR, offline tests.
 - Original ZIP: `ha_tunnel_hardening_candidate(1).zip`, SHA-256 `b56be95fb58793a91eabc134614767072e42c1b95fc4ea311435b40a82af91e4`.
 - 2026-10-08: `git apply --check`, application, exact hardened file comparison, reverse-check/reverse application, baseline restoration all passed offline.
 - 2026-10-08: candidate `python -B -m unittest discover -s tests -v` passed 14 tests, including intentional reproduction of vulnerable baseline. Integrated security tests adapted to repository import style: 12 passed locally in isolated environment with the patched module; full repository tests not yet established by this evidence.
-- Original tests exercise tunnel-client subprocess logic and need the full repository checkout. GitHub Actions is the first authoritative full-repository CI execution; record actual run status separately.
+- Original tests exercise tunnel-client subprocess logic. GitHub Actions completed a full checkout and test run; see CI receipts below. The HA selector schema test remains skipped due to unavailable `homeassistant` dependency.
 - Never store production secrets, URL secret paths or credentials in tickets, CI, or logs.
 
 ## Independent security concerns / blockers
@@ -53,3 +53,42 @@ Authorized: fork development branch, CI, documentation, draft PR, offline tests.
 - The skipped test requires review; it does not change Phase 2 staging/authentication requirements.
 - Draft PR [#1](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/pull/1) was opened against fork main; no merge or production change.
 - Phase 1 offline GitHub-preparation acceptance satisfied subject to an independent security review of residual findings. Phase 2 remains pending. Re-check CI after any additional commit.
+
+## Phase 2 execution receipt — 2026-10-08
+
+**Current disposition: PARTIALLY COMPLETE / BLOCKED.** The working production Home Assistant connection was not changed. No hosted negative-access tests, production device calls, production port scans, credentials, Auth0 updates, router changes, process restarts, or Control Plane modifications.
+
+### Completed tasks and evidence
+
+- Independently inspected latest draft PR #1, source, docs, workflow and previous CI; corrected stale Phase 1 table status.
+- Official OpenAI Secure MCP Tunnel guide documents org/workspace associations and separate Tunnels Read/Use requirements. Whether an unauthorized identity can attach to **this** tunnel was not tested; the label No Auth does not establish either public accessibility or successful denial.
+- Read-only HA Core 2026.10.0 / HA-MCP app 8.6.0 / tunnel integration loaded; app policies, redaction and strict best-practice checks on; `enable_security_policy_tool=false`; `read_only_mode=false`; `disabled_tools` empty; token/key configuration presence confirmed but values never collected or written.
+- Read-only UniFi survey: Home, IoT, Guest, VPN; 113 policy records; HA-MCP add-on `host_network=true` and 9583/tcp published. No live IPv6 listener or inter-VLAN negative reachability testing.
+- Added `AUTHENTICATION_ARCHITECTURE.md`, `NETWORK_EXPOSURE.md`, `PHASE2_TEST_EVIDENCE.md`, `PHASE3_READINESS.md`. Extended audit, threat model, rollback. Do not promote from documentation alone.
+- Isolated representative MCP JSON-RPC fixture exercises POST `initialize`, `tools/list`, read-only `tools/call`, and missing/wrong/expired/revoked/scopeless credentials. These are **simulated fixture contracts, not actual HA-MCP/tunnel-client behavior**.
+- Source-level fake tunnel-child exit test demonstrates current watcher does not automatically relaunch. The health-URL-file sentinel is not full readiness.
+- Identified legacy URL redaction userinfo leakage; development-branch source fix and security regression tests added. **No deployment.**
+- Relevant new full-checkout CI [PR run 37835878059](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37835878059) at commit `eacf8a4a21380447f3b3390ca8c04a9d42cb19f0`: **57 passed, 1 skipped, 2 subtests passed in 4.82s**, syntax+guard steps successful. The skipped test was `tests/test_config_flow_schema.py`, because `homeassistant.helpers.selector` cannot be imported (`No module named 'homeassistant'`); that runtime integration compatibility remains unverified. Later documentation commits need their own CI receipts.
+- CI had one intermediate FAILED run due to a malformed source line in the initial redaction edit (4 failures, 53 passes on a previous intermediate commit); immediately corrected on the development branch. **Do not claim every intermediate run passed.** Subsequent source+tests CI succeeded (above). GitHub workflow uses pytest `-rs` to reveal skip reasons.
+
+### Risk and decision register
+
+| Risk / uncertainty | Priority | Evidence / decision |
+|---|---|---|
+| Hosted cross-account/cross-workspace authentication denial, revocation, replay, scope | **HIGH risk, unverified** | Requires authorized disposable hosted tunnel/test identity; cannot infer from docs alone |
+| Backend bearer is actually validated by standard-mode HA-MCP on every MCP POST | **HIGH risk, unverified** | Current HA-MCP docs describe the secret path as the credential. Require real staging backend tests; do not overstate bearer strength |
+| Policy engine actual rule coverage and alternative invocation routes | **HIGH consequence, not audited** | No read-only policy-rule export exposed; obtain trusted rule inventory before changes |
+| Port 9583 Home-LAN direct access, IPv6, other VLANs/WAN paths | **MEDIUM, partial evidence** | Propose host-side isolation after loopback and out-of-band rollback proof; never rely solely on router inter-VLAN rules |
+| Child-process crash without integration relaunch | **MEDIUM availability, source/test confirmed** | Design bounded self-healing with independent status and alerting in Phase 3; do not restart production now |
+| Child stdout/stderr logged verbatim; secret exposure conditional | **MEDIUM conditional** | Require fake-secret logging/scrubbing verification; do not export production logs |
+| Diagnostic URL legacy userinfo echoed | **MEDIUM conditional, fixed in unmerged branch** | New source test + narrow fix. Full CI must be green before merge review |
+| DNS rebind, proxy, TLS redirect downgrade and raw binary behavior | **NOT VERIFIED** | Isolated staging with exact v0.0.15 binary required |
+
+### Required separate approvals / next actions
+
+1. **Hosted authorization:** permission to provision a disposable OpenAI test tunnel and distinct test identities, with independently confirmed zero-cost/no-billing effect and permission to run the nine negative attachment cases. Do **not** test unauthorized access against production.
+2. **Real HA-MCP staging:** permission to launch a disposable isolated copy of the real HA-MCP service with synthetic tokens, no production HA URL, and a test-only tunnel-client where necessary; if paid resources or external credentials would be needed, stop.
+3. **Policy and network:** read-only export of exact effective HA-MCP tool-security rules and network listener/IPv6/NAT inventory from a safe out-of-band interface; production negative network probes require approval and approved devices.
+4. **Phase 3 hardening:** plan pinning, backoff/recovery, tested multi-layer redaction and independent local console before any production rollout.
+
+**Security recommendation:** Continue Phase 2 offline planning and retain the PR as draft; do not merge or deploy. Phase 3 production readiness is **NO-GO**. Treat OpenAI association as documented behavior and the HA-MCP secret URL as a credential; neither substitutes for negative authorization evidence. Keep the Home Infra Control Plane separate.
