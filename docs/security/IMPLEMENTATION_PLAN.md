@@ -133,3 +133,15 @@ Evidence: exact implementation links and risks in `BACKEND_AUTH_VERIFICATION.md`
 - SHA pins were independently resolved through GitHub metadata: `actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683` (v4.2.2) and `actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065` (v5.6.0); staging upstream source SHA and runtime dependency lock remain pinned.
 - The skipped original config-flow test requires `homeassistant.helpers.selector` not installed in lightweight integration runner. It does not invalidate tested standard-mode FastMCP authentication and policy behavior. Testing the installed Supervisor image remains a separate acceptance criterion.
 - This documentation-only commit will itself trigger CI; check its status independently rather than assuming it passed. **No permission to merge or deploy is implied.**
+
+## Phase 2D review work — 2026-10-08
+
+Status: OFFLINE REVIEW IN PROGRESS. Overall Phase 2 remains partial; Phase 3 deployment is NO-GO.
+
+A separate branch, `security/ha-mcp-phase2d-candidates`, preserves the existing tunnel draft PR #1. This branch contains reproducible, SHA-guarded HA-MCP v8.6.0 server and startup-log patch candidates, isolated test cases, and a GitHub Actions workflow. It does not contain a production installation, hosted experiment, or upstream change.
+
+The initial complete isolated candidate CI run, [37840487066](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37840487066), reported 38 baseline tests passed, 19 candidate tests passed and 20 selected upstream tests passed. Both candidate source files were reverted to their verified original Git blob hashes. Additional hardening of the top-level policy initialization error and independent candidate tests require separate final CI verification.
+
+Live read-only metadata confirms policy feature enabled and the HA-MCP add-on running, but does not expose the effective rule list. The prior documented settings API attempt returned 403 and remains respected. The authorized next route for review is the Home Assistant add-on's Open Web UI used by a local administrator; production policy enforcement is not yet verified.
+
+See `docs/security/phase2d/REVIEW.md`, `POLICY_BASELINE.md`, and `ARCHITECTURE_DECISION.md` for implementation, limitations and recommendations. Do not merge, deploy or alter network or credentials without explicit separate approval.
