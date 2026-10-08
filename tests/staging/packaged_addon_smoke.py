@@ -28,9 +28,13 @@ req=urllib.request.Request(url,data=body,headers={
   "Accept":"application/json, text/event-stream",
   "Authorization":"Bearer arbitrary-synthetic"
 },method="POST")
-with urllib.request.urlopen(req,timeout=2) as response:
-  obj=json.loads(response.read())
-  assert response.status==200 and obj["id"]==5 and "result" in obj
+try:
+  with urllib.request.urlopen(req,timeout=2) as response:
+    obj=json.loads(response.read())
+    assert response.status==200 and obj["id"]==5 and "result" in obj
+except Exception as exc:
+  print(type(exc).__name__)
+  sys.exit(1)
 '''
 
 
@@ -100,6 +104,7 @@ def smoke_case(label, state, expected_ready, option_enabled=True):
             assert network["NetworkMode"] == "none" and not network.get("PortBindings")
             ready = False
             stopped = False
+            last_probe = "none"
             for _ in range(25):
                 info = json.loads(run("docker", "inspect", cid).stdout)[0]
                 if not info["State"]["Running"]:
@@ -108,6 +113,8 @@ def smoke_case(label, state, expected_ready, option_enabled=True):
                 check = run("docker", "exec", cid, "python3", "-c",
                             PROBE_SCRIPT, SYNTHETIC_PATH,
                             timeout=10, check=False)
+                if check.returncode != 0:
+                    last_probe = check.stdout.strip()[:40] or "process-error"
                 if check.returncode == 0:
                     ready = True
                     break
@@ -122,6 +129,7 @@ def smoke_case(label, state, expected_ready, option_enabled=True):
                                "MCP server crashed", "Required MCP policy")
                     print("packaged log classifications=",
                           {label: label in sample for label in classes})
+                    print("packaged last probe class=", last_probe)
                     print("packaged startup state=", state["Status"],
                           "exit=", state["ExitCode"], "error_type=",
                           state.get("Error", "")[:80])
