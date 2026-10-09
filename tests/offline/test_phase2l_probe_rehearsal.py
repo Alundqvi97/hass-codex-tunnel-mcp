@@ -86,6 +86,16 @@ class RehearsalTests(unittest.TestCase):
         f=Fixture()
         f.readback=lambda k: False if k=="ipv6_chain_absent" else True
         self.assertEqual(f.run().result,"BLOCKED_CLEANUP_READBACK")
+    def test_every_independent_cleanup_readback_attempted_even_after_first_failure(self):
+        f=Fixture()
+        recorded=[]
+        def probe(k):
+            recorded.append(k)
+            return k!=CLEANUP_READBACKS[0]
+        f.readback=probe
+        out=f.run()
+        self.assertEqual(out.result,"BLOCKED_CLEANUP_READBACK")
+        self.assertEqual(tuple(recorded),CLEANUP_READBACKS)
     def test_untrusted_exception_does_not_skip_teardown(self):
         f=Fixture()
         f.issue=lambda cmd: (_ for _ in ()).throw(RuntimeError("synthetic secret string"))
