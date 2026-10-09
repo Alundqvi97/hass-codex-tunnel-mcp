@@ -77,3 +77,8 @@ Authoritative sources: https://www.qemu.org/docs/master/system/qemu-manpage.html
 - Overall engineering CI: must be checked at final HEAD. AI scanner failure is not accepted as a qualified independent review.
 
 **Final release gate:** Phase 3 production NO-GO. Neither PR may merge. Any further probe/VM/deploy requires a new explicit approval.
+
+
+## Single bounded network probe package — 2026-10-09
+
+The future Probe A package is INERT source-only; no new workflow or privileged action is authorized. Scoped owner-UID iptables/ip6tables argv, deny-first dual-family setup, exact DNS UDP/TCP destination, narrow established-loopback reply and independently required rollback/readbacks live in docs/security/phase2l/probe_contract.py. Old potentially dangerous iptables-restore payload is replaced by non-loadable inert comments; unrelated firewall tables must never be flushed. Ordinary Linux process probe A does NOT prove QEMU/libslirp; QEMU probe B would need separate explicit QEMU approval and guest-originated DNS to prove upstream routing. See docs/security/phase2l/PROBE_APPROVAL_PACKAGE.md. NOT READY for live probe: bounded command executor, DNS client, kernel counters, deadlines and independent cleanup readbacks are not yet implemented; HAOS/Supervisor and production remain NO-GO.
