@@ -27,6 +27,26 @@ class RunnerDenied(RuntimeError):
     pass
 
 
+def _require_unprivileged_or_failstop(started_as_root):
+    """Never return to an original root caller unless /proc proves full drop.
+
+    Called on every normal/exceptional runner exit and immediately after
+    launcher return or error. os._exit cannot be intercepted by Python
+    BaseException, finally blocks or caller code. No OS mutation at import.
+    """
+    if not started_as_root:
+        return
+    verified = False
+    try:
+        verified = verify_unprivileged() is True
+    except BaseException:
+        pass
+    if not verified:
+        os._exit(77)
+
+
+
+
 class OneShotRunner:
     def __init__(self, plan, *, launcher=None, verify_activation=None, clock=time.monotonic):
         self.plan=plan
@@ -36,6 +56,18 @@ class OneShotRunner:
         self.used=False
 
     def run(self, *, activated=False, approval=None):
+        # Snapshot the original authority BEFORE any user-controlled verifier,
+        # clock or launcher callback is invoked. An early refusal must not
+        # return control to an untrusted Python caller still running as root.
+        started_as_root = os.geteuid() == 0
+        try:
+            return self._run_checked(
+                activated=activated, approval=approval,
+                started_as_root=started_as_root)
+        finally:
+            _require_unprivileged_or_failstop(started_as_root)
+
+    def _run_checked(self, *, activated, approval, started_as_root):
         if self.used:
             return "BLOCKED_REPLAY"
         self.used=True  # even a failed authorization consumes this object
@@ -50,11 +82,17 @@ class OneShotRunner:
         status="BLOCKED_SUPERVISION_FAILURE"
         try:
             channel=self.launcher.launch(self.plan,deadline,cleanup_cutoff)
+            # Do not execute ANY controller work if a supplied launcher
+            # returned without proving the root-to-unprivileged transition.
+            _require_unprivileged_or_failstop(started_as_root)
             outcome=control(
                 self.plan, RemoteIO(channel,self.plan,clock=self.clock),self.clock,
                 absolute_deadline=deadline,cleanup_cutoff=cleanup_cutoff)
             status=outcome.receipt()
         except BaseException:
+            # A failed launcher may have retained root. Never proceed to
+            # parent audit or return a status before this check.
+            _require_unprivileged_or_failstop(started_as_root)
             status="BLOCKED_SUPERVISION_FAILURE"
         finally:
             if channel is not None:
@@ -70,6 +108,7 @@ class OneShotRunner:
         return status+";POST="+post
 
 
+
 class ForkGuardianLauncher:
     """Explicit, Linux-only launch into an independent OS session.
 
@@ -80,97 +119,130 @@ class ForkGuardianLauncher:
                  controller_drop=drop_controller, root_check=os.geteuid,
                  context_factory=multiprocessing.get_context,
                  transport_pair_factory=socket_channel_pair, clock=time.monotonic):
-        if not callable(backend_factory):
-            raise RunnerDenied("MISSING_REVIEWED_BACKEND")
-        if not callable(controller_drop):
-            raise RunnerDenied("MISSING_OS_PRIVILEGE_BOUNDARY")
-        # No read-only broker is bundled: without a reviewed external actor
-        # launch is refused rather than inheriting privileged commands.
-        self.post_observer_factory=post_observer_factory
-        self.controller_drop=controller_drop
-        self.backend_factory=backend_factory
-        self.root_check=root_check
-        self.context_factory=context_factory
-        if not callable(transport_pair_factory):
-            raise RunnerDenied("MISSING_BOUNDED_IPC_TRANSPORT")
-        self.transport_pair_factory=transport_pair_factory
-        self.clock=clock
-        self.child=None
-        self.parent_observer=None
-        self.parent_resources=None
+        started_as_root = os.geteuid() == 0
+        try:
+            if not callable(backend_factory):
+                raise RunnerDenied("MISSING_REVIEWED_BACKEND")
+            if not callable(controller_drop):
+                raise RunnerDenied("MISSING_OS_PRIVILEGE_BOUNDARY")
+            # No read-only broker is bundled: without a reviewed external actor
+            # launch is refused rather than inheriting privileged commands.
+            self.post_observer_factory=post_observer_factory
+            self.controller_drop=controller_drop
+            self.backend_factory=backend_factory
+            self.root_check=root_check
+            self.context_factory=context_factory
+            if not callable(transport_pair_factory):
+                raise RunnerDenied("MISSING_BOUNDED_IPC_TRANSPORT")
+            self.transport_pair_factory=transport_pair_factory
+            self.clock=clock
+            self.child=None
+            self.parent_observer=None
+            self.parent_resources=None
+
+        except BaseException:
+            # Constructor denial is part of privileged bootstrap, not a
+            # recoverable error for an untrusted original root caller.
+            if started_as_root:
+                # No guardian exists during constructor validation.
+                os._exit(76)
+            raise RunnerDenied("GUARDIAN_INITIALIZATION_REFUSED") from None
 
     def launch(self, plan, deadline, cleanup_cutoff=None):
-        if (self.child is not None or not callable(self.post_observer_factory)
-                or self.root_check()!=0 or
-                validate_plan(plan)!="OFFLINE_SAFE_SCOPED_PLAN_NOT_KERNEL_VERIFIED" or
-                type(deadline) not in (int,float) or
-                type(cleanup_cutoff) not in (int,float) or
-                deadline-cleanup_cutoff!=60 or
-                not self.clock()<cleanup_cutoff<deadline<=self.clock()+240):
-            raise RunnerDenied("GUARDIAN_LAUNCH_REFUSED")
-        # Independent parent pre-change inventory BEFORE any guardian writes.
-        from probe_a_observer import KernelReadback
-        command, _unused_work, resources=self.backend_factory(plan)
-        if resources.preflight() is not True:
-            raise RunnerDenied("PARENT_RESOURCES_NOT_CLEAN")
-        observer=KernelReadback(plan,read=command,clock=self.clock)
-        observer.preflight(deadline)
-        post_read=self.post_observer_factory(plan)
-        read_only=ReadOnlyPostObserver(plan,read=post_read)
-        if self.clock() >= cleanup_cutoff:
-            raise RunnerDenied("BOOTSTRAP_CONSUMED_WORK_WINDOW")
-        # Preflight uses the privileged bootstrap; after the drop every
-        # post-guardian observation passes through an independent read-only
-        # broker and checks real unprivileged controller identity.
-        self.parent_observer=KernelReadback(plan,read=read_only,clock=self.clock)
-        self.parent_observer.baseline=observer.baseline
-        self.parent_observer.versions=observer.versions
-        self.parent_resources=resources
-        ctx=self.context_factory("fork")
-        # A single AF_UNIX SOCK_STREAM framing contract replaces
-        # multiprocessing.Connection entirely. Both sides are nonblocking,
-        # and every transaction has an absolute monotonic deadline.
-        parent,child=self.transport_pair_factory(clock=self.clock)
-        # The child holds the backend; the controller never receives root I/O.
-        def child_main():
-            interrupted=[False]
-            exit_code=13
-            try:
-                parent.close()
-                os.setsid()  # separate session is NOT a CI job survival guarantee
-                command,work,resources=self.backend_factory(plan)
-                core=GuardianCore(plan,command=command,work=work,resources=resources,
-                                  clock=self.clock)
-                installed_signal_abort(lambda: interrupted.__setitem__(0,True))
-                state=GuardianChannel(core,clock=self.clock).serve(
-                    child,end=deadline,cleanup_cutoff=cleanup_cutoff)
-                # Zero is possible ONLY after normal verified guardian lifecycle.
-                # It is still not trusted kernel evidence or Probe A PASS.
-                if interrupted[0] or state==LIFECYCLE_CANCELLED:
-                    exit_code=10
-                elif state==LIFECYCLE_DEADLINE:
-                    exit_code=11
-                elif state==LIFECYCLE_INCOMPLETE:
-                    exit_code=12
-                elif state==LIFECYCLE_COMPLETE:
-                    exit_code=0
-            except BaseException:
-                # Includes rogue SystemExit(0): exceptions cannot forge a
-                # normal lifecycle. Never expose raw exception content.
-                exit_code=13
-            finally:
-                try:
-                    child.close()
-                except BaseException:
-                    exit_code=13
-            if exit_code:
-                raise SystemExit(exit_code) from None
-        process=ctx.Process(target=child_main,daemon=False,name="p2a-owned-guardian")
-        if self.clock() >= cleanup_cutoff:
-            parent.close()
-            child.close()
-            raise RunnerDenied("BOOTSTRAP_CONSUMED_WORK_WINDOW")
+        # The first effectful privileged preparation step is INSIDE this
+        # failure boundary. None of the backend/observer/context/socket/process
+        # operations may raise back to an original root caller.
+        started_as_root = os.geteuid() == 0
+        parent = None
+        child = None
+        attempted_spawn = False
         try:
+            if (self.child is not None or not callable(self.post_observer_factory)
+                    or self.root_check()!=0 or
+                    validate_plan(plan)!="OFFLINE_SAFE_SCOPED_PLAN_NOT_KERNEL_VERIFIED" or
+                    type(deadline) not in (int,float) or
+                    type(cleanup_cutoff) not in (int,float) or
+                    deadline-cleanup_cutoff!=60 or
+                    not self.clock()<cleanup_cutoff<deadline<=self.clock()+240):
+                raise RunnerDenied("GUARDIAN_LAUNCH_REFUSED")
+            # Independent parent pre-change inventory BEFORE any guardian writes.
+            from probe_a_observer import KernelReadback
+            command, _unused_work, resources=self.backend_factory(plan)
+            if resources.preflight() is not True:
+                raise RunnerDenied("PARENT_RESOURCES_NOT_CLEAN")
+            observer=KernelReadback(plan,read=command,clock=self.clock)
+            observer.preflight(deadline)
+            post_read=self.post_observer_factory(plan)
+            read_only=ReadOnlyPostObserver(plan,read=post_read)
+            if self.clock() >= cleanup_cutoff:
+                raise RunnerDenied("BOOTSTRAP_CONSUMED_WORK_WINDOW")
+            # Preflight uses the privileged bootstrap; after the drop every
+            # post-guardian observation passes through an independent read-only
+            # broker and checks real unprivileged controller identity.
+            self.parent_observer=KernelReadback(plan,read=read_only,clock=self.clock)
+            self.parent_observer.baseline=observer.baseline
+            self.parent_observer.versions=observer.versions
+            self.parent_resources=resources
+            ctx=self.context_factory("fork")
+            # A single AF_UNIX SOCK_STREAM framing contract replaces
+            # multiprocessing.Connection entirely. Both sides are nonblocking,
+            # and every transaction has an absolute monotonic deadline.
+            pair=self.transport_pair_factory(clock=self.clock)
+            if not isinstance(pair,tuple) or len(pair)!=2:
+                # A faulty injected factory can return one partially-created
+                # endpoint. Close that bounded known handle before fail-stop;
+                # the real socket factory closes its own handles on errors.
+                if isinstance(pair,tuple) and len(pair)<=2:
+                    for endpoint in pair:
+                        try:
+                            if callable(getattr(endpoint,"close",None)):
+                                endpoint.close()
+                        except BaseException:
+                            pass
+                raise RunnerDenied("INVALID_BOUNDED_IPC_PAIR")
+            parent,child=pair
+            if parent is None or child is None or parent is child:
+                raise RunnerDenied("INVALID_BOUNDED_IPC_ENDPOINTS")
+            # The child holds the backend; the controller never receives root I/O.
+            def child_main():
+                interrupted=[False]
+                exit_code=13
+                try:
+                    parent.close()
+                    os.setsid()  # separate session is NOT a CI job survival guarantee
+                    command,work,resources=self.backend_factory(plan)
+                    core=GuardianCore(plan,command=command,work=work,resources=resources,
+                                      clock=self.clock)
+                    installed_signal_abort(lambda: interrupted.__setitem__(0,True))
+                    state=GuardianChannel(core,clock=self.clock).serve(
+                        child,end=deadline,cleanup_cutoff=cleanup_cutoff)
+                    # Zero is possible ONLY after normal verified guardian lifecycle.
+                    # It is still not trusted kernel evidence or Probe A PASS.
+                    if interrupted[0] or state==LIFECYCLE_CANCELLED:
+                        exit_code=10
+                    elif state==LIFECYCLE_DEADLINE:
+                        exit_code=11
+                    elif state==LIFECYCLE_INCOMPLETE:
+                        exit_code=12
+                    elif state==LIFECYCLE_COMPLETE:
+                        exit_code=0
+                except BaseException:
+                    # Includes rogue SystemExit(0): exceptions cannot forge a
+                    # normal lifecycle. Never expose raw exception content.
+                    exit_code=13
+                finally:
+                    try:
+                        child.close()
+                    except BaseException:
+                        exit_code=13
+                if exit_code:
+                    raise SystemExit(exit_code) from None
+            process=ctx.Process(target=child_main,daemon=False,name="p2a-owned-guardian")
+            if self.clock() >= cleanup_cutoff:
+                raise RunnerDenied("BOOTSTRAP_CONSUMED_WORK_WINDOW")
+            # A failed process.start may have forked before throwing: treat
+            # that outcome as uncertain and always hard-stop the bootstrap.
+            attempted_spawn = True
             process.start()
             self.child=process
             child.close()
@@ -188,23 +260,25 @@ class ForkGuardianLauncher:
                 raise RunnerDenied("WORK_WINDOW_EXPIRED_AFTER_DROP")
             return parent
         except BaseException:
-            # Irreversible fail-stop. We may still be root after a failed
-            # controller privilege reduction, or a child may have started
-            # before a process.start() error. A catchable Python exception,
-            # return code or sys.exit() is UNSAFE here.
-            #
-            # Closing both sockets causes surviving guardian-side EOF
-            # recovery under its own deadline. This parent CANNOT claim a
-            # successful post-guardian audit after hard termination.
+            # An aborted bootstrap cannot produce trusted cleanup evidence.
+            # Close only endpoints which demonstrably exist. After a fork,
+            # EOF allows the separately running guardian to own its cleanup;
+            # before a fork there is no guardian to audit.
             try:
-                try: parent.close()
-                except BaseException: pass
-                try: child.close()
-                except BaseException: pass
+                for endpoint in (parent,child):
+                    if endpoint is not None:
+                        try:
+                            endpoint.close()
+                        except BaseException:
+                            pass
             finally:
-                os._exit(77)
-            # Only reached if os._exit was incorrectly replaced by a mock.
-            raise RunnerDenied("IMPOSSIBLE_FATAL_BOOTSTRAP_RETURN")
+                if started_as_root or attempted_spawn:
+                    # 76 = root preparation failed before any fork attempt.
+                    # 77 = guardian start attempted/uncertain, may need EOF
+                    # recovery by the independent child. Neither is a
+                    # cleanup result or post-guardian audit.
+                    os._exit(77 if attempted_spawn else 76)
+            raise RunnerDenied("GUARDIAN_BOOTSTRAP_ABORTED") from None
 
     def wait_for_exit(self, *, deadline):
         if self.child is None:
