@@ -91,6 +91,22 @@ def compile_plan(*, scope, uid, dns, qemu=False, auto_retry=False):
     )
     return Plan("OFFLINE_NOT_EXECUTED",uid,scope,c4,c6,dns,inspect,setup,teardown)
 
+def emergency_deny_commands(plan):
+    """Fixed, owned-only ACCEPT deletion; never remove hooks or terminal REJECT.
+
+    Reverse setup order ensures each readback remains a recognized partial
+    prefix. This is NOT an automatically executable operation.
+    """
+    if validate_plan(plan)!="OFFLINE_SAFE_SCOPED_PLAN_NOT_KERNEL_VERIFIED":
+        raise Refused("INVALID_EMERGENCY_PLAN")
+    result=[]
+    for orig in reversed(plan.setup[-3:]):
+        a=orig.argv
+        if orig.family!="ipv4" or a[3:6]!=("-I",plan.chain4,"1") or a[-1]!="ACCEPT":
+            raise Refused("EMERGENCY_NOT_EXACT_OWNED_ALLOW")
+        result.append(Command("ipv4",a[:3]+("-D",plan.chain4)+a[6:],"emergency-deny"))
+    return tuple(result)
+
 def validate_plan(plan):
     if not isinstance(plan,Plan) or plan.status!="OFFLINE_NOT_EXECUTED": return "BLOCKED"
     seen=set()

@@ -7,7 +7,7 @@ change a firewall. This is not evidence of real kernel provenance.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from probe_contract import validate_plan
+from probe_contract import validate_plan, emergency_deny_commands
 from probe_a_kernel import bounded, extract_rules, tokens, compare_after, canonical_owned_rule
 
 
@@ -75,7 +75,8 @@ def inspect_partial(plan, before, current):
     return v4, v6
 
 
-def recover_owned(plan, baseline, *, snapshot, execute, deadline, clock):
+def recover_owned(plan, baseline, *, snapshot, execute, deadline, clock,
+                  previous_attempts=(), on_attempt=None):
     """Attempt each exact teardown argv at most once, never flush unknown state.
 
     Must be invoked by the separate guardian, NOT by the test UID.
@@ -84,6 +85,11 @@ def recover_owned(plan, baseline, *, snapshot, execute, deadline, clock):
     post-failure retry and no restoration of unrelated tables.
     """
     attempted = []
+    previous=set(previous_attempts)
+    if not previous.issubset({x.argv for x in plan.teardown}):
+        raise RecoveryDenied("UNREVIEWED_PREVIOUS_TEARDOWN")
+    if on_attempt is not None and not callable(on_attempt):
+        raise RecoveryDenied("INVALID_MUTATION_JOURNAL")
     failure = False
     for command in plan.teardown:
         try:
@@ -101,7 +107,14 @@ def recover_owned(plan, baseline, *, snapshot, execute, deadline, clock):
                     raise RecoveryDenied("CANNOT_FLUSH_HOOKED_CHAIN")
             if not present:
                 continue
+            if command.argv in previous:
+                # The command's result was uncertain. NEVER automatically
+                # replay it, even if the readback still shows this resource.
+                failure = True
+                continue
             attempted.append(command.argv)
+            if on_attempt is not None:
+                on_attempt(command.argv)  # durable-in-process BEFORE mutation
             if execute(command.argv, deadline) is not True:
                 failure = True
                 # Do not retry. Subsequent steps still require verified
@@ -123,3 +136,65 @@ def recover_owned(plan, baseline, *, snapshot, execute, deadline, clock):
         failure = True
     return ("SYNTHETIC_RECOVERED_NOT_KERNEL_ATTESTED" if not failure
             else "BLOCKED_CLEANUP_UNVERIFIED", tuple(attempted))
+
+
+def emergency_deny_only(plan, baseline, *, snapshot, execute, deadline, clock,
+                        previous_attempts=(), on_attempt=None):
+    """Emergency ACCEPT removal, while keeping BOTH restrictive UID hooks.
+
+    Never unlink a hook here. Requires dual-family hooks prior to any write:
+    if a compromised worker exists during partial setup, this fails closed.
+    Each action is observed before and after, preserving unrelated rules.
+    """
+    commands=emergency_deny_commands(plan)
+    previously=set(previous_attempts)
+    if not previously.issubset({c.argv for c in commands}):
+        raise RecoveryDenied("UNREVIEWED_EMERGENCY_JOURNAL")
+    attempted=[]
+    failed=False
+    for command in commands:
+        try:
+            if clock()>=deadline:
+                raise RecoveryDenied("EMERGENCY_DEADLINE")
+            before=inspect_partial(plan,baseline,snapshot(deadline))
+            if not (before[0].hook and before[1].hook):
+                raise RecoveryDenied("DUAL_STACK_OWNER_HOOK_NOT_PRESENT")
+            # Require expected rule membership before exact deletion.
+            active=snapshot(deadline)[0]
+            _,own=extract_rules(active,plan.chain4,("-A","OUTPUT","-m","owner","--uid-owner",
+                                                    str(plan.uid),"-j",plan.chain4))
+            from probe_a_kernel import canonical_owned_rule
+            needle=canonical_owned_rule(
+                ("-A",plan.chain4)+command.argv[5:],chain=plan.chain4,ipv6=False)
+            present=any(canonical_owned_rule(tokens(row),chain=plan.chain4,ipv6=False)==needle
+                        for kind,row in own if kind=="rule")
+            if not present:
+                continue
+            if command.argv in previously:
+                failed=True  # already attempted, no second mutation
+                continue
+            attempted.append(command.argv)
+            if on_attempt is not None:
+                on_attempt(command.argv)
+            if execute(command.argv,deadline) is not True:
+                failed=True
+            after=inspect_partial(plan,baseline,snapshot(deadline))
+            if not (after[0].hook and after[1].hook):
+                raise RecoveryDenied("EMERGENCY_HOOK_DRIFT")
+        except BaseException:
+            failed=True
+            # No blind continuation after unknown ownership/drift.
+            try:
+                state=inspect_partial(plan,baseline,snapshot(deadline))
+                if not (state[0].hook and state[1].hook):
+                    break
+            except BaseException:
+                break
+    try:
+        now=inspect_partial(plan,baseline,snapshot(deadline))
+        if not (now[0].hook and now[1].hook) or now[0].rules!=1:
+            failed=True
+    except BaseException:
+        failed=True
+    return ("BLOCKED_EMERGENCY_UNVERIFIED" if failed else "DENY_ONLY_OWNER_HOOKS_RETAINED_NOT_LIVE_ATTESTED",
+            tuple(attempted))

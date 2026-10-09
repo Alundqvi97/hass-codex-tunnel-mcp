@@ -15,7 +15,7 @@ import time
 from probe_contract import validate_plan, CLEANUP_READBACKS
 from probe_a_exec_adapter import ExactArgvGate
 from probe_a_observer import KernelReadback
-from probe_a_recovery import recover_owned, inspect_partial
+from probe_a_recovery import recover_owned, inspect_partial, emergency_deny_only
 
 
 class GuardianDenied(RuntimeError):
@@ -44,14 +44,20 @@ class GuardianCore:
         self.gate = ExactArgvGate(plan, invoke=lambda argv, timeout: command(argv, clock()+timeout))
         self.baseline = None
         self.started = False
-        self.cleaned = False
+        self.cleanup_state = "NOT_STARTED"
+        self.cleanup_attempts = set()
+        self.emergency_attempts = set()
         self.cleanup_result = None
         self.receipts = None
         self.client_started = False
         self.writes_attempted = False
 
+    @property
+    def cleaned(self):
+        return self.cleanup_state != "NOT_STARTED"
+
     def handle(self, method, argument, deadline):
-        if self.clock() >= deadline or (self.cleaned and method not in ("cleanup_readback", "snapshot")):
+        if self.clock() >= deadline or (self.cleaned and method not in ("cleanup","cleanup_readback", "snapshot")):
             raise GuardianDenied("NO_MORE_WORK")
         if method == "preflight":
             if self.started or argument != "START":
@@ -94,38 +100,70 @@ class GuardianCore:
         raise GuardianDenied("UNREVIEWED_OPERATION")
 
     def cleanup(self, deadline):
-        if self.cleaned:
-            return self.cleanup_result == "SYNTHETIC_RECOVERED_NOT_KERNEL_ATTESTED"
-        self.cleaned = True
-        # Cleanup must never accidentally release a still-running test UID.
+        """Resume safely from fresh readbacks, never replay a logged mutation.
+
+        Guardian may verify its owned rules but may NEVER attest its own exit.
+        The parent must separately re-observe the post-guardian host.
+        """
+        if self.cleanup_state == "IN_PROGRESS":
+            self.cleanup_state = "BLOCKED"
+            return False
+        self.cleanup_state = "IN_PROGRESS"
         try:
             stopped = self.work.stop(deadline) is True
         except BaseException:
             stopped = False
         self.cleanup_result = "BLOCKED_UID_STILL_ACTIVE"
-        if self.baseline is not None and stopped:
+        absent = False
+        if self.baseline is not None:
             try:
                 absent = self.observer._query(
-                    ("/usr/bin/pgrep", "-u", str(self.plan.uid)), deadline, codes=(1,)
+                    ("/usr/bin/pgrep","-u",str(self.plan.uid)),deadline,codes=(1,)
                 ) == ""
-                if absent:
-                    self.cleanup_result, _ = recover_owned(
-                        self.plan, self.baseline, snapshot=self.observer.snapshot,
-                        execute=lambda argv, limit: self.command(argv, limit).code == 0,
-                        deadline=deadline, clock=self.clock
-                    )
             except BaseException:
-                self.cleanup_result = "BLOCKED_CLEANUP_UNVERIFIED"
-        # Read back every check even when an earlier one fails.
+                absent = False
+            if not absent:
+                # Deny the still-running UID's temporary allowed traffic.
+                # Do not expose its IPv4/IPv6 hooks through partial teardown.
+                try:
+                    self.cleanup_result, _ = emergency_deny_only(
+                        self.plan,self.baseline,snapshot=self.observer.snapshot,
+                        execute=lambda argv,limit:self.command(argv,limit).code==0,
+                        deadline=deadline,clock=self.clock,
+                        previous_attempts=self.emergency_attempts,
+                        on_attempt=self.emergency_attempts.add
+                    )
+                except BaseException:
+                    self.cleanup_result="BLOCKED_EMERGENCY_UNVERIFIED"
+            elif stopped:
+                try:
+                    self.cleanup_result, _ = recover_owned(
+                        self.plan,self.baseline,snapshot=self.observer.snapshot,
+                        execute=lambda argv,limit:self.command(argv,limit).code==0,
+                        deadline=deadline,clock=self.clock,
+                        previous_attempts=self.cleanup_attempts,
+                        on_attempt=self.cleanup_attempts.add
+                    )
+                except BaseException:
+                    self.cleanup_result="BLOCKED_CLEANUP_UNVERIFIED"
         try:
             self.receipts = self.observer.mandatory_readbacks(
-                deadline, independent_resources=self.resources
+                deadline,independent_resources=self.resources
             )
         except BaseException:
-            self.receipts = {key: False for key in CLEANUP_READBACKS}
-        # Cleanup itself cannot attest that this guardian has exited.
-        self.receipts["watchdog_absent"] = False
-        return False  # never assert live or synthetic completeness here
+            self.receipts={key:False for key in CLEANUP_READBACKS}
+        # No response can claim this same guardian has exited.
+        self.receipts["watchdog_absent"]=False
+        if (self.cleanup_result=="SYNTHETIC_RECOVERED_NOT_KERNEL_ATTESTED"
+                and absent and stopped
+                and all(self.receipts.get(k) is True for k in CLEANUP_READBACKS
+                        if k!="watchdog_absent")):
+            self.cleanup_state="POST_AUDIT_REQUIRED"
+        elif self.cleanup_result and self.cleanup_result.startswith("BLOCKED"):
+            self.cleanup_state="BLOCKED"
+        else:
+            self.cleanup_state="PARTIAL"
+        return False
 
 
 class GuardianChannel:
