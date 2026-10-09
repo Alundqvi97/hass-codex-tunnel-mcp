@@ -243,7 +243,7 @@ class PrivilegeGateTests(unittest.TestCase):
     def test_verifier_uses_os_status_only_after_drop_before_return(self):
         events=[]
         runner,ctx,order=self.launcher(drop=lambda:events.append("drop") or True)
-        def verify_file(path, **kwargs):
+        def verify_file(*args, **kwargs):
             self.assertEqual(events,["drop"])
             self.assertFalse(ctx.parent.closed)
             events.append("read-proc")
