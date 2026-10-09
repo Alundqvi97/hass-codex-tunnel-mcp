@@ -73,3 +73,8 @@ Immutable **VM-triggering workflow blob f6b498b359d2cc9049558589cf8d29d95b417149
 **NOT READY FOR A NEW VM APPROVAL.** The policy-provisioning blocker now has a safe developer-supported *candidate* and negative tests. However, the DNS/egress preflight, precise real Supervisor version+installed-image proof, complete 16 runtime case observers and independent cleanup/restore drill remain materially incomplete. Production Phase 3 NO-GO; Phase 4 unauthorized; no PR merge.
 
 **Single smallest next engineering action:** implement the bounded **pre-guest DNS/egress preflight model and abort condition** with offline fixtures and review, keeping the VM-triggering workflow unchanged. Do not request another guest yet. Separate qualified security review remains unavailable; this phase is NOT an independent approval.
+
+
+## Phase 2L — DNS preflight and real pinned build-context validation (2026-10-09)
+
+The future-only harness now fails BEFORE sudo, firewall, guest download or QEMU when an independent QEMU host-side resolver/network attestation is unavailable. The static preflight distinguishes unsafe DNS and forwarding configurations and refuses all unverified paths; no broad web/DNS/NTP public egress remains in the dormant proposed firewall. Exact staging of the pinned Phase 2K candidate and required Docker COPY helper/template succeeded with 33 Phase 2L offline tests (source CI #37927463857). No Docker image was built, no kernel rules were tested, and Supervisor 16-case acceptance remains BLOCKED. See docs/security/phase2l/DNS_AND_PACKAGING_PREFLIGHT.md. **NOT READY** for another guest, Phase 3 NO-GO.
