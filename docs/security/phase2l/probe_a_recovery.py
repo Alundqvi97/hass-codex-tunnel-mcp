@@ -178,6 +178,9 @@ def emergency_deny_only(plan, baseline, *, snapshot, execute, deadline, clock,
                 on_attempt(command.argv)
             if execute(command.argv,deadline) is not True:
                 failed=True
+                # Subsequent deletion would break the validated removal
+                # order; stop rather than creating an unknown partial state.
+                break
             after=inspect_partial(plan,baseline,snapshot(deadline))
             if not (after[0].hook and after[1].hook):
                 raise RecoveryDenied("EMERGENCY_HOOK_DRIFT")

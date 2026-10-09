@@ -74,12 +74,12 @@ def canonical_owned_rule(row, *, chain, ipv6):
         row = row[:-2]
     if row.count("-m") == 1 and "--dport" in row:
         idx = row.index("-m")
-        if idx + 1 < len(row) and row[idx+1] in ("tcp", "udp"):
-            # Only skip a module if it agrees with the pinned protocol.
-            proto = row[idx+1]
-            if "-p" not in row or row[row.index("-p")+1] != proto:
-                raise InvalidEvidence("MISMATCHED_PORT_MODULE")
-            row = row[:idx] + row[idx+2:]
+        if idx+1>=len(row) or row[idx+1] not in ("tcp", "udp"):
+            raise InvalidEvidence("UNREVIEWED_PORT_MODULE")
+        proto=row[idx+1]
+        if "-p" not in row or row.index("-p")+1 >= len(row) or row[row.index("-p")+1] != proto:
+            raise InvalidEvidence("MISMATCHED_PORT_MODULE")
+        row = row[:idx] + row[idx+2:]
     return row
 
 def extract_rules(snapshot, chain, output_hook):
