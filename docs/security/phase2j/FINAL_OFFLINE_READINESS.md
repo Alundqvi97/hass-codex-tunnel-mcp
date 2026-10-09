@@ -67,3 +67,8 @@ References: https://github.com/home-assistant/supervisor/blob/2026.10.1/supervis
 **NOT READY.** The gate model is sound as an offline acceptance scaffold, but *actual* DNS bootstrap, supported add-on policy provisioning, 16 runtime observers and fail-closed teardown still require code and verified preflight design. No request for a VM is warranted at this commit. **Single smallest next correction:** replace unsupported direct Supervisor `/data` seeding with a reviewed supported guest-local installation and policy-provisioning path, and wire one acceptance observer end-to-end against synthetic responses before seeking a new VM approval.
 
 Production Phase 3 is **NO-GO**. Phase 4 unauthorized. PRs remain drafts.
+
+
+### Offline Supervisor v2 API-sequence guard
+
+Published Supervisor 2026.10.1 routes confirm POST /store/reload, GET /store/apps/{slug}, POST /store/apps/{slug}/install, and GET/POST /apps/{slug}/info/options/start as applicable; legacy v1 routes also exist. The pure Phase 2J installation_plan.py refuses other Supervisor versions until explicitly reviewed; it never connects to an API. Separate store discovery, install, strict schema, option readback and runtime steps must all be observed. Even all successful mocked responses produce only SYNTHETIC_ONLY_NOT_INSTALLED. Direct legacy data-folder seeding remains unresolved. Source: https://github.com/home-assistant/supervisor/blob/2026.10.1/supervisor/api/__init__.py .
