@@ -106,8 +106,10 @@ class GuardianCore:
         The parent must separately re-observe the post-guardian host.
         """
         if self.cleanup_state == "IN_PROGRESS":
-            self.cleanup_state = "BLOCKED"
-            return False
+            # An asynchronous SIGTERM may have interrupted an earlier call.
+            # The recorded argv journal and fresh snapshots make a resumed
+            # call safe without replaying an uncertain firewall mutation.
+            self.cleanup_state = "PARTIAL"
         self.cleanup_state = "IN_PROGRESS"
         try:
             stopped = self.work.stop(deadline) is True
