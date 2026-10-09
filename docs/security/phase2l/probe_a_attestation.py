@@ -21,6 +21,7 @@ BINARY_PATHS=(
     "/usr/sbin/iptables", "/usr/sbin/ip6tables",
     "/usr/sbin/iptables-save", "/usr/sbin/ip6tables-save",
     "/usr/bin/setpriv", "/usr/bin/python3", "/usr/bin/sudo",
+    "/usr/bin/getent", "/usr/bin/pgrep",
 )
 SOURCE_NAMES=(
     "probe_contract.py", "probe_a_attestation.py", "probe_a_client.py",
@@ -36,8 +37,18 @@ MAX_FILE=20*1024*1024
 
 
 class DigestGate:
-    def __init__(self, expected, *, image_version, read_bytes=None, environ=None):
-        if (not isinstance(expected, dict) or set(expected)!=set(PINNED) or
+    def __init__(self, expected, *, image_version, read_bytes=None, environ=None,
+                 dependency_paths=(), verified_dependency_inventory=False):
+        # A file hash is not an OS image signature. A reviewed external
+        # launcher must provide the *complete* dynamic loader, linked-library
+        # and Python-runtime dependency inventory, or activation stays blocked.
+        if (verified_dependency_inventory is not True or not isinstance(dependency_paths, tuple)
+                or not dependency_paths or len(set(dependency_paths)) != len(dependency_paths)
+                or any(type(p) is not str or not p.startswith("/") or
+                       ".." in p.split("/") or p in PINNED for p in dependency_paths)):
+            raise AttestationDenied("DEPENDENCY_INVENTORY_NOT_APPROVED")
+        self.dependency_paths = dependency_paths
+        if (not isinstance(expected, dict) or set(expected)!=set(PINNED) | set(self.dependency_paths) or
                 any(not isinstance(v,str) or not re.fullmatch("[0-9a-f]{64}",v) for v in expected.values()) or
                 not isinstance(image_version,str) or
                 not re.fullmatch(r"[0-9]{8}\.[0-9]+(?:\.[0-9]+)?",image_version)):
@@ -50,7 +61,7 @@ class DigestGate:
     def verify(self):
         if self.environ.get("ImageOS")!="ubuntu24" or self.environ.get("ImageVersion")!=self.image_version:
             raise AttestationDenied("RUNNER_IMAGE_DRIFT")
-        for path in PINNED:
+        for path in PINNED + self.dependency_paths:
             try:
                 data=self.read_bytes(path)
             except (OSError, ValueError):

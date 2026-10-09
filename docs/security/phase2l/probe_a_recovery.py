@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from probe_contract import validate_plan
-from probe_a_kernel import bounded, extract_rules, tokens, compare_after
+from probe_a_kernel import bounded, extract_rules, tokens, compare_after, canonical_owned_rule
 
 
 class RecoveryDenied(RuntimeError):
@@ -50,12 +50,12 @@ def _family(active, baseline, chain, uid, *, ipv6=False, dns=None):
     if not ipv6:
         for count in range(1, len(allowed) + 1):
             prefixes.append(tuple(reversed(allowed[:count])))
-    canonical = []
-    for row in raw:
-        if row[-2:] == ("--reject-with", "icmp6-port-unreachable" if ipv6 else "icmp-port-unreachable"):
-            row = row[:-2]
-        canonical.append(row)
-    if tuple(canonical) not in prefixes:
+    canonical = tuple(canonical_owned_rule(row, chain=chain, ipv6=ipv6) for row in raw)
+    normalized_prefixes = tuple(
+        tuple(canonical_owned_rule(row, chain=chain, ipv6=ipv6) for row in prefix)
+        for prefix in prefixes
+    )
+    if canonical not in normalized_prefixes:
         raise RecoveryDenied("UNREVIEWED_CHAIN_RULE")
     if hooks:
         output = [tokens(line) for line in bounded(active).splitlines()

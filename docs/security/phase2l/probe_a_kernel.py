@@ -57,6 +57,31 @@ def tokens(text):
     try: return tuple(shlex.split(text,posix=True))
     except ValueError: raise InvalidEvidence("INVALID_RULE_SYNTAX")
 
+
+def canonical_owned_rule(row, *, chain, ipv6):
+    """One strict tokenizer for active checks and partial-state cleanup.
+
+    Only known xtables spellings are accepted; never normalize destination,
+    target, port, UID or rule ordering. Canonical spelling excludes the
+    implicit tcp/udp match module used by some iptables-save versions.
+    """
+    if not isinstance(row, tuple):
+        row = tokens(row)
+    if len(row) < 3 or row[:2] != ("-A", chain):
+        raise InvalidEvidence("NOT_OWNED_RULE")
+    suffix = ("--reject-with", "icmp6-port-unreachable" if ipv6 else "icmp-port-unreachable")
+    if row[-2:] == suffix:
+        row = row[:-2]
+    if row.count("-m") == 1 and "--dport" in row:
+        idx = row.index("-m")
+        if idx + 1 < len(row) and row[idx+1] in ("tcp", "udp"):
+            # Only skip a module if it agrees with the pinned protocol.
+            proto = row[idx+1]
+            if "-p" not in row or row[row.index("-p")+1] != proto:
+                raise InvalidEvidence("MISMATCHED_PORT_MODULE")
+            row = row[:idx] + row[idx+2:]
+    return row
+
 def extract_rules(snapshot, chain, output_hook):
     """Strip exact owned chain and hook; return rest in original order.
 
@@ -104,23 +129,8 @@ def expect_active(snapshot_v4,snapshot_v6, baseline_v4,baseline_v6, plan, *, fin
                 ("-A",chain,"-d",plan.dns+"/32","-p","udp","-m","udp","--dport","53","-j","ACCEPT"),
                 ("-A",chain,"-j","REJECT"),
             ]
-        # Common iptables-save canonical forms include -m tcp/udp and
-        # --reject-with icmp-port-unreachable; narrow exact variants only.
-        def normalized(t):
-            if t[-2:]==("--reject-with","icmp6-port-unreachable" if ipver=="ipv6" else "icmp-port-unreachable"):
-                return t[:-2]
-            return t
-        def reduce_port_module(t):
-            # Permit only the canonical xtables injected matching module for
-            # the specific protocol and the fixed 53 port.
-            if len(t)>8 and "-m" in t and "--dport" in t:
-                index=t.index("-m")
-                if index+1<len(t) and t[index+1] in ("tcp","udp") and t[index+1] in t:
-                    return t[:index]+t[index+2:]
-            return t
-        if ipver=="ipv4" and final:
-            expected=[reduce_port_module(x) for x in expected]
-        got=[reduce_port_module(normalized(t)) for t in ownrules]
+        expected=[canonical_owned_rule(t,chain=chain,ipv6=ipver=="ipv6") for t in expected]
+        got=[canonical_owned_rule(t,chain=chain,ipv6=ipver=="ipv6") for t in ownrules]
         if got!=expected:
             raise InvalidEvidence("CHAIN_RULE_ORDER_OR_CONTENT")
         # Inserting at OUTPUT position 1 must precede all existing OUTPUT

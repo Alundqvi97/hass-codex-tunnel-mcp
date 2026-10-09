@@ -54,18 +54,37 @@ class AdditionalSecurityTests(unittest.TestCase):
         all_files={p:digest for p in PINNED}
         with self.assertRaises(AttestationDenied):
             DigestGate({p:digest for p in PINNED[:-1]},image_version="20261009.1")
-        good=DigestGate(all_files,image_version="20261009.1",
+        # The manifest cannot be accepted without a separately reviewed
+        # complete dependency closure, even if primary binaries match.
+        with self.assertRaises(AttestationDenied):
+            DigestGate(all_files,image_version="20261009.1",
+                       read_bytes=lambda p:b"mock pinned bytes",
+                       environ={"ImageOS":"ubuntu24","ImageVersion":"20261009.1"})
+        dependency="/usr/lib/p2a-fixture/ld-approved.so"
+        full={**all_files,dependency:digest}
+        good=DigestGate(full,dependency_paths=(dependency,),verified_dependency_inventory=True,image_version="20261009.1",
                        read_bytes=lambda p:b"mock pinned bytes",
                        environ={"ImageOS":"ubuntu24","ImageVersion":"20261009.1"})
         self.assertTrue(good.verify())
-        altered=DigestGate(all_files,image_version="20261009.1",
+        altered=DigestGate(full,dependency_paths=(dependency,),verified_dependency_inventory=True,image_version="20261009.1",
                           read_bytes=lambda p:b"modified",
                           environ={"ImageOS":"ubuntu24","ImageVersion":"20261009.1"})
         with self.assertRaises(AttestationDenied):altered.verify()
-        wrong=DigestGate(all_files,image_version="20261009.1",
+        wrong=DigestGate(full,dependency_paths=(dependency,),verified_dependency_inventory=True,image_version="20261009.1",
                          read_bytes=lambda p:b"mock pinned bytes",
                          environ={"ImageOS":"ubuntu22","ImageVersion":"20261009.1"})
         with self.assertRaises(AttestationDenied):wrong.verify()
+
+    def test_manifest_omitted_security_tools_fail_closed(self):
+        self.assertIn("/usr/bin/pgrep", PINNED)
+        self.assertIn("/usr/bin/getent", PINNED)
+        digest=hashlib.sha256(b"source").hexdigest()
+        manifest={path:digest for path in PINNED if path!="/usr/bin/pgrep"}
+        manifest["/lib/ld-audited.so"]=digest
+        with self.assertRaises(AttestationDenied):
+            DigestGate(manifest,image_version="20261009.1",
+                       dependency_paths=("/lib/ld-audited.so",),
+                       verified_dependency_inventory=True)
 
     def test_bounded_json_not_pickle_and_wrong_index_rejected(self):
         class Model:

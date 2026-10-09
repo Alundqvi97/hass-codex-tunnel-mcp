@@ -52,6 +52,18 @@ class FakeKernel:
         return True
 
 class RecoveryTests(unittest.TestCase):
+    def test_canonical_tcp_udp_matches_active_and_recovery(self):
+        from probe_a_kernel import canonical_owned_rule
+        for protocol in ("tcp","udp"):
+            chain=P.chain4
+            text=("-A",chain,"-d","9.9.9.9/32","-p",protocol,
+                  "-m",protocol,"--dport","53","-j","ACCEPT")
+            expected=text[:5]+text[7:]
+            self.assertEqual(canonical_owned_rule(text,chain=chain,ipv6=False),expected)
+            with self.assertRaises(Exception):
+                canonical_owned_rule(text[:6]+("-m","icmp")+text[8:],chain=chain,ipv6=False)
+
+
     def test_all_setup_prefixes_recover_without_rerun(self):
         for n in range(10):
             with self.subTest(setup_prefix=n):
