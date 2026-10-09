@@ -236,7 +236,7 @@ class AdditionalSecurityTests(unittest.TestCase):
             with self.assertRaises(StreamFailure):
                 capture(("/usr/bin/true",),2,spawn=lambda *a,**kw:Child(),
                         selector_factory=Selector,clock=lambda:1,
-                        group_owner=lambda pid:True)
+                        group_owner=lambda pid:True,group_kill=kill)
             kill.assert_called_once_with(81712,__import__("signal").SIGKILL)
         self.assertEqual(MAX_BYTES,131072)
 
