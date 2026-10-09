@@ -136,7 +136,7 @@ def classify_probe(*, running: bool = True, listener: bool = True,
     """Fixed categories only. Never include exception strings or HTTP bodies."""
     if not running:
         return 'QEMU_EXIT'
-    if not listener:
+    if not listener and status is None:
         return 'HOST_FORWARD_ABSENT'
     if error == 'refused':
         return 'TCP_REFUSED'
@@ -213,3 +213,19 @@ def runtime_milestones(evidence: Mapping[str, bool]) -> tuple[str, ...]:
 def cleanup_intentions() -> tuple[str, ...]:
     """Neutral restoration checklist, not executable cleanup commands."""
     return CLEANUP_ITEMS
+
+
+def planned_cleanup_actions(active: Mapping[str, bool]) -> tuple[str, ...]:
+    """Synthetic ordered intent identifiers; never executes privileged cleanup."""
+    ordered = (
+        ('guest_started', 'stop_guest'), ('watchdog_started', 'stop_watchdog'),
+        ('fs_mounted', 'unmount'), ('nbd_connected', 'disconnect_nbd'),
+        ('ipv4_jump_created', 'delete_ipv4_jump'),
+        ('ipv4_chain_created', 'delete_ipv4_chain'),
+        ('ipv6_jump_created', 'delete_ipv6_jump'),
+        ('ipv6_chain_created', 'delete_ipv6_chain'),
+        ('kvm_acl_added', 'remove_kvm_acl'),
+        ('user_created', 'delete_temporary_user'),
+        ('workspace_created', 'delete_temporary_workspace'),
+    )
+    return tuple(action for key, action in ordered if active.get(key) is True)

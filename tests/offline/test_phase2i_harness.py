@@ -96,6 +96,12 @@ class OfflineHarnessTests(unittest.TestCase):
         self.assertIn('ipv6=off', content)
         self.assertNotIn('report("RAW_HTTP_BODY"', content)
 
+    def test_cleanup_plan_partial_setup_and_observed_http(self):
+        state = {'ipv4_chain_created':True, 'user_created':True, 'kvm_acl_added':True}
+        self.assertEqual(model.planned_cleanup_actions(state), ('delete_ipv4_chain', 'remove_kvm_acl', 'delete_temporary_user'))
+        self.assertEqual(model.planned_cleanup_actions({}), ())
+        self.assertEqual(model.classify_probe(listener=False,status=404), 'HTTP_404')
+
     def test_vm_trigger_guard_from_source(self):
         workflow=(ROOT/'.github/workflows/phase2h-haos-vm-once.yml')
         if not workflow.is_file():self.skipTest('GitHub workflow not mounted locally')
