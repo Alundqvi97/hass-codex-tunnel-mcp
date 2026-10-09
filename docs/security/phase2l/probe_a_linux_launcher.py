@@ -160,6 +160,11 @@ class ExecSpec:
             raise LaunchDenied("UNBOUNDED_OR_INVALID_ARGV")
         if self.argv[0] not in EXECUTABLES[self.role]:
             raise LaunchDenied("NO_PRIVILEGED_SHELL_SUDO_OR_EXECUTABLE_WIDENING")
+        if self.role in (*ACTORS, "peer"):
+            if (len(self.argv) < 4 or self.argv[1:3] != ("-I", "-B")
+                    or not self.argv[3].startswith("/")
+                    or os.path.normpath(self.argv[3]) != self.argv[3]):
+                raise LaunchDenied("ISOLATED_REVIEWED_PYTHON_SCRIPT_REQUIRED")
         if (type(self.executable_fd) is not int or self.executable_fd < 3
                 or type(self.group.fd) is not int or self.group.fd < 3
                 or self.executable_fd == self.group.fd):
@@ -294,7 +299,11 @@ class NativeAtomicSpawner:
             try:
                 # This is fixed TRUSTED bootstrap code, not a caller callback.
                 self.syscalls.prepare_child(spec.role, parent_pid)
-                devnull = os.open("/dev/null", os.O_RDWR | os.O_CLOEXEC)
+                devnull = os.open("/dev/null", os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC)
+                null_stat = os.fstat(devnull)
+                if (not stat.S_ISCHR(null_stat.st_mode) or null_stat.st_uid != 0
+                        or null_stat.st_rdev != os.makedev(1, 3)):
+                    raise LaunchDenied("TRUSTED_NULL_DEVICE_REQUIRED")
                 os.dup2(devnull, 0)
                 os.dup2(devnull if stdout_fd is None else stdout_fd, 1)
                 os.dup2(devnull, 2)

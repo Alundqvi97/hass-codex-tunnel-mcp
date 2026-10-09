@@ -168,6 +168,16 @@ class RuntimeInventory:
                 or (group["device"], group["inode"]) != spec.group.identity
                 or spec.argv[0] not in self.document["files"]):
             raise InventoryDenied("EXEC_ROLE_ARGV_OR_CGROUP_NOT_REVIEWED")
+        # Pin the actual Python program as well as its interpreter. A signed
+        # pathname alone does not authenticate the bytes executed as root.
+        if spec.role in ("guardian", "observer", "controller", "peer"):
+            if (len(spec.argv) < 4 or spec.argv[1:3] != ("-I", "-B")
+                    or spec.argv[3] not in self.document["categories"]["source"]):
+                raise InventoryDenied("PYTHON_ENTRYPOINT_MISSING_FROM_SOURCE_INVENTORY")
+        if spec.role == "worker":
+            from probe_a_workload import WORKER
+            if len(spec.argv) < 11 or spec.argv[10] != WORKER:
+                raise InventoryDenied("WORKER_ENTRYPOINT_NOT_REVIEWED")
         check_root_file(spec.executable_fd, executable=True)
         # Read the exact retained descriptor that execve will use, not a path.
         data = bytearray()

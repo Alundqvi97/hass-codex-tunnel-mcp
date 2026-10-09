@@ -193,6 +193,8 @@ class LauncherTests(unittest.TestCase):
         with patch("probe_a_linux_launcher.os.geteuid", return_value=0), \
              patch("probe_a_linux_launcher.os.listdir", return_value=["1"]), \
              patch("probe_a_linux_launcher.os.open", return_value=20), \
+             patch("probe_a_linux_launcher.os.fstat", return_value=SimpleNamespace(
+                 st_mode=__import__("stat").S_IFCHR, st_uid=0, st_rdev=os.makedev(1, 3))), \
              patch("probe_a_linux_launcher.os.dup2"), \
              patch("probe_a_linux_launcher.close_except"), \
              patch("probe_a_linux_launcher.os.execve", side_effect=lambda *args: calls.append("exec")), \
@@ -461,6 +463,17 @@ class InventoryTests(unittest.TestCase):
         inventory = self.make(doc, verify_signature=lambda *args: True)
         doc["files"].clear()
         self.assertTrue(inventory.verify())
+
+    def test_python_pathname_without_source_digest_cannot_execute(self):
+        doc = self.document()
+        argv = ("/usr/bin/python3", "-I", "-B", "/unreviewed/entry.py")
+        doc["exec"]["guardian"] = [list(argv)]
+        inventory = self.make(doc, verify_signature=lambda *args: True)
+        group = doc["groups"]["guardian"]
+        spec = SimpleNamespace(role="guardian", argv=argv,
+                               group=SimpleNamespace(identity=(group["device"], group["inode"])))
+        with self.assertRaisesRegex(InventoryDenied, "ENTRYPOINT_MISSING"):
+            inventory.authorize_exec(spec, b"separate test approval")
 
     def test_all_dependency_categories_mandatory(self):
         for key in CATEGORIES:
