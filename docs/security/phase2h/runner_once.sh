@@ -145,6 +145,7 @@ test "$(git -C ha_mcp_pinned rev-parse HEAD)" = fc54437a804858732e4bc927add98e20
 python3 docs/security/phase2d/patch_candidates.py policy --apply >/dev/null
 python3 docs/security/phase2d/patch_candidates.py logging --apply >/dev/null
 python3 docs/security/phase2f/strict_addon_candidate.py --apply >/dev/null
+python3 docs/security/phase2k/source_candidate.py --root ha_mcp_pinned --apply >/dev/null
 python3 docs/security/phase2g/middleware_revalidation.py --apply >/dev/null
 git -C ha_mcp_pinned diff --check
 echo "PHASE2H_REVIEWED_PATCH_APPLICATION=PASS"
@@ -165,6 +166,8 @@ mkdir -p "$WORK/addon" "$WORK/mount"
 cp ha_mcp_pinned/homeassistant-addon/{config.yaml,Dockerfile,start.py} "$WORK/addon/"
 cp ha_mcp_pinned/{pyproject.toml,uv.lock} "$WORK/addon/"
 cp -a ha_mcp_pinned/src "$WORK/addon/"
+cp docs/security/phase2k/bootstrap_policy.py "$WORK/addon/phase2k_bootstrap.py"
+cp docs/security/phase2k/phase2k_policy.json "$WORK/addon/phase2k_policy.json"
 python3 - "$WORK/addon" <<'PY'
 from pathlib import Path
 import sys
@@ -195,10 +198,10 @@ if sudo modprobe nbd max_part=16 2>/dev/null && test -b /dev/nbd0 && sudo qemu-n
   echo "PHASE2I_DATA_PARTITION_LABEL=PASS"
   if sudo mount "$DATA_DEVICE" "$WORK/mount" >/dev/null 2>&1; then
     MOUNTED=true
-    sudo mkdir -p "$WORK/mount/supervisor/addons/local/ha_mcp_phase2h" "$WORK/mount/supervisor/addons/data/local_ha_mcp_phase2h"
-    sudo cp -a "$WORK/addon/." "$WORK/mount/supervisor/addons/local/ha_mcp_phase2h/"
-    printf '%s\n' '{"schema_version":2,"rule_effect":"allow","rules":[{"tool_name":"ha_get_overview","when":[],"remember_minutes":0}]}' | sudo tee "$WORK/mount/supervisor/addons/data/local_ha_mcp_phase2h/tool_policy.json" >/dev/null
-    sudo chmod 0600 "$WORK/mount/supervisor/addons/data/local_ha_mcp_phase2h/tool_policy.json"
+    # Bootstrap local SOURCE only. Do not write private Supervisor operational data.
+    # Installation is a separate, authenticated Supervisor store/API step.
+    sudo mkdir -p "$WORK/mount/supervisor/apps/local/ha_mcp_phase2h"
+    sudo cp -a "$WORK/addon/." "$WORK/mount/supervisor/apps/local/ha_mcp_phase2h/"
     sudo umount "$WORK/mount"
     MOUNTED=false
     GUEST_SEEDED=true

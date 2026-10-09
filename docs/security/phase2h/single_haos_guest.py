@@ -175,6 +175,7 @@ def test_addon(ws):
         "secret_path":synthetic_capability,
         "enable_tool_security_policies":True,
         "require_strict_tool_policy":True,
+        "bootstrap_reviewed_policy":True,
         "enable_security_policy_tool":False,
         "read_only_mode":False,
         "redact_secrets":True,
@@ -193,7 +194,7 @@ def test_addon(ws):
     report("CANDIDATE_ADDON_INSTALL","PASS")
     info=ws.supervisor_api(f"/addons/{SLUG}/info",timeout=90)
     schema=info.get("schema",{})
-    if "require_strict_tool_policy" not in str(schema):
+    if "require_strict_tool_policy" not in str(schema) or "bootstrap_reviewed_policy" not in str(schema):
         report("SUPERVISOR_RECOGNIZES_STRICT_OPTION","FAIL")
         return
     report("SUPERVISOR_RECOGNIZES_STRICT_OPTION","PASS")
