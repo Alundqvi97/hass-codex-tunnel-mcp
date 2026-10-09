@@ -52,13 +52,13 @@ class Link:
             return True
         self.clock.advance(max(timeout, 0.02))
         return False
-    def recv_bytes(self, maxsize):
+    def recv_bytes(self, maxsize, *, deadline=None):
         if self.first is not None:
             msg=self.first
             self.first=None
             return msg
         raise EOFError()
-    def send_bytes(self, payload):
+    def send_bytes(self, payload, *, deadline=None):
         self.replies.append(json.loads(payload))
     def close(self):
         self.closed=True
