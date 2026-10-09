@@ -127,5 +127,26 @@ class AdditionalSecurityTests(unittest.TestCase):
             kill.assert_called_once_with(81712,__import__("signal").SIGKILL)
         self.assertEqual(MAX_BYTES,131072)
 
+    def test_ipv6_default_reject_encoding_is_narrowly_accepted(self):
+        from probe_a_recovery import inspect_partial,RecoveryDenied
+        base="*filter\\n:INPUT ACCEPT [0:0]\\n:FORWARD ACCEPT [0:0]\\n:OUTPUT ACCEPT [0:0]\\nCOMMIT\\n".replace("\\n","\n")
+        chain=PLAN.chain6
+        active=base.replace("COMMIT\\n".replace("\\n","\n"),
+            ":"+chain+" - [0:0]\\n-A "+chain+" -j REJECT --reject-with icmp6-port-unreachable\\nCOMMIT\\n".replace("\\n","\n"))
+        self.assertTrue(inspect_partial(PLAN,(base,base),(base,active))[1].chain)
+        with self.assertRaises(RecoveryDenied):
+            inspect_partial(PLAN,(base,base),(base,active.replace("icmp6-port-unreachable","icmp6-adm-prohibited")))
+
+    def test_sigterm_handler_is_deterministic_and_offline(self):
+        from probe_a_guardian import installed_signal_abort,GuardianDenied
+        import signal
+        signals=[]
+        with patch("probe_a_guardian.signal.signal",side_effect=lambda a,b:signals.append((a,b))):
+            installed_signal_abort(lambda:signals.append(("cleanup",True)))
+            handler=signals[0][1]
+            with self.assertRaises(GuardianDenied):handler(signal.SIGTERM,None)
+        self.assertIn(("cleanup",True),signals)
+        self.assertIn((signal.SIGTERM,signal.SIG_IGN),signals)
+
 if __name__=="__main__":
     unittest.main()

@@ -52,7 +52,7 @@ def _family(active, baseline, chain, uid, *, ipv6=False, dns=None):
             prefixes.append(tuple(reversed(allowed[:count])))
     canonical = []
     for row in raw:
-        if row[-2:] == ("--reject-with", "icmp-port-unreachable"):
+        if row[-2:] == ("--reject-with", "icmp6-port-unreachable" if ipv6 else "icmp-port-unreachable"):
             row = row[:-2]
         canonical.append(row)
     if tuple(canonical) not in prefixes:

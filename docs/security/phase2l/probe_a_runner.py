@@ -40,20 +40,25 @@ class OneShotRunner:
             return "BLOCKED_DISABLED_OR_UNAPPROVED"
         deadline=self.clock()+240
         channel=None
+        status="BLOCKED_SUPERVISION_FAILURE"
         try:
             channel=self.launcher.launch(self.plan,deadline)
             outcome=control(self.plan,RemoteIO(channel,self.plan,clock=self.clock),self.clock)
-            # A channel result is NOT kernel proof, and final process exit /
-            # post-guardian readback must be independently established.
-            return outcome.receipt()
+            status=outcome.receipt()
         except BaseException:
-            return "BLOCKED_SUPERVISION_FAILURE"
+            status="BLOCKED_SUPERVISION_FAILURE"
         finally:
             if channel is not None:
                 try: channel.close()
                 except BaseException: pass
-            # Must never kill guardian as part of closing the controller;
-            # it independently owns the cleanup reserve until completion.
+        # A parent that survives must independently observe guardian exit,
+        # both filter tables and every residual resource. This audit also
+        # executes when the controller aborted. NEVER return runtime PASS.
+        try:
+            post=self.launcher.verify_after(self.plan,deadline)
+        except BaseException:
+            post="BLOCKED_POST_GUARDIAN_AUDIT"
+        return status+";POST="+post
 
 
 class ForkGuardianLauncher:
@@ -71,12 +76,23 @@ class ForkGuardianLauncher:
         self.context_factory=context_factory
         self.clock=clock
         self.child=None
+        self.parent_observer=None
+        self.parent_resources=None
 
     def launch(self, plan, deadline):
         if (self.child is not None or self.root_check()!=0 or
                 validate_plan(plan)!="OFFLINE_SAFE_SCOPED_PLAN_NOT_KERNEL_VERIFIED" or
                 not self.clock()<deadline<=self.clock()+240):
             raise RunnerDenied("GUARDIAN_LAUNCH_REFUSED")
+        # Independent parent pre-change inventory BEFORE any guardian writes.
+        from probe_a_observer import KernelReadback
+        command, _unused_work, resources=self.backend_factory(plan)
+        if resources.preflight() is not True:
+            raise RunnerDenied("PARENT_RESOURCES_NOT_CLEAN")
+        observer=KernelReadback(plan,read=command,clock=self.clock)
+        observer.preflight(deadline)
+        self.parent_observer=observer
+        self.parent_resources=resources
         ctx=self.context_factory("fork")
         parent,child=ctx.Pipe(duplex=True)
         # The child holds the backend; the controller never receives root I/O.
@@ -116,6 +132,35 @@ class ForkGuardianLauncher:
             return "BLOCKED_GUARDIAN_NOT_CONFIRMED_EXITED"
         return "GUARDIAN_EXITED_NEEDS_EXTERNAL_KERNEL_READBACK"
 
+
+    def verify_after(self, plan, deadline):
+        """Read fresh evidence AFTER the separate guardian is reaped.
+
+        This is a separate observer from the guardian, not a cryptographic
+        attestation or qualified human/security review.
+        """
+        if (self.child is None or self.parent_observer is None or
+                self.parent_resources is None or plan!=self.parent_observer.plan):
+            return "BLOCKED_NO_INDEPENDENT_BASELINE"
+        if self.wait_for_exit(deadline)!="GUARDIAN_EXITED_NEEDS_EXTERNAL_KERNEL_READBACK":
+            return "BLOCKED_GUARDIAN_ALIVE_OR_FAILED"
+        try:
+            import os as _os
+            pid=self.child.pid
+            absent=(type(pid) is int and pid>1 and not self.child.is_alive()
+                    and not _os.path.exists("/proc/"+str(pid)))
+            audit=self.parent_observer.mandatory_readbacks(
+                deadline,independent_resources=self.parent_resources
+            )
+            # Guardian cannot check its own exit; only reaping parent can.
+            audit["watchdog_absent"] = absent is True
+            self.parent_observer.require_restored(deadline)
+            if set(audit)==set(__import__("probe_contract").CLEANUP_READBACKS) and all(
+                    type(v) is bool and v for v in audit.values()):
+                return "POST_RESTORED_INDEPENDENTLY_OBSERVED_NOT_PROBE_PASS"
+        except BaseException:
+            pass
+        return "BLOCKED_POST_RESTORE_UNVERIFIED"
 
 def reviewed_boundary_factory(plan, *, attestor):
     """Concrete low-level wiring, effectful ONLY when guardian explicitly runs.

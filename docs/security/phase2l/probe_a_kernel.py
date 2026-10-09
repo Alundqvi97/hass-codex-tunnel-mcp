@@ -74,7 +74,7 @@ def expect_active(snapshot_v4,snapshot_v6, baseline_v4,baseline_v6, plan, *, fin
         # Common iptables-save canonical forms include -m tcp/udp and
         # --reject-with icmp-port-unreachable; narrow exact variants only.
         def normalized(t):
-            if t[-2:]==("--reject-with","icmp-port-unreachable"):
+            if t[-2:]==("--reject-with","icmp6-port-unreachable" if ipver=="ipv6" else "icmp-port-unreachable"):
                 return t[:-2]
             return t
         def reduce_port_module(t):
