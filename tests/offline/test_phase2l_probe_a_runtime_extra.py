@@ -86,6 +86,52 @@ class AdditionalSecurityTests(unittest.TestCase):
                        dependency_paths=("/lib/ld-audited.so",),
                        verified_dependency_inventory=True)
 
+    def test_os_privilege_drop_contract_never_accepts_root_or_caps(self):
+        from probe_a_privilege import verify_unprivileged, drop_controller, PrivilegeDenied
+        status=("Uid:\t65534 65534 65534 65534\n"
+                "Gid:\t65534 65534 65534 65534\nGroups:\t\n"
+                "CapInh:\t0000000000000000\nCapPrm:\t0000000000000000\n"
+                "CapEff:\t0000000000000000\nCapBnd:\t0000000000000000\n"
+                "CapAmb:\t0000000000000000\nNoNewPrivs:\t1\n")
+        self.assertTrue(verify_unprivileged(read_text=lambda p: status))
+        for wrong in (status.replace("65534 65534 65534 65534","0 0 0 0",1),
+                      status.replace("CapBnd:\t0000000000000000","CapBnd:\t0000000000000001"),
+                      status.replace("NoNewPrivs:\t1","NoNewPrivs:\t0")):
+            with self.assertRaises(PrivilegeDenied):
+                verify_unprivileged(read_text=lambda p, s=wrong:s)
+        calls=[]
+        self.assertTrue(drop_controller(getuid=lambda:0,
+                 prctl=lambda: calls.append("nnp") or 0,
+                 setgroups=lambda v:calls.append(("groups",v)),
+                 setgid=lambda *v:calls.append(("gid",v)),
+                 setuid=lambda *v:calls.append(("uid",v)),
+                 verify=lambda *a:calls.append("verify") or True))
+        self.assertEqual(calls,["nnp",("groups",[]),
+                               ("gid",(65534,)*3),("uid",(65534,)*3),"verify"])
+        with self.assertRaises(PrivilegeDenied):
+            drop_controller(getuid=lambda:65534,prctl=lambda:0)
+
+    def test_readonly_observer_does_not_expose_guardian_write(self):
+        from probe_a_privilege import ReadOnlyPostObserver, PrivilegeDenied
+        observed=[]
+        reader=ReadOnlyPostObserver(PLAN,read=lambda a,d:observed.append(a),
+                                    check=lambda:True)
+        reader(("/usr/sbin/iptables-save","-t","filter"),10)
+        self.assertEqual(len(observed),1)
+        for cmd in PLAN.setup+PLAN.teardown:
+            with self.assertRaises(PrivilegeDenied):
+                reader(cmd.argv,10)
+        with self.assertRaises(PrivilegeDenied):
+            ReadOnlyPostObserver(PLAN,read=lambda *a:True,
+                                check=lambda:False)(("/usr/sbin/iptables-save","-t","filter"),10)
+
+    def test_root_command_adapter_refuses_unprivileged_sudo_fallback(self):
+        from probe_a_os_boundary import bounded_process, HostBlocked
+        with patch("probe_a_os_boundary.os.geteuid",return_value=65534), \
+             patch("probe_a_os_boundary.capture",side_effect=AssertionError("unreviewed spawn")):
+            with self.assertRaises(HostBlocked):
+                bounded_process(PLAN.setup[0].argv,2,reviewed_plan=PLAN)
+
     def test_bounded_json_not_pickle_and_wrong_index_rejected(self):
         class Model:
             cleaned=False

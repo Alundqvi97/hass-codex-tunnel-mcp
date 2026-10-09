@@ -30,6 +30,7 @@ SOURCE_NAMES=(
     "probe_a_stream.py", "probe_a_recovery.py", "probe_a_guardian.py",
     "probe_a_runner.py", "probe_a_worker.py", "probe_a_workload.py",
     "probe_a_client_process.py", "probe_a_resources.py",
+    "probe_a_privilege.py",
 )
 PINNED=BINARY_PATHS+tuple(str(Path(__file__).resolve().parent / f) for f in SOURCE_NAMES)
 

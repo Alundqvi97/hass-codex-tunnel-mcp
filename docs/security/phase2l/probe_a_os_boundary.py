@@ -6,6 +6,7 @@ post-termination watchdog are still MISSING.
 from __future__ import annotations
 import subprocess
 import time
+import os
 from probe_a_stream import capture, StreamFailure
 from probe_contract import validate_plan
 from probe_a_exec_adapter import Reply, checked_reply, RUN_LIMIT_SECONDS
@@ -71,7 +72,12 @@ def bounded_process(argv,timeout,*,reviewed_plan):
     if type(timeout) not in (int,float) or not 0<timeout<=RUN_LIMIT_SECONDS:
         raise HostBlocked("INVALID_DEADLINE")
     privileged=argv[0].startswith("/usr/sbin/")
-    cmd=("/usr/bin/sudo","-n",*argv) if privileged else argv
+    if privileged and os.geteuid()!=0:
+        raise HostBlocked("HOST_PRIVILEGE_NOT_GUARDIAN_ROOT")
+    # Running through sudo -n gave an unprivileged controller a possible
+    # alternative privileged command path; use direct root-owned execution
+    # only inside the separately forked guardian.
+    cmd=argv
     try:
         # Streamed hard cap is enforced while the child runs; no unbounded
         # subprocess.run(..., PIPE) buffering and no stderr exposure.

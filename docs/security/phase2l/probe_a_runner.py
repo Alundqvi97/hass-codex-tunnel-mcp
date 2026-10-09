@@ -15,6 +15,7 @@ import time
 from probe_contract import validate_plan
 from probe_a_controller import control
 from probe_a_guardian import GuardianCore, GuardianChannel, RemoteIO, installed_signal_abort
+from probe_a_privilege import drop_controller, ReadOnlyPostObserver, PrivilegeDenied
 
 
 class RunnerDenied(RuntimeError):
@@ -67,10 +68,17 @@ class ForkGuardianLauncher:
     Nothing starts until launch() is called by an externally authorized
     OneShotRunner. No default arbitrary process executors are available.
     """
-    def __init__(self, *, backend_factory, root_check=os.geteuid,
+    def __init__(self, *, backend_factory, post_observer_factory=None,
+                 controller_drop=drop_controller, root_check=os.geteuid,
                  context_factory=multiprocessing.get_context, clock=time.monotonic):
         if not callable(backend_factory):
             raise RunnerDenied("MISSING_REVIEWED_BACKEND")
+        if not callable(controller_drop):
+            raise RunnerDenied("MISSING_OS_PRIVILEGE_BOUNDARY")
+        # No read-only broker is bundled: without a reviewed external actor
+        # launch is refused rather than inheriting privileged commands.
+        self.post_observer_factory=post_observer_factory
+        self.controller_drop=controller_drop
         self.backend_factory=backend_factory
         self.root_check=root_check
         self.context_factory=context_factory
@@ -80,7 +88,8 @@ class ForkGuardianLauncher:
         self.parent_resources=None
 
     def launch(self, plan, deadline):
-        if (self.child is not None or self.root_check()!=0 or
+        if (self.child is not None or not callable(self.post_observer_factory)
+                or self.root_check()!=0 or
                 validate_plan(plan)!="OFFLINE_SAFE_SCOPED_PLAN_NOT_KERNEL_VERIFIED" or
                 not self.clock()<deadline<=self.clock()+240):
             raise RunnerDenied("GUARDIAN_LAUNCH_REFUSED")
@@ -91,7 +100,14 @@ class ForkGuardianLauncher:
             raise RunnerDenied("PARENT_RESOURCES_NOT_CLEAN")
         observer=KernelReadback(plan,read=command,clock=self.clock)
         observer.preflight(deadline)
-        self.parent_observer=observer
+        post_read=self.post_observer_factory(plan)
+        read_only=ReadOnlyPostObserver(plan,read=post_read)
+        # Preflight uses the privileged bootstrap; after the drop every
+        # post-guardian observation passes through an independent read-only
+        # broker and checks real unprivileged controller identity.
+        self.parent_observer=KernelReadback(plan,read=read_only,clock=self.clock)
+        self.parent_observer.baseline=observer.baseline
+        self.parent_observer.versions=observer.versions
         self.parent_resources=resources
         ctx=self.context_factory("fork")
         parent,child=ctx.Pipe(duplex=True)
@@ -117,11 +133,15 @@ class ForkGuardianLauncher:
             process.start()
             self.child=process
             child.close()
+            # Bootstrap privilege must be irreversibly dropped BEFORE the
+            # root guardian channel reaches the controller. Never allow
+            # parent-side sudo as an alternate firewall mutation boundary.
+            self.controller_drop()
             return parent
         except BaseException:
             parent.close()
             child.close()
-            raise RunnerDenied("GUARDIAN_START_FAILED") from None
+            raise RunnerDenied("GUARDIAN_LAUNCH_OR_DROP_FAILED") from None
 
     def wait_for_exit(self, *, deadline):
         if self.child is None:
