@@ -58,8 +58,8 @@ class RehearsalTests(unittest.TestCase):
                 self.assertEqual(x.teardown_attempts,len(f.plan.teardown))
                 self.assertEqual(x.workload_attempts,0)
                 self.assertEqual(f.stops,1)
-                self.assertIn("ipv4",[fam for tag,fam,phase in f.calls if tag=="issue" and phase=="unhook"])
-                self.assertIn("ipv6",[fam for tag,fam,phase in f.calls if tag=="issue" and phase=="unhook"])
+                self.assertIn("ipv4",[entry[1] for entry in f.calls if len(entry)==3 and entry[0]=="issue" and entry[2]=="unhook"])
+                self.assertIn("ipv6",[entry[1] for entry in f.calls if len(entry)==3 and entry[0]=="issue" and entry[2]=="unhook"])
     def test_failed_dual_hook_readback_blocks_workload(self):
         f=Fixture(fail_observer="dual_stack_deny_hooks")
         x=f.run()
