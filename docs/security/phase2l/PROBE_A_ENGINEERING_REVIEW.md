@@ -152,10 +152,49 @@ authorized Home Assistant administration remains the product goal.
 
 ### Immutable delivery receipt
 
-Source commit and GitHub CI receipts: pending the authorized normal-history
-push to existing draft PR #2. Documentation will pin the immutable final source
-commit and observed CI runs. A documentation-only receipt commit's own hash is
-reported in the final delivery report (a Git commit cannot contain its own hash).
+Final immutable **source/test commit**: [`182c8b7c95513b83abc71f2d49ea82adde7ef4fa`](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/commit/182c8b7c95513b83abc71f2d49ea82adde7ef4fa).
+It follows integration commit `6819d1029f790a057ad0f170c37f9b33a826e1c6` without
+history rewriting. The subsequent delivery receipt commit changes only this
+document and `IMPLEMENTATION_PLAN.md`; its own final GitHub HEAD is reported in
+the delivery report, because a Git commit cannot contain its own hash. The
+source/test tree must remain byte-identical to the immutable commit above.
+
+Local validation at that source: **424 Phase 2L passed, zero failed/skipped**;
+**560 broader regressions passed, zero failed, one optional Home Assistant schema
+skipped**; Python compilation, guest-script syntax and Git whitespace checks
+passed. External logs/fixtures: `/tmp/probe-a-offline.gYP5aY`. This is offline
+engineering evidence, not actual OS enforcement.
+
+GitHub evidence for that exact source revision (run titles and native PR merge
+parent `9c84ce7e0178ebdaba6345ac5a10428ba98f0bb0` verified against full source SHA):
+
+| Existing workflow | Result | Immutable run |
+|---|---|---|
+| D — upstream patch candidates (PR) | SUCCESS | [38001047306](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38001047306) |
+| I — synthetic offline harness | SUCCESS | [38001047402](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38001047402) |
+| J — pure offline acceptance model | SUCCESS | [38001047305](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38001047305) |
+| K — packaged initial policy offline | SUCCESS | [38001047385](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38001047385) |
+| L — offline DNS/build context (push / PR) | SUCCESS / SUCCESS | [38001041994](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38001041994) / [38001047345](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38001047345) |
+| E — disposable packaged addon | SUCCESS | [38001041964](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38001041964) |
+| F — supported strict addon staging | SUCCESS | [38001042059](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38001042059) |
+| H — non-VM approval semantics | SUCCESS | [38001041959](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38001041959) |
+| GitHub AI scanning automation | FAILED | [38001050352](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38001050352) |
+
+Historical E/F Docker Hub token HTTP 504 failures are preserved as historical
+outcomes. These new automatic packaging runs succeeded; no manual retry or
+unrelated application correction was performed. Packaging success does not
+satisfy genuine Supervisor acceptance. AI scanning failure is not independent
+security certification; its full authenticated logs are unavailable under the
+current network policy. Public GitHub read-only pages and native Git metadata
+were used; environment authentication/network publication was not modified.
+
+PR #2 remains draft, open and unmerged. Three normal-history delivery commits
+cover integration, the final alias/ownership correction and documentation
+receipts. All workflow files, original VM workflow and full administrator
+blueprint remain byte-for-byte equal to baseline `8ca67a92f224c57c7ea84c2d32a49d4d439d6e32`.
+No live Probe A, root execution, real approval/signature/key, cgroup/firewall
+mutation, VM/QEMU, production/tunnel access or paid/manual workflow retry
+occurred. Runtime, HAOS/Supervisor and production remain **NO-GO**.
 
 ## Historical foundation delivery at 8ca67a9, 2026-10-09
 
