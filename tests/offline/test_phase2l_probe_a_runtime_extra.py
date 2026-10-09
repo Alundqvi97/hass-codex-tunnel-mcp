@@ -170,10 +170,13 @@ class AdditionalSecurityTests(unittest.TestCase):
     def test_bounded_json_not_pickle_and_wrong_index_rejected(self):
         class Model:
             cleaned=False
+            cleanup_state="NOT_STARTED"
             plan=PLAN
             calls=[]
             def handle(self,*a):self.calls.append(a);return True
-            def cleanup(self,deadline):self.cleaned=True
+            def cleanup(self,deadline):
+                self.cleaned=True
+                self.cleanup_state="POST_AUDIT_REQUIRED"
         for wire in (b"cos\nsystem\n", b'{"method":"issue","value":999,"deadline":9}',
                      b'{"method":"issue","value":["-F","OUTPUT"],"deadline":9}'):
             model=Model(); model.calls=[]

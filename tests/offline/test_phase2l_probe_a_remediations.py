@@ -2,6 +2,7 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/"docs/security/phase2l"))
 
@@ -162,7 +163,14 @@ class RemediationSafetyTests(unittest.TestCase):
                    post_observer_factory=lambda plan:lambda a,d:Reply(0,""),
                    controller_drop=drop,root_check=lambda:0,
                    context_factory=lambda _:fake,clock=lambda:1)
-        parent=launcher.launch(P,200)
+        # Simulate the host /proc fields while exercising the real verifier.
+        status=("Uid:\t65534 65534 65534 65534\n"
+                "Gid:\t65534 65534 65534 65534\nGroups:\t\n"
+                "CapInh:\t0000000000000000\nCapPrm:\t0000000000000000\n"
+                "CapEff:\t0000000000000000\nCapBnd:\t0000000000000000\n"
+                "CapAmb:\t0000000000000000\nNoNewPrivs:\t1\n")
+        with patch("probe_a_privilege.Path.read_text",return_value=status):
+            parent=launcher.launch(P,200)
         self.assertTrue(fake.process.started)
         self.assertFalse(parent.closed)
         self.assertEqual(calls,["preflight","drop"])

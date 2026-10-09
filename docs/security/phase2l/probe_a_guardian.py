@@ -105,6 +105,10 @@ class GuardianCore:
         Guardian may verify its owned rules but may NEVER attest its own exit.
         The parent must separately re-observe the post-guardian host.
         """
+        if self.cleanup_state == "POST_AUDIT_REQUIRED":
+            # Only the reaping parent can perform the final independent audit.
+            # Avoid restarting teardown after all owned resources were checked.
+            return False
         if self.cleanup_state == "IN_PROGRESS":
             # An asynchronous SIGTERM may have interrupted an earlier call.
             # The recorded argv journal and fresh snapshots make a resumed
@@ -174,76 +178,133 @@ class GuardianChannel:
     poll(timeout)->bool, recv_bytes(limit)->bytes, send_bytes(bytes). Caller must provide a
     distinct OS process for actual independence. No live channel by default.
     """
-    def __init__(self, core, *, clock=time.monotonic):
+    def __init__(self, core, *, clock=time.monotonic, sleep=time.sleep):
         self.core = core
         self.clock = clock
+        self.sleep = sleep
 
     def serve(self, channel, *, end, cleanup_reserve=60):
         if not 45 <= cleanup_reserve <= 90 or end-self.clock() > 240:
             raise GuardianDenied("INVALID_SUPERVISOR_DEADLINE")
         work_end = end-cleanup_reserve
-        done = False
+        # Each invocation re-observes ownership. The core's before-write
+        # journals prevent an uncertain firewall operation being replayed.
+        next_cleanup_at = work_end
+        retry_seconds = 0.5
+        disconnected = False
+        cleanup_requested = False
         try:
             while self.clock() < end:
-                if self.clock() >= work_end and not self.core.cleaned:
-                    self.core.cleanup(end)
-                    done = True
+                now = self.clock()
+                recovering = disconnected or cleanup_requested or now >= work_end
+                if (recovering and self.core.cleanup_state != "POST_AUDIT_REQUIRED"
+                        and now >= next_cleanup_at):
+                    try:
+                        self.core.cleanup(end)
+                    except BaseException:
+                        # An interrupted cleanup remains eligible for
+                        # ownership-checked continuation within the deadline.
+                        pass
+                    next_cleanup_at = self.clock() + retry_seconds
+                if disconnected:
+                    if self.core.cleanup_state == "POST_AUDIT_REQUIRED":
+                        break
+                    now = self.clock()
+                    # No polling on a broken IPC channel and no tight loop.
+                    remaining = min(end-now, next_cleanup_at-now, 0.20)
+                    if remaining > 0:
+                        self.sleep(remaining)
+                    continue
                 remaining = max(0, end-self.clock())
-                if not channel.poll(min(0.20, remaining)):
+                try:
+                    ready = channel.poll(min(0.20, remaining))
+                except BaseException:
+                    disconnected = True
+                    next_cleanup_at = self.clock()
+                    continue
+                if not ready:
                     continue
                 try:
                     wire = channel.recv_bytes(256)
                     request = json.loads(wire.decode("utf-8", "strict"))
                 except (EOFError, OSError, ValueError, UnicodeError):
-                    break
+                    disconnected = True
+                    next_cleanup_at = self.clock()
+                    continue
                 if (type(request) is not dict or
                         set(request) != {"method", "value", "deadline"} or
                         type(request["method"]) is not str or
                         type(request["deadline"]) not in (int, float) or
                         not self.clock() < request["deadline"] <= end):
-                    break
-                method=request["method"]
-                arg=request["value"]
-                requested_end=request["deadline"]
+                    disconnected = True
+                    next_cleanup_at = self.clock()
+                    continue
+                method = request["method"]
+                arg = request["value"]
+                requested_end = request["deadline"]
                 if method not in ("preflight", "snapshot", "issue", "counters",
                                   "exercise", "stop", "cleanup", "cleanup_readback"):
-                    break
-                if method=="issue":
-                    if type(arg) is not int or not 0<=arg<len(self.core.plan.setup):
-                        break
-                    arg=self.core.plan.setup[arg]
-                elif method=="preflight":
-                    if arg!="START":break
-                elif method in ("snapshot","stop","cleanup") and arg is not None:
-                    break
-                elif method=="counters" and arg not in ("ipv4","ipv6"):
-                    break
-                elif method=="exercise" and arg not in tuple(c[0] for c in __import__("probe_a_controller").CASES):
-                    break
-                elif method=="cleanup_readback" and arg not in CLEANUP_READBACKS:
-                    break
-                if self.clock() >= work_end and method not in ("stop", "cleanup", "cleanup_readback", "snapshot"):
-                    break
-                if done and method not in ("cleanup_readback", "snapshot"):
-                    break
+                    disconnected = True
+                    next_cleanup_at = self.clock()
+                    continue
+                if method == "issue":
+                    if type(arg) is not int or not 0 <= arg < len(self.core.plan.setup):
+                        disconnected = True
+                        next_cleanup_at = self.clock()
+                        continue
+                    arg = self.core.plan.setup[arg]
+                elif method == "preflight":
+                    if arg != "START":
+                        disconnected = True
+                        next_cleanup_at = self.clock()
+                        continue
+                elif method in ("snapshot", "stop", "cleanup") and arg is not None:
+                    disconnected = True
+                    next_cleanup_at = self.clock()
+                    continue
+                elif method == "counters" and arg not in ("ipv4", "ipv6"):
+                    disconnected = True
+                    next_cleanup_at = self.clock()
+                    continue
+                elif method == "exercise" and arg not in tuple(
+                        c[0] for c in __import__("probe_a_controller").CASES):
+                    disconnected = True
+                    next_cleanup_at = self.clock()
+                    continue
+                elif method == "cleanup_readback" and arg not in CLEANUP_READBACKS:
+                    disconnected = True
+                    next_cleanup_at = self.clock()
+                    continue
+                if recovering and method not in ("stop", "cleanup", "cleanup_readback", "snapshot"):
+                    disconnected = True
+                    next_cleanup_at = self.clock()
+                    continue
                 try:
-                    value = self.core.handle(method, arg, min(requested_end, work_end)
-                                             if method not in ("stop","cleanup","cleanup_readback","snapshot")
-                                             else min(requested_end, end))
-                    channel.send_bytes(json.dumps({"ok":True,"value":value},separators=(",",":")).encode("utf-8"))
+                    value = self.core.handle(
+                        method, arg,
+                        min(requested_end, work_end)
+                        if method not in ("stop", "cleanup", "cleanup_readback", "snapshot")
+                        else min(requested_end, end))
+                    channel.send_bytes(
+                        json.dumps({"ok": True, "value": value},
+                                   separators=(",", ":")).encode("utf-8"))
                     if method == "cleanup":
-                        done = True
+                        cleanup_requested = True
+                        next_cleanup_at = self.clock() + retry_seconds
                 except BaseException:
                     try:
                         channel.send_bytes(b'{"ok":false,"value":null}')
                     except BaseException:
                         pass
-                    break
+                    disconnected = True
+                    next_cleanup_at = self.clock()
         except BaseException:
             pass
         finally:
             try:
-                self.core.cleanup(end)
+                if (self.clock() < end and
+                        self.core.cleanup_state != "POST_AUDIT_REQUIRED"):
+                    self.core.cleanup(end)
             except BaseException:
                 pass
             try:

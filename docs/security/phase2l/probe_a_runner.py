@@ -15,7 +15,7 @@ import time
 from probe_contract import validate_plan
 from probe_a_controller import control
 from probe_a_guardian import GuardianCore, GuardianChannel, RemoteIO, installed_signal_abort
-from probe_a_privilege import drop_controller, ReadOnlyPostObserver, PrivilegeDenied
+from probe_a_privilege import drop_controller, verify_unprivileged, ReadOnlyPostObserver, PrivilegeDenied
 
 
 class RunnerDenied(RuntimeError):
@@ -136,11 +136,22 @@ class ForkGuardianLauncher:
             # Bootstrap privilege must be irreversibly dropped BEFORE the
             # root guardian channel reaches the controller. Never allow
             # parent-side sudo as an alternate firewall mutation boundary.
-            self.controller_drop()
+            if self.controller_drop() is not True:
+                raise RunnerDenied("CONTROLLER_DROP_UNCONFIRMED")
+            # The launcher must independently read /proc/self/status AFTER
+            # the injected drop callback, BEFORE returning root guardian IPC.
+            # No injectable verification callback is accepted here.
+            if verify_unprivileged() is not True:
+                raise RunnerDenied("CONTROLLER_IDENTITY_UNVERIFIED")
             return parent
         except BaseException:
-            parent.close()
-            child.close()
+            # Close the parent IPC on any launch/drop/identity failure. The
+            # surviving guardian observes EOF and owns any cleanup; the
+            # OneShotRunner still performs post-guardian independent audit.
+            try: parent.close()
+            except BaseException: pass
+            try: child.close()
+            except BaseException: pass
             raise RunnerDenied("GUARDIAN_LAUNCH_OR_DROP_FAILED") from None
 
     def wait_for_exit(self, *, deadline):
