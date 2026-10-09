@@ -176,7 +176,7 @@ class AcceptanceEvidenceTests(unittest.TestCase):
         args=cmd.elts
         netarg=next(i for i,x in enumerate(args) if isinstance(x,ast.Constant) and x.value=="-netdev")
         self.assertIsInstance(args[netarg+1],ast.Constant)
-        expected=self.good().qemu_netdev
+        expected=egress.compile_proposal(approved_proposal(),now_epoch=NOW).qemu_netdev
         self.assertEqual(args[netarg+1].value,expected)
         self.assertEqual(sum(1 for x in args if isinstance(x,ast.Constant) and x.value=="-netdev"),1)
     def test_cleanup_exit_requires_runtime_readback(self):
