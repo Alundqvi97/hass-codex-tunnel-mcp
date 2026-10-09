@@ -110,6 +110,14 @@ def validate_plan(plan):
     if seen!={("ipv4","hook"),("ipv6","hook"),("ipv4","create"),("ipv6","create")}:
         return "BLOCKED"
     if any(a.argv.count("ACCEPT") for a in plan.setup if a.family=="ipv6"): return "BLOCKED"
+    # Exact regeneration is an allowlist for every argv, phase, order and
+    # teardown/readback command: no injected extra ACCEPT or wider owner hook.
+    try:
+        canonical=compile_plan(scope=plan.scope,uid=plan.uid,dns=plan.dns)
+    except Refused:
+        return "BLOCKED"
+    if plan!=canonical:
+        return "BLOCKED"
     return "OFFLINE_SAFE_SCOPED_PLAN_NOT_KERNEL_VERIFIED"
 
 CLEANUP_READBACKS=(
