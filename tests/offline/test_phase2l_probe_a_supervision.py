@@ -93,8 +93,8 @@ class StreamTests(unittest.TestCase):
         # These are mock-only tests: no subprocess starts, no SIGKILL sent.
         from probe_a_stream import MAX_BYTES
         self.assertEqual(MAX_BYTES,131072)
-        with patch("probe_a_stream.subprocess.Popen",side_effect=KeyboardInterrupt):
-            with self.assertRaises(StreamFailure):capture(("/usr/bin/true",),1)
+        with self.assertRaises(StreamFailure):
+            capture(("/usr/bin/true",),1,spawn=lambda *a,**kw: (_ for _ in ()).throw(KeyboardInterrupt()))
     def test_no_automatic_entrypoint(self):
         for name in ("probe_a_stream.py","probe_a_observer.py"):
             source=(ROOT/"docs/security/phase2l"/name).read_text()
