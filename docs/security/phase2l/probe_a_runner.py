@@ -182,7 +182,7 @@ class ForkGuardianLauncher:
             pass
         return "BLOCKED_POST_RESTORE_UNVERIFIED"
 
-def reviewed_boundary_factory(plan, *, attestor):
+def reviewed_boundary_factory(plan, *, attestor, containment=None):
     """Concrete low-level wiring, effectful ONLY when guardian explicitly runs.
 
     Every firewall command must cross RestrictedHost's exact argv gate. The
@@ -192,9 +192,13 @@ def reviewed_boundary_factory(plan, *, attestor):
     from probe_a_workload import FixedWorkload
     from probe_a_client_process import ClientProcess
     from probe_a_resources import LocalResourceReadback
+    from probe_a_containment import CgroupV2Containment
 
     if attestor is None or attestor.verify() is not True:
         raise RunnerDenied("UNPINNED_EXECUTION_BOUNDARY")
+    if (not isinstance(containment,CgroupV2Containment)
+            or containment.plan != plan or not containment.armed):
+        raise RunnerDenied("ATOMIC_PROCESS_CONTAINMENT_NOT_APPROVED")
     def guarded_command(argv,seconds):
         if attestor.verify() is not True:
             raise RunnerDenied("HOST_DRIFT_BEFORE_COMMAND")
@@ -204,7 +208,7 @@ def reviewed_boundary_factory(plan, *, attestor):
         return reply
     restricted=RestrictedHost(plan,call=guarded_command)
     command=lambda argv,deadline: restricted.execute(argv,deadline=deadline)
-    client=ClientProcess(plan)
+    client=ClientProcess(plan,stream=containment.capture,containment=containment)
     def guarded_client(*args):
         if attestor.verify() is not True:
             raise RunnerDenied("HOST_DRIFT_BEFORE_CLIENT")

@@ -132,6 +132,41 @@ class AdditionalSecurityTests(unittest.TestCase):
             with self.assertRaises(HostBlocked):
                 bounded_process(PLAN.setup[0].argv,2,reviewed_plan=PLAN)
 
+    def test_cgroup_contract_catches_detached_descendant_and_peer_survival(self):
+        from probe_a_containment import CgroupV2Containment,ContainmentDenied
+        class Fake:
+            def __init__(self):
+                self.populated="1";self.procs="112\n113\n";self.killed=False
+            def preflight_atomic_spawn(self,path):return path.endswith("A1B2C3D4")
+            def capture_atomic(self,path,argv,timeout,**callbacks):return Reply(0,"ok")
+            def kill_all(self,path,deadline):
+                self.killed=True
+                return True
+            def readback(self,path,deadline):
+                return "populated "+self.populated+"\n",self.procs
+            def check_uid_absent(self,uid,deadline):return True
+        fake=Fake()
+        fence=CgroupV2Containment(PLAN,agent=fake)
+        with self.assertRaises(ContainmentDenied):
+            fence.capture(peer_argv(),3)
+        self.assertTrue(fence.arm())
+        fence.capture(peer_argv(),3)
+        fence.capture(exact_argv(PLAN,"approved-udp"),3)
+        # A detached root peer remains despite kill() claiming success.
+        self.assertFalse(fence.stop(10))
+        self.assertTrue(fake.killed)
+        fake.populated="0";fake.procs=""
+        self.assertTrue(fence.stop(10))
+        with self.assertRaises(ContainmentDenied):
+            fence.capture(peer_argv(),3)
+
+    def test_live_factory_rejects_non_atomic_process_boundary(self):
+        from probe_a_runner import reviewed_boundary_factory,RunnerDenied
+        class Attestor:
+            def verify(self):return True
+        with self.assertRaises(RunnerDenied):
+            reviewed_boundary_factory(PLAN,attestor=Attestor())
+
     def test_bounded_json_not_pickle_and_wrong_index_rejected(self):
         class Model:
             cleaned=False
