@@ -29,6 +29,18 @@ class HostGateTests(unittest.TestCase):
         h=RestrictedHost(PLAN,call=lambda argv,t:(_ for _ in ()).throw(ValueError(marker)),clock=lambda:0)
         with self.assertRaises(HostBlocked) as e:h.execute(PLAN.setup[0].argv,deadline=10)
         self.assertNotIn(marker,str(e.exception))
+    def test_low_level_rejects_unreviewed_operations_before_subprocess(self):
+        from unittest.mock import patch
+        from probe_a_os_boundary import bounded_process
+        with patch("probe_a_os_boundary.subprocess.run",side_effect=AssertionError("must not execute")) as run:
+            for unsafe in (
+                ("/usr/sbin/iptables","-F","INPUT"),
+                ("/usr/sbin/iptables","-w","5","-F","OUTPUT"),
+                ("/usr/bin/bash","-c","true"),
+            ):
+                with self.subTest(cmd=unsafe),self.assertRaises(HostBlocked):
+                    bounded_process(unsafe,1,reviewed_plan=PLAN)
+            self.assertEqual(run.call_count,0)
     def test_absent_automatic_entry(self):
         src=(ROOT/"docs/security/phase2l/probe_a_os_boundary.py").read_text()
         self.assertNotIn('if __name__',src)

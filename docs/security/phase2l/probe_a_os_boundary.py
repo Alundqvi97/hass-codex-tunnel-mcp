@@ -44,12 +44,24 @@ class RestrictedHost:
         except BaseException:
             raise HostBlocked("FAILED_WITHOUT_RAW_LOGS") from None
 
-def bounded_process(argv,timeout):
+def bounded_process(argv,timeout,*,reviewed_plan):
     """Effectful only if called explicitly after separate approval.
 
     No shell. Does not guarantee clean-up after SIGKILL or runner cancellation,
     so a separate fail-safe supervisor remains mandatory.
     """
+    # Defense in depth: the low-level helper must not become a bypass of
+    # the exact-argv contract simply because its caller is miswired.
+    if validate_plan(reviewed_plan)!="OFFLINE_SAFE_SCOPED_PLAN_NOT_KERNEL_VERIFIED":
+        raise HostBlocked("INVALID_REVIEWED_PLAN")
+    allowed=frozenset(x.argv for x in (*reviewed_plan.inspect,*reviewed_plan.setup,*reviewed_plan.teardown))
+    allowed|={SAVE4,SAVE6,VERSION4,VERSION6}
+    allowed|=frozenset((
+        (b,"-w","5","-L",chain,"-v","-n","-x")
+        for b,chain in (("/usr/sbin/iptables",reviewed_plan.chain4),("/usr/sbin/ip6tables",reviewed_plan.chain6))
+    ))
+    if not isinstance(argv,tuple) or argv not in allowed:
+        raise HostBlocked("LOW_LEVEL_COMMAND_NOT_REVIEWED")
     if not isinstance(argv,tuple) or not argv or argv[0] not in (
         "/usr/sbin/iptables","/usr/sbin/ip6tables",
         "/usr/sbin/iptables-save","/usr/sbin/ip6tables-save",
