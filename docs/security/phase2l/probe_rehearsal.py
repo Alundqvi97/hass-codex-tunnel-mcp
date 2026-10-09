@@ -65,9 +65,15 @@ def rehearse(plan, *, preflight, issue, observe, workload, stop, cleanup_readbac
                     state="BLOCKED_TEARDOWN"
             except Exception:
                 state="BLOCKED_TEARDOWN"
-        try:
-            if any(cleanup_readback(key) is not True for key in CLEANUP_READBACKS):
-                state="BLOCKED_CLEANUP_READBACK"
-        except Exception:
+        # Every required cleanup readback must be attempted independently;
+        # short-circuiting after an early failed check hides later residue.
+        bad=False
+        for key in CLEANUP_READBACKS:
+            try:
+                if cleanup_readback(key) is not True:
+                    bad=True
+            except Exception:
+                bad=True
+        if bad:
             state="BLOCKED_CLEANUP_READBACK"
     return Rehearsal(state,setup_count,teardown_count,workload_count)
