@@ -1,0 +1,48 @@
+name: Phase 2L - DNS and Build Context Offline
+on:
+  push:
+    branches: [security/ha-mcp-phase2d-candidates]
+    paths:
+      - docs/security/phase2l/**
+      - tests/offline/test_phase2l_*.py
+      - docs/security/phase2h/runner_once.sh
+      - .github/workflows/phase2l-offline-only.yml
+  pull_request:
+    branches: [security/tunnel-auth-hardening]
+    paths:
+      - docs/security/phase2l/**
+      - tests/offline/test_phase2l_*.py
+      - .github/workflows/phase2l-offline-only.yml
+permissions: {contents: read}
+jobs:
+  pure-config-and-package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: homeassistant-ai/ha-mcp
+          ref: fc54437a804858732e4bc927add98e202d879a09
+          path: ha_mcp_pinned
+          persist-credentials: false
+      - name: Apply pinned candidate patches without building or launching anything
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C ha_mcp_pinned rev-parse HEAD)" = fc54437a804858732e4bc927add98e202d879a09
+          python3 docs/security/phase2d/patch_candidates.py policy --apply >/dev/null
+          python3 docs/security/phase2d/patch_candidates.py logging --apply >/dev/null
+          python3 docs/security/phase2f/strict_addon_candidate.py --apply >/dev/null
+          python3 docs/security/phase2g/middleware_revalidation.py --apply >/dev/null
+          python3 docs/security/phase2k/source_candidate.py --root ha_mcp_pinned --apply >/dev/null
+          python3 -B docs/security/phase2l/stage_candidate.py \
+            --source ha_mcp_pinned \
+            --destination "$RUNNER_TEMP/phase2l-candidate" \
+            --reference docs/security/phase2k
+          python3 -B -m unittest discover -s tests/offline -p 'test_phase2l_*.py' -v
+          python3 -B -m py_compile docs/security/phase2l/*.py
+          bash -n docs/security/phase2h/runner_once.sh
+          git -C ha_mcp_pinned diff --check
+          git diff --exit-code
