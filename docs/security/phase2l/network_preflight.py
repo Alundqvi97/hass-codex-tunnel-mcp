@@ -146,7 +146,7 @@ def inspect_network(resolv_conf: str, manifest: object, qemu_netdev: str) -> Ver
     hosts=manifest["reviewed_bootstrap_hosts"]
     if not isinstance(web,list) or not web or len(web)>32 or len(set(map(str,web)))!=len(web) or not all(public_ip(ip) for ip in web):
         return reject("UNAPPROVED_WEB_DESTINATION")
-    if not isinstance(hosts,list) or not hosts or len(hosts)>16 or not all(isinstance(h,str) and re.fullmatch(r"[a-z0-9][a-z0-9.-]{1,250}[a-z0-9]",h) for h in hosts):
+    if not isinstance(hosts,list) or not hosts or len(hosts)>16 or not all(isinstance(h,str) and re.fullmatch(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?",h) for h in hosts):
         return reject("BOOTSTRAP_HOSTS_NOT_REVIEWED")
     if type(manifest["web_tcp_ports"]) is not list or sorted(manifest["web_tcp_ports"]) != [80,443]:
         return reject("UNAPPROVED_WEB_PORT")
