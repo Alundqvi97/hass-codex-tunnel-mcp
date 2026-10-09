@@ -16,12 +16,13 @@ class ClientProcessDenied(RuntimeError):
 
 class ClientProcess:
     def __init__(self, plan, *, stream=capture, check_uid=numeric_identity,
-                 check_listener=attest_listener, clock=time.monotonic):
+                 check_listener=attest_listener, clock=time.monotonic, sleep=time.sleep):
         self.plan=plan
         self.stream=stream
         self.check_uid=check_uid
         self.check_listener=check_listener
         self.clock=clock
+        self.sleep=sleep
         self.seen=set()
         self.running_pids=set()
 
@@ -40,15 +41,30 @@ class ClientProcess:
         def on_spawn(actual_pid):
             pid[0]=actual_pid
             self.running_pids.add(actual_pid)
-            verified[0]=self.check_uid(actual_pid,uid) is True
+            # setpriv initially exists as a root-owned launcher; inspect
+            # /proc until it becomes the reviewed numeric UID, with a bounded
+            # observation window. Never relaunch a failing process.
+            for _ in range(25):
+                try:
+                    if self.check_uid(actual_pid,uid) is True:
+                        verified[0]=True
+                        break
+                except BaseException:
+                    pass
+                if self.clock()>=deadline:
+                    break
+                self.sleep(0.02)
             if not verified[0]:
                 raise ClientProcessDenied("UID_NOT_ATTESTED")
         def on_chunk(data):
             if root_peer_command is None or verified[1]:
                 return
-            if len(data)>4096 or not data.startswith(b"READY\n"):
+            if len(data)>4096 or not data.startswith(b"READY\n"[:len(data)]):
                 raise ClientProcessDenied("BAD_LOOPBACK_READINESS")
-            self.check_listener(pid[0])
+            if len(data)<6:
+                return  # streaming reader may split READY across chunks
+            if self.check_listener(pid[0]) is not True:
+                raise ClientProcessDenied("LISTENER_NOT_ATTESTED")
             reply=self.stream(root_peer_command, min(5,deadline-self.clock()))
             if reply.code!=0 or reply.stdout!="ROOT_PEER_ACK_MATCHED\n":
                 raise ClientProcessDenied("PEER_ATTESTATION_FAILED")
