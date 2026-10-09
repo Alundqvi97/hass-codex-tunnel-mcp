@@ -183,15 +183,25 @@ class LauncherTests(unittest.TestCase):
     def test_child_drop_precedes_exec_failure_hard_stop(self):
         calls = []
         spec = SimpleNamespace(role="controller", group=Mock(fd=12), executable_fd=13,
-                               argv=("/pinned/python",), inherited=(), validate=lambda: True)
+                               argv=("/pinned/python",), inherited=(), validate=lambda **kwargs: True)
+        from probe_a_execution_contract import ReviewedExecutionContract
+        contract = Mock(spec=ReviewedExecutionContract)
+        contract.before_spawn.return_value = True
+        contract.child_ready_for_exec.return_value = True
+        contract.verify_child_identity.return_value = True
         inventory = Mock()
         inventory.authorize_exec.return_value = True
+        contract.inventory = inventory
         syscalls = Mock()
         syscalls.clone_into.return_value = (0, -1)
         syscalls.prepare_child.side_effect = lambda *args: calls.append("trusted-drop")
         class Stopped(BaseException): pass
         with patch("probe_a_linux_launcher.os.geteuid", return_value=0), \
              patch("probe_a_linux_launcher.os.listdir", return_value=["1"]), \
+             patch("probe_a_linux_launcher.os.pipe2", return_value=(21,22)), \
+             patch("probe_a_linux_launcher.os.close"), \
+             patch("probe_a_linux_launcher.select.select", return_value=([21],[],[])), \
+             patch("probe_a_linux_launcher.os.read", return_value=b"S"), \
              patch("probe_a_linux_launcher.os.open", return_value=20), \
              patch("probe_a_linux_launcher.os.fstat", return_value=SimpleNamespace(
                  st_mode=__import__("stat").S_IFCHR, st_uid=0, st_rdev=os.makedev(1, 3))), \
@@ -200,7 +210,7 @@ class LauncherTests(unittest.TestCase):
              patch("probe_a_linux_launcher.os.execve", side_effect=lambda *args: calls.append("exec")), \
              patch("probe_a_linux_launcher.os._exit", side_effect=Stopped):
             with self.assertRaises(Stopped):
-                NativeAtomicSpawner(inventory=inventory, syscalls=syscalls, clock=lambda: 0).spawn(
+                NativeAtomicSpawner(inventory=inventory, contract=contract, syscalls=syscalls, clock=lambda: 0).spawn(
                     spec, deadline=180, activated=True, approval=b"fixture")
         self.assertEqual(calls, ["trusted-drop", "exec"])
 

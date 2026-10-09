@@ -1,6 +1,159 @@
 # Probe A — recovered implementation and adversarial engineering review
 
-## Current delivery: disabled OS foundation, 2026-10-09
+## Current delivery: integrated disabled offline engineering, 2026-10-09
+
+**Decision: COMPLETED — DISABLED OFFLINE ENGINEERING.** Runtime acceptance,
+HAOS/Supervisor acceptance and production deployment remain **NO-GO**. This
+is source development and adversarial self-review, not independent security
+certification or evidence that Linux enforces the proposed restrictions.
+
+Before editing, PR #2 and `security/ha-mcp-phase2d-candidates` both resolved to
+`8ca67a92f224c57c7ea84c2d32a49d4d439d6e32`. GitHub reported DRAFT with no merge
+time; the checkout was clean, on that branch, and the approved source gate
+`ad5e0c2ba52901c8384597d3cafd26ce3ffb124d` remained an ancestor. No other agent's
+work was overwritten. The 311 Phase 2L and 447 broader passing regressions
+were reproduced before extension (one optional Home Assistant schema skip).
+
+### Implemented interfaces and their existing foundation
+
+| Workstream | Source integration |
+|---|---|
+| A — sealed roles | `probe_a_session.py` defines canonical bounded role configuration, one immutable plan/source/inventory/session/deadline, root-controlled readonly memfd seals, actual PID/starttime handoff and delegated live pidfds. `probe_a_role_entrypoints.py` supplies explicit guardian/observer/controller functions with no CLI, import or environment activation. Root exceptions fail-stop; controller code loads only after verified UID/GID/capability drop. |
+| B — readiness | `probe_a_coordinator.py` binds each sequenced state message to configuration, role, kernel identity and context. All ten lifecycle states are explicit. Guardian and observer readiness is checked before controller clone; native release observes both services RUNNING and collects the independent baseline before controller work. EOF, forged/reordered/replayed messages, interruption and deadlines block. |
+| C — inventory | `probe_a_inventory_integration.py` extends the existing signed inventory with exact file metadata, reviewed executable aliases, dependency edges, loader/libcap/libc/NSS closure, exact source-commit verification, interpreter/entrypoint identity and explicit kernel requirements. Retained executable FD metadata and bytes must match. Changed assets/configuration, incomplete closure or absent external trust block permanently. |
+| D/E — containment and root policy | `probe_a_execution_contract.py` defines seven distinct owned scopes, exact ancestry/ownership, no delegation, atomic attachment, retained process incarnation and independent emptiness. A signed external OS policy must deny root helper IPv4/IPv6 egress, constrain NSS to files, isolate FDs and enforce immutable source mounts. Actual UID/GID/capabilities/NNP are inspected before exec. Worker bootstrap and final profiles are separate. No provisioner or policy installer is activated. |
+| F — evidence | `probe_a_evidence.py` composes bounded independent collector receipts for immutable context, actual identities/scopes, dual-family baseline/active rules, every case's worker identity and packet delta, root peer, emergency barrier, owned cleanup, restoration, guardian reaping, observer shutdown and residual absence. Synthetic, source and incomplete runtime provenance remain distinct. Even complete kernel receipt packages return `BLOCKED_NO_TRUSTED_RUNTIME_PASS`. |
+
+`probe_a_integrated_bootstrap.py` integrates these interfaces through the
+existing `TrustedActorBootstrap`, `NativeAtomicSpawner`, `ProcessBinding`,
+`CredentialSocket`, `BoundedSocketIPC` and `IndependentSupervisor`. An externally
+signed boot/context-bound attempt permit requires a trusted persistent atomic
+anti-replay ledger. A failed/uncertain ledger claim never becomes active.
+
+The existing launcher now holds **every** atomically attached child before
+exec until its kernel incarnation is retained. Actor configuration is filled
+and sealed while that child is blocked; writable config handles cannot cross
+exec. The reviewed OS adapter installs policy before the fixed trusted
+controller drop. The child then verifies effective identity, closes every
+unapproved FD, redirects stdio to checked `/dev/null`, and execs the retained
+binary FD. Interrupted handoff terminates the privileged bootstrap; child
+exceptions cannot return to Python. No unrestricted execution fallback exists.
+
+The guardian retains the existing mutation journals, emergency deny-first
+logic and EOF/shared-cutoff cleanup. The independent observer multiplexes two
+separately authenticated fixed read interfaces: controller and bootstrap audit.
+Controller snapshots, counters and cleanup reads use the broker; mutations and
+work requests use the guardian. Controller authentication of root peers uses
+sealed identities and inherited pidfds, without reading inaccessible root
+procfs metadata. A trusted service factory runs after inherited-FD inspection;
+root executable/cgroup FDs are opened from reviewed configuration after exec.
+Native worker/peer checks retain the launch pidfd and process starttime.
+
+Modified foundation files: `probe_a_linux_launcher.py`,
+`probe_a_linux_containment.py`, `probe_a_readonly_broker.py` and
+`probe_a_attestation.py`. Seven added source modules are named above. Extended
+`test_phase2l_probe_a_linux_foundation.py`; added
+`test_phase2l_probe_a_integration.py`. Application code, dependencies, locks,
+all workflows, original VM workflow, authorization package and the full
+administrator `PROJECT_DESIGN_BLUEPRINT.md` are unchanged.
+
+### Manifest generation and verification — separate authorization required
+
+1. Obtain independent review of the source commit, trusted collector/verifier,
+   service/actor factories, confinement policy, authorization ledger and approved
+   runner image/kernel. Deploy the source in a root-controlled immutable mount;
+   this writable development checkout is unsuitable for privileged execution.
+2. An approved read-only collector records canonical path and alias-to-target
+   bindings, root ownership/modes, device/inode/size and SHA-256 for every source
+   module, Python interpreter/entrypoint, executable, loader, libcap, glibc/NSS,
+   Python runtime and transitive dependency. Inspect ELF metadata without
+   executing untrusted `ldd` or arbitrary binaries. Include `/etc/nsswitch.conf`,
+   `/etc/passwd` and every other configuration/dependency actually consulted.
+   The approved root helper NSS configuration must use files-only backends,
+   including hosts; egress enforcement must independently cover hidden traffic.
+3. Supply complete dependency edges and observed kernel/cgroup requirements to
+   `inventory_candidate`. It formats an **unsigned, unapproved candidate** only.
+   Review closure against actual loading behavior, including dynamic/NSS loads;
+   graph coverage is not proof that an external collector found every load.
+4. An external reviewer signs the exact canonical v2 inventory under
+   `ProbeA inventory v2\0`. The runner supplies a separately pinned verifier
+   trust root and trusted asset/alias/fact/source readers. Inventory acceptance
+   is not runtime authorization. No signing key or genuine signature is bundled.
+5. Provisioning is separately authorized: root-owned 0700, nondelegated cgroup
+   v2 scopes for guardian, controller, observer, worker, peer, read-command and
+   guardian-command. Bind exact group device/inode and ancestry. Obtain separate
+   signed confinement and one-attempt boot/session/deadline authorizations;
+   the ledger must atomically reject replay across process/runner restarts.
+6. `IntegratedInventory.verify_integration`, `ReviewedExecutionContract.verify`,
+   scope preflight and permit claim must all succeed before native integration.
+   Authorization of full argv and retained executable FD is repeated for each
+   spawn; runtime inventory is checked again around root command execution.
+   Root source mounts, aliases, dependencies and NSS drift must reject execution.
+   Do not generate approvals, signatures or keys in this repository.
+
+### Validation, adversarial self-review and missing external gates
+
+The unchanged `.github/workflows/phase2l-offline-only.yml` is authoritative,
+including upstream `fc54437a804858732e4bc927add98e202d879a09`. Reused the existing
+security environment; no new environment publication or authentication change.
+All patched fixtures, caches, compilation output and logs are outside the repo.
+
+Current Phase 2L result: **421 passed, zero failed/skipped**. Broader offline
+regressions: **557 passed, one optional Home Assistant schema skipped**, zero
+failed. Python source compilation, shell syntax and whitespace checks passed.
+Validation logs: `/tmp/probe-a-offline.MJolwx` (development instance only).
+GitHub CI receipts are recorded in the immutable delivery receipt below.
+Tests use synthetic identities, fake FDs/observations and injected failures;
+no real clone3, privilege drop, firewall/cgroup operation or live Probe A occurs.
+Existing nonprivileged self-pidfd/Unix-credential and malformed/partial/stalled
+IPC regressions remain. New coverage includes every root startup boundary,
+sealed writer failure/replay, forged readiness, wrong identities/executables,
+deadline exhaustion, supervisor interruption, wrong ownership/delegation,
+detached descendants, unsupported kernel facts, aliases, binary/configuration
+TOCTOU, external ledger failures, independent audit ordering, uncertain mutation,
+emergency barrier failure and forbidden synthetic/blocked PASS promotion.
+
+A separate adversarial self-review corrected verifier-exception fail-open
+paths, failed-ledger activation, missed fast-child registration, executable-FD
+inode mismatch, root service FD timing, missing independent baseline release,
+controller self-observation and interrupted supervisor cleanup reporting.
+**No confirmed unresolved source defect remains from that pass.** This is not
+qualified independent security certification. Trusted external callbacks are
+part of the reviewed computing base, never worker-provided proof.
+
+Still absent and mandatory: independently approved runtime inventory and
+complete native collector, external verifier trust roots/signatures, reviewed
+actor/service factories and OS confinement adapter, persistent authorization
+ledger, provisioned approved cgroups, independent signed kernel evidence
+journal and separately approved runtime authorization. No defaults fill them.
+
+Real Linux acceptance must independently demonstrate atomic clone3 attachment
+and pidfd lifetime through exec/UID transitions; irreversible capability drop;
+FD/seal isolation and every interrupted startup; root syscall/filesystem/network
+policy, NSS dependency/egress confinement; no delegation or detached descendant
+escape; worker/root-peer identities; exact owned IPv4/IPv6 firewall state;
+all successful/denied network cases and counter deltas; uncertain-write and
+emergency-barrier failures; 60-second cleanup reserve under cancellation/EOF;
+owned-only restoration; guardian reaping, observer shutdown and absence of all
+residual privileged processes/resources. Root/CAP_NET_ADMIN with a read-only
+RPC is **not** claimed to have kernel-enforced read-only privilege. Guardian
+SIGKILL, lost kernel access or destroyed runner can leave cleanup uncertain.
+Every such result stays blocked; a signed manifest cannot replace OS evidence.
+
+**Smallest next milestone:** independent adversarial review of this exact source
+and its proposed collector/factory/confinement interfaces, followed by a reviewed
+runner/policy/inventory package. Runtime approval is a later, separate gate.
+No VM, QEMU, HAOS/Supervisor or production acceptance is authorized. Full securely
+authorized Home Assistant administration remains the product goal.
+
+### Immutable delivery receipt
+
+Source commit and GitHub CI receipts: pending the authorized normal-history
+push to existing draft PR #2. Documentation will pin the immutable final source
+commit and observed CI runs. A documentation-only receipt commit's own hash is
+reported in the final delivery report (a Git commit cannot contain its own hash).
+
+## Historical foundation delivery at 8ca67a9, 2026-10-09
 
 **Engineering decision: PARTIALLY IMPLEMENTED — EXACT BLOCKERS below.** The
 user-authoritative A1 source gate at `ad5e0c2ba52901c8384597d3cafd26ce3ffb124d`

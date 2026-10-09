@@ -151,7 +151,7 @@ class ExecSpec:
     group: OwnedCgroup
     inherited: tuple[tuple[str, int], ...] = ()
 
-    def validate(self):
+    def validate(self, *, pending_config=None):
         if self.role not in (*ACTORS, "read-command", "guardian-command", "worker", "peer"):
             raise LaunchDenied("UNREVIEWED_PROCESS_ROLE")
         if (not self.argv or type(self.argv) is not tuple
@@ -193,7 +193,14 @@ class ExecSpec:
             if kind == "config" and stat.S_ISREG(st.st_mode):
                 if (st.st_uid == 0 and not st.st_mode & 0o022
                         and fcntl.fcntl(fd, fcntl.F_GETFL) & os.O_ACCMODE == os.O_RDONLY
-                        and fcntl.fcntl(fd, F_GET_SEALS) & SEALS == SEALS):
+                        and (fcntl.fcntl(fd, F_GET_SEALS) & SEALS == SEALS
+                             or pending_config is not None and fd == pending_config.reader
+                             and not pending_config.completed)):
+                    continue
+            if kind == "pidfd" and self.role == "controller":
+                from probe_a_session import DelegatedProcessBinding
+                fields = DelegatedProcessBinding._fdinfo(fd)
+                if os.readlink(f"/proc/self/fd/{fd}") == "anon_inode:[pidfd]" and "Pid:" in fields:
                     continue
             raise LaunchDenied("ONLY_PRIVATE_IPC_AND_SEALED_READONLY_CONFIG_MAY_CROSS")
         if self.role not in ACTORS and self.inherited:
@@ -278,12 +285,13 @@ class NativeAtomicSpawner:
     owned group and complete dependency/config inventory. No default approval.
     All privileged-child exceptions terminate via _exit, never caller Python.
     """
-    def __init__(self, *, inventory=None, syscalls=None, clock=time.monotonic):
+    def __init__(self, *, inventory=None, contract=None, syscalls=None, clock=time.monotonic):
         self.inventory = inventory
+        self.contract = contract
         self.syscalls = LinuxSyscalls() if syscalls is None else syscalls
         self.clock = clock
 
-    def spawn(self, spec, *, deadline, activated=False, approval=None, stdout_fd=None):
+    def spawn(self, spec, *, deadline, activated=False, approval=None, stdout_fd=None, pending=None):
         if (activated is not True or self.inventory is None or os.geteuid() != 0
                 or type(deadline) not in (int, float) or not math.isfinite(deadline)
                 or not 0 < deadline - self.clock() <= 240):
@@ -291,14 +299,48 @@ class NativeAtomicSpawner:
         if (len(os.listdir("/proc/self/task")) != 1
                 or self.inventory.authorize_exec(spec, approval) is not True):
             raise LaunchDenied("UNREVIEWED_OR_MULTITHREADED_ROOT_BOOTSTRAP")
-        spec.validate()
+        from probe_a_execution_contract import ReviewedExecutionContract
+        if (not isinstance(self.contract, ReviewedExecutionContract)
+                or self.contract.inventory is not self.inventory
+                or self.contract.before_spawn(spec, deadline) is not True):
+            raise LaunchDenied("REVIEWED_OS_CONFINEMENT_CONTRACT_REQUIRED")
+        if pending is not None:
+            from probe_a_session import PendingRoleConfiguration
+            if not isinstance(pending, PendingRoleConfiguration) or spec.role not in ACTORS:
+                raise LaunchDenied("TRUSTED_PENDING_ROLE_CONFIGURATION_REQUIRED")
+        spec.validate(pending_config=pending)
         spec.group.verify(empty=True)
+        if self.clock() >= deadline:
+            raise LaunchDenied("PREFLIGHT_EXHAUSTED_ABSOLUTE_DEADLINE")
         parent_pid = os.getpid()
-        pid, pidfd = self.syscalls.clone_into(spec.group.fd)
+        gate_read, gate_write = os.pipe2(os.O_CLOEXEC | os.O_NONBLOCK)
+        try:
+            pid, pidfd = self.syscalls.clone_into(spec.group.fd)
+        except BaseException:
+            for fd in (gate_read, gate_write):
+                if fd is not None: os.close(fd)
+            raise
         if pid == 0:
             try:
+                os.close(gate_write)
+                if pending is not None:
+                    os.close(pending.writer)  # writer NEVER reaches actor code
+                while self.clock() < deadline:
+                    if select.select([gate_read], [], [], max(0, deadline-self.clock()))[0]:
+                        if os.read(gate_read, 2) != b"S":
+                            raise LaunchDenied("UNSEALED_OR_INTERRUPTED_IDENTITY_HANDOFF")
+                        break
+                else:
+                    raise LaunchDenied("IDENTITY_HANDOFF_DEADLINE")
+                os.close(gate_read)
+                if pending is not None:
+                    spec.validate()  # the parent must have completed all seals
                 # This is fixed TRUSTED bootstrap code, not a caller callback.
+                if self.contract.child_ready_for_exec(spec) is not True:
+                    raise LaunchDenied("CHILD_OS_POLICY_REQUIRED")
                 self.syscalls.prepare_child(spec.role, parent_pid)
+                if self.contract.verify_child_identity(spec) is not True:
+                    raise LaunchDenied("UNVERIFIED_CHILD_EFFECTIVE_IDENTITY")
                 devnull = os.open("/dev/null", os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC)
                 null_stat = os.fstat(devnull)
                 if (not stat.S_ISCHR(null_stat.st_mode) or null_stat.st_uid != 0
@@ -316,9 +358,24 @@ class NativeAtomicSpawner:
             except BaseException:
                 os._exit(77)
             os._exit(77)
-        if pid <= 1 or pidfd < 0:
-            raise LaunchDenied("UNCERTAIN_ATOMIC_CHILD_CREATION")
-        return ActorHandle(pid, pidfd, spec.group)
+        try:
+            os.close(gate_read)
+            if pid <= 1 or pidfd < 0:
+                raise LaunchDenied("UNCERTAIN_ATOMIC_CHILD_CREATION")
+            handle = ActorHandle(pid, pidfd, spec.group)
+            if pending is not None:
+                pending.complete(pid, pidfd)
+            elif spec.role in ACTORS:
+                raise LaunchDenied("ACTORS_REQUIRE_SEALED_INCARNATION_HANDOFF")
+            else:
+                self.contract.child_spawned(spec.role, handle)
+            if os.write(gate_write, b"S") != 1:
+                raise LaunchDenied("CHILD_HANDOFF_SIGNAL_FAILED")
+        except BaseException:
+            os._exit(76)
+        finally:
+            os.close(gate_write)
+        return handle
 
 
 class NativeBoundedCapture:
@@ -397,6 +454,8 @@ class NativeBoundedCapture:
                     child.reap()
                     events, procs = spec.group.readback()
                     if empty_group(events, procs):
+                        if self.spawner.contract is not None:
+                            self.spawner.contract.scopes.check(spec.role, empty=True)
                         clean = True
                         return checked_reply(Reply(child.exitcode, output.decode("utf-8", "strict")))
             raise LaunchDenied("COMMAND_DEADLINE_OR_DESCENDANT_NOT_REAPED")
@@ -411,6 +470,8 @@ class NativeBoundedCapture:
                         child.reap()
             finally:
                 if child is not None:
+                    if self.spawner.contract is not None:
+                        self.spawner.contract.child_finished(spec.role)
                     child.close()
                 for fd in (read, write):
                     if fd is not None:
@@ -477,6 +538,19 @@ class TrustedActorBootstrap:
                 os._exit(76)
             raise
 
+    def launch_integrated(self, *, factory, permit, evidence_audit=None, activated=False, approval=None):
+        from probe_a_integrated_bootstrap import IntegratedBootstrap
+        if self.used:
+            raise LaunchDenied("ACTOR_BOOTSTRAP_ALREADY_CONSUMED")
+        if activated is not True:
+            raise LaunchDenied("ACTOR_BOOTSTRAP_DISABLED")
+        if factory.context.end != self.end or factory.context.cutoff != self.cutoff:
+            raise LaunchDenied("BOOTSTRAP_FACTORY_DEADLINE_MISMATCH")
+        self.used = True
+        return IntegratedBootstrap(spawner=self.spawner, factory=factory,
+                                   permit=permit, clock=self.clock).launch(
+                                       activated=activated, approval=approval, evidence_audit=evidence_audit)
+
 
 class IndependentSupervisor:
     """Trusted parent monitors real pidfds against the same work/end deadline.
@@ -505,11 +579,51 @@ class IndependentSupervisor:
                     return "BLOCKED_ACTOR_SHUTDOWN_UNCERTAIN"
                 if not empty_group(*actor.group.readback()):
                     return "BLOCKED_ACTOR_CGROUP_CLEANUP_UNVERIFIED"
+            coordinator = getattr(self, "coordinator", None)
+            if coordinator is not None:
+                coordinator.request_cleanup("SUPERVISOR_FINAL_INDEPENDENT_AUDIT")
+                if not all(coordinator.independently_stopped(role) for role in ACTORS):
+                    return "BLOCKED_INDEPENDENT_ACTOR_CGROUP_CLEANUP"
+            evidence = getattr(self, "evidence_audit", None)
+            if evidence is not None:
+                self.evidence_package = evidence.after_observer_shutdown()
             return result
         except BaseException:
             return "BLOCKED_ACTOR_SHUTDOWN_UNCERTAIN"
 
     def run(self, *, close_controller_channel, observe_after, cancelled=lambda: False,
+            activated=False):
+        if activated is not True or os.geteuid() != 0:
+            raise LaunchDenied("INDEPENDENT_SUPERVISION_DISABLED")
+        try:
+            if getattr(self, "evidence_audit", None) is not None:
+                observe_after = self.evidence_audit.observe_after
+            return self._run(close_controller_channel=close_controller_channel,
+                             observe_after=observe_after, cancelled=cancelled, activated=True)
+        except BaseException:
+            # An interrupted trusted supervisor cannot skip controller shutdown
+            # or independently certify cleanup. Guardian owns its same cutoff.
+            coordinator = getattr(self, "coordinator", None)
+            if coordinator is not None: coordinator.abort("SUPERVISOR_INTERRUPTED")
+            try:
+                close_controller_channel()
+            except BaseException:
+                pass
+            try:
+                controller = self.actors["controller"]
+                if not controller.exited(): controller.signal(signal.SIGKILL)
+                guardian = self.actors["guardian"]
+                while not guardian.exited() and self.clock() < self.end:
+                    select.select([guardian.pidfd], [], [], min(0.05, self.end-self.clock()))
+            except BaseException:
+                pass
+            return self._finish("BLOCKED_SUPERVISOR_INTERRUPTED")
+        finally:
+            for binding in getattr(self, "bindings", {}).values():
+                try: binding.close()
+                except BaseException: pass
+
+    def _run(self, *, close_controller_channel, observe_after, cancelled=lambda: False,
             activated=False):
         if activated is not True or os.geteuid() != 0:
             raise LaunchDenied("INDEPENDENT_SUPERVISION_DISABLED")

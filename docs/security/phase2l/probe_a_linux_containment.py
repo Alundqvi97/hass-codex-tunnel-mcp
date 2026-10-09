@@ -52,6 +52,11 @@ class NativeContainmentAdapter:
         self._scope(path)
         if self.spawner.inventory is None or self.spawner.inventory.verify() is not True:
             raise LaunchDenied("CONTAINMENT_INVENTORY_REQUIRED")
+        from probe_a_execution_contract import ReviewedExecutionContract
+        if not isinstance(self.spawner.contract, ReviewedExecutionContract):
+            raise LaunchDenied("INDEPENDENT_CONTAINMENT_POLICY_REQUIRED")
+        for role in ("worker", "peer"):
+            self.spawner.contract.scopes.check(role, empty=True)
         for group in self.groups:
             group.verify(empty=True)
         # This selects actual CLONE_INTO_CGROUP machinery, not proof that an
@@ -84,6 +89,11 @@ class NativeContainmentAdapter:
         if self.clock() >= deadline:
             raise LaunchDenied("CONTAINMENT_READBACK_EXPIRED")
         empty = all(empty_group(*value) for value in snapshots)
+        if empty:
+            # Guardian-local reads cannot substitute for the independent scope
+            # authority that includes descendants and exact owned group IDs.
+            for role in ("worker", "peer"):
+                self.spawner.contract.scopes.check(role, empty=True)
         return ("populated " + ("0" if empty else "1") + "\n",
                 "".join(value[1] for value in snapshots))
 

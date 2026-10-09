@@ -4,39 +4,43 @@ Updated 2026-10-09. Repository: Alundqvi97/hass-codex-tunnel-mcp. This work is i
 
 ## Current Probe A OS engineering delivery
 
-The user-authoritative source gate at `ad5e0c2ba52901c8384597d3cafd26ce3ffb124d`
-is PASSED for disabled engineering. PR #2 and its source branch were checked at
-that exact commit before work; the 266-test offline baseline is retained.
-No runtime approval follows and completed source remediation is not restarted.
+**COMPLETED — DISABLED OFFLINE ENGINEERING.** Continuation from verified PR #2
+HEAD `8ca67a92f224c57c7ea84c2d32a49d4d439d6e32`; approved source gate
+`ad5e0c2ba52901c8384597d3cafd26ce3ffb124d` remains an ancestor. PR #2 is draft
+and unmerged. The existing 311/447 passing offline baseline was reproduced
+before extension; earlier 266-test and phase histories below remain intact.
 
-Implemented, disconnected and disabled: native atomic clone3/cgroup and pidfd
-exec/supervision primitives; retained executable-FD exec after controller UID/
-GID/capability drop; strict descriptor handoff and parent-death checks; exact
-bounded guardian/read-command capture; identity-bound read-only Unix broker;
-native worker/root-peer containment adapter; externally reviewed dependency/
-kernel inventory with reject-on-drift; nonprivileged and DI regressions.
-Privileged imports obtain the unchanged case list from the inert contract and
-do not load controller code. The existing journal, deny-first emergency barrier,
-absolute deadline, bounded framing and blocked trusted PASS are preserved.
+Source-side A–F interfaces now integrate sealed role entrypoints, actual
+kernel-incarnation/deadline/FD handoff, authenticated sequenced readiness,
+independent baseline-before-controller release, externally signed dependency
+inventory/alias/FD verification, seven distinct inactive containment scopes,
+reviewed root/NSS/network confinement contracts and independent evidence
+composition. The existing launcher, broker, guardian journals, emergency deny
+barrier, irreversible controller drop and no-trusted-PASS gates are preserved.
+Default activation remains absent; no CLI, environment opt-in or automatic
+privileged workflow was introduced. Every incomplete result remains blocked.
 
-**Decision: PARTIALLY IMPLEMENTED — EXACT BLOCKERS:** disabled role entrypoints
-and sealed readiness/identity/deadline handoff; native fact/dependency collector,
-signature trust root and one-attempt runtime authorization; nondelegated cgroup
-provisioning, root actor/command confinement and NSS egress enforcement;
-independently trusted complete kernel/post-guardian/observer-shutdown evidence.
-No privileged kernel acceptance has occurred. Root/CAP_NET_ADMIN observation
-has a read-only API, not proven kernel read-only privileges. Complete runner
-destruction and guardian SIGKILL remain unrecoverable/uncertain cases.
+Phase 2L expanded result: **421 passing offline tests**. Final broader results,
+compilation, immutable source SHA and GitHub CI receipts are recorded in the
+current `phase2l/PROBE_A_ENGINEERING_REVIEW.md` delivery section. The authoritative
+Phase 2L workflow and its pinned upstream commit are unchanged. A separate
+adversarial self-review corrected confirmed integration defects; no unresolved
+source defect was confirmed, and this is not independent security certification.
 
-**Next smallest delivery:** reviewed sealed configuration and post-exec actor
-identity/readiness handoff with disabled entrypoints and native restriction
-preconditions, followed by independent source review. No new project phase,
-privileged workflow, runtime activation or trusted PASS composer is introduced.
-See the current section of `phase2l/PROBE_A_ENGINEERING_REVIEW.md`; final counts,
-immutable commit and CI receipts are reported with this delivery. Historical
-phase records below are preserved. Workflows, original VM workflow and the full
-administrator `PROJECT_DESIGN_BLUEPRINT.md` remain unchanged. Draft PRs stay
-unmerged; HAOS/Supervisor acceptance and production remain NO-GO.
+**External gates remain:** independent review of the source and trusted native
+collectors/factories; approved immutable runner/kernel and reviewed confinement
+policy; external signature/verifier trust roots and complete inventory; persistent
+one-attempt ledger; separately authorized cgroup provisioning and runtime attempt;
+actual independently observed kernel/network/cleanup evidence; final genuine
+HAOS/Supervisor acceptance. A read-only root RPC does not prove kernel read-only
+privileges. Guardian SIGKILL/runner destruction can leave cleanup uncertain.
+
+**Next smallest milestone:** independent adversarial source/interface review and
+a reviewed runner/policy/inventory package. Do not repeat completed remediations.
+No live Probe A, VM/QEMU, production/tunnel access or paid retry occurred. All
+workflows and full administrator `PROJECT_DESIGN_BLUEPRINT.md` are unchanged.
+Securely authorized full Home Assistant administration remains required; a
+read-only replacement is not completion. HAOS/Supervisor and production **NO-GO**.
 
 ## Phase status
 

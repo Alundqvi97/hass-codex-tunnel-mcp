@@ -158,9 +158,10 @@ class NativeReadCommands:
 class BrokerClient:
     """Adapter for existing ReadOnlyPostObserver/KernelReadback contracts."""
     def __init__(self, plan, *, channel, observer_identity, inventory_id):
+        from probe_a_session import DelegatedProcessBinding
         if (not isinstance(channel, BoundedSocketIPC)
                 or not isinstance(channel.stream, CredentialSocket)
-                or not isinstance(channel.stream.peer, ProcessBinding)
+                or not isinstance(channel.stream.peer, (ProcessBinding, DelegatedProcessBinding))
                 or channel.stream.peer.identity != observer_identity
                 or channel.stream.peer.verify() is not True):
             raise BrokerDenied("AUTHENTICATED_OBSERVER_CHANNEL_REQUIRED")
