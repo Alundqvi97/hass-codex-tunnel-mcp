@@ -88,7 +88,7 @@ def compile_proposal(plan: Mapping, *, now_epoch: int) -> Compiled:
     if type(plan["hostforwards"]) is not list or plan["hostforwards"] != [[h,g] for h,g in HOSTPORTS]:
         deny("UNEXPECTED_FORWARD")
     required_cleanup=(
-        "qemu_absent","watchdog_absent","hostforwards_absent",
+        "guest_absent","watchdog_absent","hostforwards_absent",
         "mounts_absent","nbd_detached","ipv4_rules_absent",
         "ipv6_rules_absent","user_absent","kvm_acl_removed",
         "guest_disk_absent","firmware_absent","serial_absent",

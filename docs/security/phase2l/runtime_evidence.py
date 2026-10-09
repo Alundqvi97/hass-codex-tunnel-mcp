@@ -36,7 +36,7 @@ def review_cleanup(evidence: object) -> str:
 
 def future_readback_requirements():
     return {
-        "qemu_absent":"pgrep owner by UID and exact executable + process wait result",
+        "guest_absent":"pgrep owner by UID and exact executable + process wait result",
         "watchdog_absent":"watchdog PID wait and independent /proc PID start-time",
         "hostforwards_absent":"ss -ltnp bound ports and listener owner, including 0.0.0.0/::",
         "mounts_absent":"findmnt target + /proc/self/mountinfo",
