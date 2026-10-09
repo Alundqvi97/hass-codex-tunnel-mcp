@@ -15,7 +15,7 @@ class AcceptanceTests(unittest.TestCase):
     def test_sixteen_stable_gates(self):
         self.assertEqual(len(mod.GATES), 16)
         self.assertEqual(len(set(mod.REQUIRED)),16)
-        self.assertEqual([g.name for g in mod.GATES], mod.REQUIRED)
+        self.assertEqual(tuple(g.name for g in mod.GATES), mod.REQUIRED)
     def test_default_fails_closed(self):
         a=mod.Acceptance()
         self.assertEqual(a.verdict(),"BLOCKED")
