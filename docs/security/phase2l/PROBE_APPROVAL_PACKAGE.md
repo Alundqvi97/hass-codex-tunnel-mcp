@@ -71,3 +71,7 @@ Proposed future approval wording (NOT an authorization now):
 This statement must contain the final immutable commit and targets when actually requested. It cannot be inferred from this preparation prompt.
 
 **Release: NOT READY for Probe A execution; full HAOS/Supervisor and production remain NO-GO.**
+
+### Final offline transaction rehearsal (2026-10-09)
+
+The inert module docs/security/phase2l/probe_rehearsal.py now drives injected *synthetic callbacks only* through preflight, deny-first dual-stack setup, hook readback before workload, exact effective-order readback, workload-once, stop, both-family teardown, and all mandatory independent cleanup readbacks. It always returns SYNTHETIC or BLOCKED; no subprocess or network is available. Negative tests simulate failure at every setup/teardown step, missing dual-family hook, wrong UID/order, fake provenance, process-stop/cleanup failure, and a deliberately failing first cleanup readback while verifying **all** readbacks are still attempted. Phase 2L CI on source commit e208ba8c9c9030e41e722d7d2bb4e6e9661beca2: 91/91 passed (run #37933409551). This does not close the live command controller/DNS client/counter/readback engineering blocker or authorize Probe A; it provides a safer tested scaffold for that exact correction.
