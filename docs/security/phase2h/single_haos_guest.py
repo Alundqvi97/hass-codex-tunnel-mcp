@@ -7,15 +7,19 @@ guest serial output or HTTP response bodies. A partial or blocked gate is
 recorded explicitly; a Docker container is never called Supervisor.
 """
 from __future__ import annotations
+import errno
 import importlib.util
 import json
 import logging
 import os
 import pathlib
+import socket
 import secrets
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.parse
 import urllib.request
 
 ROOT=pathlib.Path(__file__).resolve().parents[3]
@@ -25,18 +29,49 @@ OSVER="18.3"
 IMAGE="haos_ova-18.3.qcow2.xz"
 SHA256="fae6a728768cc10aff60d4820bfcd40d64cd77fab82c8bd92af13b3d9d414090"
 SLUG="local_ha_mcp_phase2h"
+sys.path.insert(0, str(ROOT / 'docs' / 'security'))
+from phase2i.offline_harness import classify_probe, loopback_listener_ports, sanitized_code  # noqa: E402
 logging.disable(logging.CRITICAL)
 
 def report(key, result):
     # Sanitized fixed-shape test receipts only.
     print("PHASE2H_"+key+"="+str(result),flush=True)
 
-def fetch_status(url,timeout=4):
+def fetch_observation(url, timeout=4):
+    """Return fixed diagnostic category and numeric status; never log URL/body/error."""
+    port = urllib.parse.urlsplit(url).port
+    path = urllib.parse.urlsplit(url).path
+    # A missing LISTEN socket differs from a refused connection. If kernel
+    # proc state is unavailable, do not assume that a listener is absent.
     try:
-        with urllib.request.urlopen(url,timeout=timeout) as resp:
-            return resp.status
+        listener = port in loopback_listener_ports(pathlib.Path('/proc/net/tcp').read_text())
+    except OSError:
+        listener = True
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            status = resp.status
+        return status, sanitized_code(classify_probe(listener=listener, status=status, path=path))
+    except urllib.error.HTTPError as exc:
+        # Valid HTTP responses (including 404) must not be reported as timeout.
+        return exc.code, sanitized_code(classify_probe(listener=listener, status=exc.code, path=path))
+    except urllib.error.URLError as exc:
+        reason = exc.reason
+        if isinstance(reason, OSError) and reason.errno == errno.ECONNREFUSED:
+            error = 'refused'
+        elif isinstance(reason, (TimeoutError, socket.timeout)):
+            error = 'timeout'
+        else:
+            error = 'other'
+        return 0, sanitized_code(classify_probe(listener=listener, error=error, path=path))
+    except (TimeoutError, socket.timeout):
+        return 0, sanitized_code(classify_probe(listener=listener, error='timeout', path=path))
     except Exception:
-        return 0
+        return 0, 'NETWORK_ERROR'
+
+
+def fetch_status(url, timeout=4):
+    """Retain legacy numeric readiness contract, with HTTP errors preserved."""
+    return fetch_observation(url, timeout)[0]
 
 def upstream_loader():
     p=SOURCE/"tests/haos_image_build/build_image.py"
@@ -59,7 +94,7 @@ def launch_guest():
          "-drive",f"if=pflash,format=raw,readonly=on,file={fw}",
          "-drive",f"if=pflash,format=raw,file={vars_file}",
          "-drive",f"if=virtio,file={disk},format=qcow2",
-         "-netdev",("user,id=net0,hostfwd=tcp:127.0.0.1:18123-:8123,"
+         "-netdev",("user,id=net0,ipv6=off,hostfwd=tcp:127.0.0.1:18123-:8123,"
                     "hostfwd=tcp:127.0.0.1:18124-:80,"
                     "hostfwd=tcp:127.0.0.1:14357-:4357,"
                     "hostfwd=tcp:127.0.0.1:19583-:9583"),
@@ -92,6 +127,7 @@ def report_sanitized_serial_milestones():
 def boot_wait(proc,secs=780):
     deadline=time.monotonic()+secs
     observer=False
+    last_diagnostic='GUEST_STARTUP_NOT_OBSERVABLE'
     while time.monotonic()<deadline:
         if proc.poll() is not None:
             report("HAOS_GUEST","BLOCKED_QEMU_EXIT")
@@ -99,13 +135,15 @@ def boot_wait(proc,secs=780):
             return None
         observer=observer or bool(fetch_status("http://127.0.0.1:14357/",2))
         for port in (18124,18123):
-            if fetch_status(f"http://127.0.0.1:{port}/manifest.json",3)==200:
+            status, last_diagnostic = fetch_observation(f"http://127.0.0.1:{port}/manifest.json",3)
+            if status == 200:
                 report("HAOS_OBSERVER","REACHABLE" if observer else "NOT_OBSERVED")
                 report("HAOS_CORE_HTTP","PASS")
                 return f"http://127.0.0.1:{port}"
         time.sleep(5)
     report("HAOS_OBSERVER","REACHABLE" if observer else "NOT_OBSERVED")
     report("HAOS_CORE_HTTP","BLOCKED_TIMEOUT")
+    report("PHASE2I_READINESS_DIAGNOSTIC", sanitized_code(last_diagnostic))
     report_sanitized_serial_milestones()
     return None
 

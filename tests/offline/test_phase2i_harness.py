@@ -86,6 +86,16 @@ class OfflineHarnessTests(unittest.TestCase):
         self.assertEqual(model.runtime_milestones(evidence)[-1], 'ADDON_IN_STORE')
         self.assertEqual(model.cleanup_intentions(), model.CLEANUP_ITEMS)
 
+    def test_runtime_probe_wiring_is_static_only(self):
+        future = ROOT / 'docs/security/phase2h/single_haos_guest.py'
+        if not future.is_file():
+            self.skipTest('Future runner file not present in scratch')
+        content = future.read_text()
+        self.assertIn('def fetch_observation(', content)
+        self.assertIn('PHASE2I_READINESS_DIAGNOSTIC', content)
+        self.assertIn('ipv6=off', content)
+        self.assertNotIn('report("RAW_HTTP_BODY"', content)
+
     def test_vm_trigger_guard_from_source(self):
         workflow=(ROOT/'.github/workflows/phase2h-haos-vm-once.yml')
         if not workflow.is_file():self.skipTest('GitHub workflow not mounted locally')
