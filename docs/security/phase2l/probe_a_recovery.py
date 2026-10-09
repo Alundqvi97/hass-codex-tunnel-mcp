@@ -7,7 +7,7 @@ change a firewall. This is not evidence of real kernel provenance.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from probe_contract import validate_plan, emergency_deny_commands
+from probe_contract import validate_plan, emergency_deny_commands, emergency_barrier_command
 from probe_a_kernel import bounded, extract_rules, tokens, compare_after, canonical_owned_rule
 
 
@@ -20,6 +20,7 @@ class FamilyState:
     chain: bool
     hook: bool
     rules: int
+    barrier: bool = False
 
 
 def _family(active, baseline, chain, uid, *, ipv6=False, dns=None):
@@ -55,14 +56,20 @@ def _family(active, baseline, chain, uid, *, ipv6=False, dns=None):
         tuple(canonical_owned_rule(row, chain=chain, ipv6=ipv6) for row in prefix)
         for prefix in prefixes
     )
-    if canonical not in normalized_prefixes:
+    reject=canonical_owned_rule(allowed[0],chain=chain,ipv6=ipv6)
+    # A verified emergency leading REJECT can coexist with the original
+    # terminal REJECT without granting more permissions.
+    barrier=(len(canonical)>=2 and canonical[0]==reject and canonical[-1]==reject)
+    valid=(canonical in normalized_prefixes or
+           (barrier and canonical[1:] in normalized_prefixes))
+    if not valid:
         raise RecoveryDenied("UNREVIEWED_CHAIN_RULE")
     if hooks:
         output = [tokens(line) for line in bounded(active).splitlines()
                   if line.startswith("-A OUTPUT ")]
         if not output or output[0] != hook or not raw:
             raise RecoveryDenied("OWNER_HOOK_DRIFT")
-    return FamilyState(bool(definitions), bool(hooks), len(raw))
+    return FamilyState(bool(definitions), bool(hooks), len(raw),barrier)
 
 
 def inspect_partial(plan, before, current):
@@ -147,11 +154,32 @@ def emergency_deny_only(plan, baseline, *, snapshot, execute, deadline, clock,
     Each action is observed before and after, preserving unrelated rules.
     """
     commands=emergency_deny_commands(plan)
+    barrier_cmd=emergency_barrier_command(plan)
     previously=set(previous_attempts)
-    if not previously.issubset({c.argv for c in commands}):
+    if not previously.issubset({c.argv for c in commands}|{barrier_cmd.argv}):
         raise RecoveryDenied("UNREVIEWED_EMERGENCY_JOURNAL")
     attempted=[]
     failed=False
+    # First deny all traffic by putting REJECT above EVERY temporary ACCEPT.
+    # If a deletion subsequently fails, DNS remains blocked by the barrier.
+    # Never retry a write whose previous outcome was uncertain.
+    try:
+        first=inspect_partial(plan,baseline,snapshot(deadline))
+        if not (first[0].hook and first[1].hook):
+            raise RecoveryDenied("DUAL_STACK_OWNER_HOOK_NOT_PRESENT")
+        if not first[0].barrier:
+            if barrier_cmd.argv in previously:
+                raise RecoveryDenied("UNCERTAIN_BARRIER_NOT_RETRIED")
+            attempted.append(barrier_cmd.argv)
+            if on_attempt is not None:
+                on_attempt(barrier_cmd.argv)
+            if execute(barrier_cmd.argv,deadline) is not True:
+                raise RecoveryDenied("EMERGENCY_BARRIER_WRITE_FAILED")
+            first=inspect_partial(plan,baseline,snapshot(deadline))
+            if not (first[0].barrier and first[0].hook and first[1].hook):
+                raise RecoveryDenied("EMERGENCY_BARRIER_NOT_VERIFIED")
+    except BaseException:
+        return "BLOCKED_EMERGENCY_UNVERIFIED",tuple(attempted)
     for command in commands:
         try:
             if clock()>=deadline:
@@ -195,7 +223,7 @@ def emergency_deny_only(plan, baseline, *, snapshot, execute, deadline, clock,
                 break
     try:
         now=inspect_partial(plan,baseline,snapshot(deadline))
-        if not (now[0].hook and now[1].hook) or now[0].rules!=1:
+        if not (now[0].hook and now[1].hook and now[0].barrier) or now[0].rules!=2:
             failed=True
     except BaseException:
         failed=True

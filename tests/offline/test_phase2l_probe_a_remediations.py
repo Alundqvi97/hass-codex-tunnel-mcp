@@ -6,13 +6,19 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/"docs/security/phase2l"))
 
 from test_phase2l_probe_a_runtime import P,BASE,FakeKernel,FakeReader,MockWork,MockResources
-from probe_contract import emergency_deny_commands
+from probe_contract import emergency_deny_commands,emergency_barrier_command
 from probe_a_recovery import inspect_partial,recover_owned,emergency_deny_only
 from probe_a_guardian import GuardianCore
 from probe_a_kernel import tokens,canonical_owned_rule
 
 class EmergencyKernel(FakeKernel):
     def perform(self,argv,deadline):
+        if argv==emergency_barrier_command(P).argv:
+            self.writes.append(argv)
+            if argv==self.fail:
+                return False
+            self.rules["ipv4"].insert(0,"-A "+P.chain4+" -j REJECT")
+            return True
         for cmd in emergency_deny_commands(P):
             if argv==cmd.argv:
                 self.writes.append(argv)
@@ -39,7 +45,7 @@ class RemediationSafetyTests(unittest.TestCase):
         self.assertEqual(v4.rules,1)
         self.assertTrue(v4.hook)
         self.assertTrue(v6.hook)
-        self.assertEqual(m.rules["ipv4"],["-A "+P.chain4+" -j REJECT"])
+        self.assertEqual(m.rules["ipv4"],["-A "+P.chain4+" -j REJECT"]*2)
 
     def test_emergency_refuses_partial_dual_family_setup(self):
         for n in (0,3,5):
@@ -108,7 +114,7 @@ class RemediationSafetyTests(unittest.TestCase):
                 if self.running and argv==("/usr/bin/pgrep","-u","45123"):
                     from probe_a_exec_adapter import Reply
                     return Reply(0,"4321\n")
-                if argv in tuple(c.argv for c in emergency_deny_commands(P)):
+                if argv in tuple(c.argv for c in emergency_deny_commands(P))+(emergency_barrier_command(P).argv,):
                     from probe_a_exec_adapter import Reply
                     return Reply(0 if m.perform(argv,d) else 4,"")
                 return self.reader(argv,d)
@@ -126,7 +132,7 @@ class RemediationSafetyTests(unittest.TestCase):
         self.assertIn(core.cleanup_state,("PARTIAL","BLOCKED"))
         self.assertTrue(m.hooks["ipv4"])
         self.assertTrue(m.hooks["ipv6"])
-        self.assertEqual(m.rules["ipv4"],["-A "+P.chain4+" -j REJECT"], core.cleanup_result+" "+str(m.writes))
+        self.assertEqual(m.rules["ipv4"],["-A "+P.chain4+" -j REJECT"]*2, core.cleanup_result+" "+str(m.writes))
         self.assertNotEqual(core.receipts["watchdog_absent"],True)
 
 if __name__=="__main__":

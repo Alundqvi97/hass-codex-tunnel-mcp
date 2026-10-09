@@ -91,6 +91,13 @@ def compile_plan(*, scope, uid, dns, qemu=False, auto_retry=False):
     )
     return Plan("OFFLINE_NOT_EXECUTED",uid,scope,c4,c6,dns,inspect,setup,teardown)
 
+def emergency_barrier_command(plan):
+    """Exact deny-first owned chain rule, ONLY after both UID hooks read back."""
+    if validate_plan(plan)!="OFFLINE_SAFE_SCOPED_PLAN_NOT_KERNEL_VERIFIED":
+        raise Refused("INVALID_EMERGENCY_BARRIER_PLAN")
+    return Command("ipv4",("/usr/sbin/iptables","-w","5","-I",
+                          plan.chain4,"1","-j","REJECT"),"emergency-barrier")
+
 def emergency_deny_commands(plan):
     """Fixed, owned-only ACCEPT deletion; never remove hooks or terminal REJECT.
 

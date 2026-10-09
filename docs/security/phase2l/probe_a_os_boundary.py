@@ -8,7 +8,7 @@ import subprocess
 import time
 import os
 from probe_a_stream import capture, StreamFailure
-from probe_contract import validate_plan, emergency_deny_commands
+from probe_contract import validate_plan, emergency_deny_commands, emergency_barrier_command
 from probe_a_exec_adapter import Reply, checked_reply, RUN_LIMIT_SECONDS
 
 class HostBlocked(RuntimeError):
@@ -31,7 +31,7 @@ class RestrictedHost:
         self.call=call
         self.clock=clock
         self.allowed=frozenset(x.argv for x in plan.inspect) | {SAVE4,SAVE6,VERSION4,VERSION6}
-        self.allowed |= frozenset(x.argv for x in (*plan.setup,*plan.teardown,*emergency_deny_commands(plan)))
+        self.allowed |= frozenset(x.argv for x in (*plan.setup,*plan.teardown,*emergency_deny_commands(plan),emergency_barrier_command(plan)))
         self.allowed |= frozenset((
             (b,"-w","5","-L",chain,"-v","-n","-x")
             for b,chain in (("/usr/sbin/iptables",plan.chain4),("/usr/sbin/ip6tables",plan.chain6))
@@ -56,7 +56,7 @@ def bounded_process(argv,timeout,*,reviewed_plan):
     # the exact-argv contract simply because its caller is miswired.
     if validate_plan(reviewed_plan)!="OFFLINE_SAFE_SCOPED_PLAN_NOT_KERNEL_VERIFIED":
         raise HostBlocked("INVALID_REVIEWED_PLAN")
-    allowed=frozenset(x.argv for x in (*reviewed_plan.inspect,*reviewed_plan.setup,*reviewed_plan.teardown,*emergency_deny_commands(reviewed_plan)))
+    allowed=frozenset(x.argv for x in (*reviewed_plan.inspect,*reviewed_plan.setup,*reviewed_plan.teardown,*emergency_deny_commands(reviewed_plan),emergency_barrier_command(reviewed_plan)))
     allowed|={SAVE4,SAVE6,VERSION4,VERSION6}
     allowed|=frozenset((
         (b,"-w","5","-L",chain,"-v","-n","-x")
