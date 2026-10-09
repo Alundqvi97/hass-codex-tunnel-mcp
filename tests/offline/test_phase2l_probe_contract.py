@@ -98,6 +98,20 @@ class ProbeContractTests(unittest.TestCase):
         self.assertEqual(validate_plan(bad),"BLOCKED")
         bad2=dataclasses.replace(p,setup=p.setup+(Command("ipv4",("/usr/sbin/iptables-restore","--noflush"),"hack"),))
         self.assertEqual(validate_plan(bad2),"BLOCKED")
+    def test_unreviewed_new_accept_in_dedicated_chain_is_blocked(self):
+        p=self.p()
+        added=Command("ipv4",("/usr/sbin/iptables","-w","5","-I",p.chain4,"1","-d","8.8.8.8/32","-p","tcp","--dport","443","-j","ACCEPT"),"allow-extra")
+        bad=dataclasses.replace(p,setup=p.setup+(added,))
+        self.assertEqual(validate_plan(bad),"BLOCKED")
+    def test_wrong_order_or_modified_teardown_is_blocked(self):
+        p=self.p()
+        bad=dataclasses.replace(p,setup=tuple(reversed(p.setup)))
+        self.assertEqual(validate_plan(bad),"BLOCKED")
+        bad2=dataclasses.replace(p,teardown=p.teardown[:-1])
+        self.assertEqual(validate_plan(bad2),"BLOCKED")
+        bad3=dataclasses.replace(p,inspect=p.inspect[:-1])
+        self.assertEqual(validate_plan(bad3),"BLOCKED")
+
     def test_teardown_requires_independent_snapshot_comparison(self):
         self.assertIn("preexisting_ipv4_filter_identical",CLEANUP_READBACKS)
         self.assertIn("preexisting_ipv6_filter_identical",CLEANUP_READBACKS)
