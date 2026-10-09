@@ -117,8 +117,10 @@ class RemediationSafetyTests(unittest.TestCase):
         # FakeKernel begins in fully configured state: build the trusted
         # pre-change baseline explicitly; real code only does this via preflight.
         core.started=True
-        core.baseline=(BASE,BASE)
-        core.observer.baseline=(BASE,BASE)
+        from probe_a_kernel import normalize_snapshot
+        baseline=(normalize_snapshot(BASE,family="ipv4"),normalize_snapshot(BASE,family="ipv6"))
+        core.baseline=baseline
+        core.observer.baseline=baseline
         caller.running=True
         self.assertFalse(core.cleanup(20))
         self.assertIn(core.cleanup_state,("PARTIAL","BLOCKED"))
