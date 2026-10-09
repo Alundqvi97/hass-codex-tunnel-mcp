@@ -135,13 +135,13 @@ class GuardianTests(unittest.TestCase):
         c,m,host,work=self.prepare()
         with self.assertRaises(GuardianDenied):c.handle("issue",P.setup[0],10)
         self.assertFalse(m.state)
-        c.handle("preflight",P,10)
-        with self.assertRaises(Exception):c.handle("preflight",P,10)
+        c.handle("preflight","START",10)
+        with self.assertRaises(Exception):c.handle("preflight","START",10)
         with self.assertRaises(Exception):c.handle("issue",P.setup[1],10)
         self.assertEqual(m.state,0)
     def test_setup_exact_once_and_independent_partial_snapshots(self):
         c,m,host,work=self.prepare()
-        self.assertTrue(c.handle("preflight",P,10))
+        self.assertTrue(c.handle("preflight","START",10))
         for command in P.setup:
             self.assertTrue(c.handle("issue",command,10))
         self.assertEqual(m.state,9)
@@ -153,7 +153,7 @@ class GuardianTests(unittest.TestCase):
         self.assertGreater(len(host.commands),len(P.setup))
     def test_eof_forces_guardian_cleanup(self):
         c,m,host,work=self.prepare()
-        c.handle("preflight",P,10)
+        c.handle("preflight","START",10)
         c.handle("issue",P.setup[0],10)
         class Dropped:
             def poll(self,seconds):return True
@@ -164,7 +164,7 @@ class GuardianTests(unittest.TestCase):
         self.assertGreaterEqual(work.stops,1)
     def test_unknown_command_fails_before_write(self):
         c,m,host,work=self.prepare()
-        c.handle("preflight",P,10)
+        c.handle("preflight","START",10)
         with self.assertRaises(GuardianDenied):c.handle("issue",P.teardown[0],10)
         self.assertEqual(m.state,0)
 
