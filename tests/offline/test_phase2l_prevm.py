@@ -164,6 +164,27 @@ class AcceptanceEvidenceTests(unittest.TestCase):
         self.assertLess(text.index("docs/security/phase2l/runner_preflight.py"),text.index("sudo apt-get update"))
         self.assertIn('echo "PHASE2L_PRE_GUEST=BLOCKED_UNIMPLEMENTED_EGRESS_PROOF"',text)
         self.assertIn("exit 3",text)
+
+    def test_qemu_source_matches_exact_compiled_netdev(self):
+        # Python AST inspection does not execute QEMU or import the launcher.
+        import ast
+        file=ROOT/"docs/security/phase2h/single_haos_guest.py"
+        code=ast.parse(file.read_text())
+        fn=next(x for x in code.body if isinstance(x,ast.FunctionDef) and x.name=="launch_guest")
+        cmd=next(x.value for x in fn.body if isinstance(x,ast.Assign)
+                 and any(isinstance(t,ast.Name) and t.id=="cmd" for t in x.targets))
+        args=cmd.elts
+        netarg=next(i for i,x in enumerate(args) if isinstance(x,ast.Constant) and x.value=="-netdev")
+        self.assertIsInstance(args[netarg+1],ast.Constant)
+        expected=self.good().qemu_netdev
+        self.assertEqual(args[netarg+1].value,expected)
+        self.assertEqual(sum(1 for x in args if isinstance(x,ast.Constant) and x.value=="-netdev"),1)
+    def test_cleanup_exit_requires_runtime_readback(self):
+        sh=(ROOT/"docs/security/phase2h/runner_once.sh").read_text()
+        self.assertIn("PHASE2L_CLEANUP=BLOCKED_INCOMPLETE_RUNTIME_READBACK",sh)
+        self.assertIn('if [[ "$exit_code" -eq 0 ]]; then',sh)
+        self.assertIn("exit_code=6",sh)
+
     def test_immutable_guest_workflow_trigger(self):
         text=(ROOT/".github/workflows/phase2h-haos-vm-once.yml").read_text()
         self.assertIn("paths: [.github/workflows/phase2h-haos-vm-once.yml]",text)

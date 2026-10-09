@@ -64,6 +64,14 @@ cleanup() {
   sudo rm -rf -- "$WORK"
   [[ ! -e "$WORK" ]] && echo "PHASE2H_TEMPORARY_VM_FILES_REMOVED=PASS" || echo "PHASE2H_TEMPORARY_VM_FILES_REMOVED=FAIL"
   echo "PHASE2H_PUBLIC_ARTIFACT_OR_CACHE_UPLOAD=NONE"
+  # Phase 2J requires 13 independent cleanup observations, some of which
+  # this dormant runner does not yet implement (NBD, hostforwards, watchdog).
+  # Never allow a later successful guest result to mask missing teardown
+  # evidence. This is a review-only guard, not a verified live readback.
+  if [[ "$exit_code" -eq 0 ]]; then
+    echo "PHASE2L_CLEANUP=BLOCKED_INCOMPLETE_RUNTIME_READBACK"
+    exit_code=6
+  fi
   echo "PHASE2H_EXIT_STATUS=$exit_code"
   exit "$exit_code"
 }
