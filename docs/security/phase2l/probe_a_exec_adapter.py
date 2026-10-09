@@ -32,7 +32,7 @@ class ExactArgvGate:
     """No command synthesis and no unapproved write; adapter is not live.
 
     A future privileged supervisor must wrap checked commands with sudo -n,
-    use subprocess.run(shell=False, stdin=DEVNULL, stdout=PIPE,
+    use the standard library's bounded process runner with shell disabled,
     stderr=DEVNULL, timeout <=RUN_LIMIT_SECONDS), verify actual binary
     versions and identity, and independently check the resulting kernel.
     """
