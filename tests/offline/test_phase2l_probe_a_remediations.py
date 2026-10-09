@@ -42,7 +42,7 @@ class RemediationSafetyTests(unittest.TestCase):
         self.assertEqual(outcome,"DENY_ONLY_OWNER_HOOKS_RETAINED_NOT_LIVE_ATTESTED")
         self.assertEqual(tuple(attempted),writes)
         v4,v6=inspect_partial(P,(BASE,BASE),m.snapshot(20))
-        self.assertEqual(v4.rules,1)
+        self.assertEqual(v4.rules,2)
         self.assertTrue(v4.hook)
         self.assertTrue(v6.hook)
         self.assertEqual(m.rules["ipv4"],["-A "+P.chain4+" -j REJECT"]*2)
@@ -63,7 +63,7 @@ class RemediationSafetyTests(unittest.TestCase):
         failed,writes=emergency_deny_only(P,(BASE,BASE),snapshot=m.snapshot,
                  execute=m.perform,deadline=20,clock=lambda:1,on_attempt=ledger.add)
         self.assertEqual(failed,"BLOCKED_EMERGENCY_UNVERIFIED")
-        self.assertEqual(len(writes),1)
+        self.assertEqual(len(writes),2)
         _,follow=emergency_deny_only(P,(BASE,BASE),snapshot=m.snapshot,
                   execute=m.perform,deadline=20,clock=lambda:1,
                   previous_attempts=ledger,on_attempt=ledger.add)
