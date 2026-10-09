@@ -124,7 +124,7 @@ class RemediationSafetyTests(unittest.TestCase):
         self.assertIn(core.cleanup_state,("PARTIAL","BLOCKED"))
         self.assertTrue(m.hooks["ipv4"])
         self.assertTrue(m.hooks["ipv6"])
-        self.assertEqual(m.rules["ipv4"],["-A "+P.chain4+" -j REJECT"])
+        self.assertEqual(m.rules["ipv4"],["-A "+P.chain4+" -j REJECT"], core.cleanup_result+" "+str(m.writes))
         self.assertNotEqual(core.receipts["watchdog_absent"],True)
 
 if __name__=="__main__":
