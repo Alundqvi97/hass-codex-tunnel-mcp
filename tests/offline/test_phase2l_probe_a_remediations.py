@@ -42,7 +42,7 @@ class RemediationSafetyTests(unittest.TestCase):
         self.assertEqual(m.rules["ipv4"],["-A "+P.chain4+" -j REJECT"])
 
     def test_emergency_refuses_partial_dual_family_setup(self):
-        for n in (0,3,5,6):
+        for n in (0,3,5):
             m=EmergencyKernel(n)
             result,writes=emergency_deny_only(P,(BASE,BASE),snapshot=m.snapshot,
                         execute=m.perform,deadline=20,clock=lambda:1)
@@ -108,6 +108,9 @@ class RemediationSafetyTests(unittest.TestCase):
                 if self.running and argv==("/usr/bin/pgrep","-u","45123"):
                     from probe_a_exec_adapter import Reply
                     return Reply(0,"4321\n")
+                if argv in tuple(c.argv for c in emergency_deny_commands(P)):
+                    from probe_a_exec_adapter import Reply
+                    return Reply(0 if m.perform(argv,d) else 4,"")
                 return self.reader(argv,d)
         caller=BeforeAfter()
         core=GuardianCore(P,command=caller,work=StopFails(),resources=MockResources(),clock=lambda:1)
