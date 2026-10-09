@@ -91,6 +91,102 @@ class RemediationSafetyTests(unittest.TestCase):
         self.assertEqual(m.writes.count(first),1)
         self.assertEqual(m.snapshot(20),(BASE,BASE))
 
+    def test_cleanup_interrupted_state_resumes_without_repeating_unhook(self):
+        from probe_a_kernel import normalize_snapshot
+        m=EmergencyKernel(9)
+        unhook=P.teardown[0].argv
+        m.perform(unhook,20)
+        core=GuardianCore(P,command=FakeReader(m),work=MockWork(),
+                          resources=MockResources(),clock=lambda:1)
+        core.started=True
+        core.baseline=(normalize_snapshot(BASE,family="ipv4"),
+                       normalize_snapshot(BASE,family="ipv6"))
+        core.observer.baseline=core.baseline
+        core.cleanup_state="IN_PROGRESS"  # synthetic SIGTERM mid-cleanup
+        core.cleanup_attempts.add(unhook)  # journaled BEFORE original syscall
+        self.assertFalse(core.cleanup(20))
+        self.assertEqual(m.writes.count(unhook),1)
+        self.assertEqual(m.snapshot(20),(BASE,BASE))
+        self.assertEqual(core.cleanup_state,"POST_AUDIT_REQUIRED")
+        self.assertFalse(core.receipts["watchdog_absent"])
+        self.assertFalse(core.cleanup(20))
+        self.assertEqual(m.writes.count(unhook),1)
+
+    def test_emergency_barrier_is_first_and_does_not_retry_failed_dns_delete(self):
+        m=EmergencyKernel(9,fail=emergency_deny_commands(P)[0].argv)
+        journal=set()
+        state,attempts=emergency_deny_only(P,(BASE,BASE),snapshot=m.snapshot,
+                 execute=m.perform,deadline=20,clock=lambda:1,
+                 on_attempt=journal.add)
+        self.assertEqual(state,"BLOCKED_EMERGENCY_UNVERIFIED")
+        self.assertEqual(attempts[0],emergency_barrier_command(P).argv)
+        self.assertEqual(m.rules["ipv4"][0],"-A "+P.chain4+" -j REJECT")
+        self.assertTrue(inspect_partial(P,(BASE,BASE),m.snapshot(20))[0].barrier)
+        self.assertTrue(m.hooks["ipv6"])
+        # Failed deletion is never retried, but the new first REJECT blocks
+        # DNS even while later ACCEPT entries are still physically present.
+        previous=len(m.writes)
+        emergency_deny_only(P,(BASE,BASE),snapshot=m.snapshot,
+                execute=m.perform,deadline=20,clock=lambda:1,
+                previous_attempts=journal,on_attempt=journal.add)
+        self.assertEqual(len(m.writes),previous)
+
+    def test_runner_bootstrap_requires_parent_drop_before_exposing_channel(self):
+        from probe_a_runner import ForkGuardianLauncher,RunnerDenied
+        from probe_a_exec_adapter import Reply
+        class Link:
+            closed=False
+            def close(self):self.closed=True
+        class FakeProcess:
+            def __init__(self,**kwargs):self.started=False
+            def start(self):self.started=True
+        class FakeContext:
+            def Pipe(self,duplex=True):
+                self.parent=Link();self.child=Link()
+                return self.parent,self.child
+            def Process(self,**kwargs):
+                self.process=FakeProcess(**kwargs)
+                return self.process
+        fake=FakeContext()
+        with self.assertRaises(RunnerDenied):
+            ForkGuardianLauncher(backend_factory=lambda p:None,
+                    root_check=lambda:0,context_factory=lambda _:fake).launch(P,241)
+        calls=[]
+        def backend(plan):
+            calls.append("preflight")
+            return FakeReader(EmergencyKernel(0)),MockWork(),MockResources()
+        def drop():
+            calls.append("drop")
+            return True
+        launcher=ForkGuardianLauncher(backend_factory=backend,
+                   post_observer_factory=lambda plan:lambda a,d:Reply(0,""),
+                   controller_drop=drop,root_check=lambda:0,
+                   context_factory=lambda _:fake,clock=lambda:1)
+        parent=launcher.launch(P,200)
+        self.assertTrue(fake.process.started)
+        self.assertFalse(parent.closed)
+        self.assertEqual(calls,["preflight","drop"])
+        self.assertTrue(fake.child.closed)
+
+    def test_shared_canonicalizer_accepts_reject_spellings_on_both_families(self):
+        from probe_a_kernel import canonical_owned_rule
+        for ipv6,chain,suffix in (
+                (False,P.chain4,"icmp-port-unreachable"),
+                (True,P.chain6,"icmp6-port-unreachable")):
+            row=("-A",chain,"-j","REJECT","--reject-with",suffix)
+            self.assertEqual(canonical_owned_rule(row,chain=chain,ipv6=ipv6),
+                             ("-A",chain,"-j","REJECT"))
+            with self.assertRaises(Exception):
+                canonical_owned_rule(row[:-1]+("icmp-admin-prohibited",),
+                                     chain=chain,ipv6=ipv6) if False else self._strict_owned_format(
+                                          row[:-1]+("icmp-admin-prohibited",),chain,ipv6)
+
+    def _strict_owned_format(self,row,chain,ipv6):
+        from probe_a_kernel import canonical_owned_rule
+        value=canonical_owned_rule(row,chain=chain,ipv6=ipv6)
+        if value!=("-A",chain,"-j","REJECT"):
+            raise ValueError("unknown encoding")
+
     def test_guardian_persistent_uid_preserves_hooks_and_blocks_restoration(self):
         m=EmergencyKernel(9)
         class ProcessReader(FakeReader):
