@@ -5,11 +5,13 @@ separately approved runtime test can populate evidence in future.
 """
 from __future__ import annotations
 import importlib.util
+import sys
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
 SPEC=importlib.util.spec_from_file_location("prevm_acceptance", ROOT/"phase2j/acceptance.py")
 mod=importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name]=mod
 SPEC.loader.exec_module(mod)
 
 REQUIRED=tuple(mod.CLEANUP)
