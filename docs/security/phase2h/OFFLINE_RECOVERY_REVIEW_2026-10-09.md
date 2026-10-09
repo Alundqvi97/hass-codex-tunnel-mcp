@@ -53,3 +53,8 @@ No finding here establishes why the immutable #37851915146 guest failed. A firew
 Future authorization, if requested, must explicitly name: one new disposable standard public `ubuntu-24.04` GitHub-hosted QEMU HAOS 18.3 guest; exact immutable workflow/harness SHA; maximum CPU/RAM/disk/runtime/network permissions and image digest; synthetic-only credentials; temporary runner-only KVM/firewall privileges with readback cleanup; zero paid resources; no production, hosted OpenAI, router, Home Infra, or credential access; required sanitized boot/network/real Supervisor observations; no retries/reruns; abort criteria and the exact 16 acceptance checkpoints. A separate explicit user approval must precede *any* guest execution or VM-trigger workflow change.
 
 Until a real Supervisor test plus hosted attachment, least-privilege, network, and backup/restore gates pass: **Phase 2 partial, Phase 3 NO-GO, Phase 4 not authorized.** Both existing PRs must remain unmerged drafts.
+
+
+## Phase 2I offline follow-up (2026-10-09; not part of original guest result)
+
+Phase 2I adds only synthetic diagnostics, guard and cleanup models in `docs/security/phase2i/offline_harness.py` and `tests/offline/test_phase2i_harness.py`, with a dedicated no-QEMU Python-only workflow. The historical run #37851915146 stays FAILED/BLOCKED. Classifiers do not contact a socket, boot a VM, validate kernel conntrack or prove Supervisor. See `docs/security/phase2i/REVIEW_AND_FUTURE_ACCEPTANCE.md`. No new guest authorization; any later acceptance must pin reviewed commit/hashes and obtain separate explicit approval. Phase 3 production NO-GO.

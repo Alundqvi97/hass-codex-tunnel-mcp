@@ -102,3 +102,8 @@ The approved single guest experiment is now consumed. **Do not rerun the VM with
 ## Final decision
 
 **Phase 2H SOURCE ACCEPTANCE PASS / DISPOSABLE GUEST CLEANUP PASS / GENUINE HAOS-SUPERVISOR ACCEPTANCE BLOCKED. Phase 3: PRODUCTION NO-GO.** The next highest-value action, if explicitly authorized later, is one fresh *offline-observable* isolated guest test of the corrected loopback/firewall behavior and real Supervisor, then completing the outstanding remaining checks. No second guest was started here.
+
+
+## Phase 2I offline follow-up (2026-10-09; not part of original guest result)
+
+Phase 2I adds only synthetic diagnostics, guard and cleanup models in `docs/security/phase2i/offline_harness.py` and `tests/offline/test_phase2i_harness.py`, with a dedicated no-QEMU Python-only workflow. The historical run #37851915146 stays FAILED/BLOCKED. Classifiers do not contact a socket, boot a VM, validate kernel conntrack or prove Supervisor. See `docs/security/phase2i/REVIEW_AND_FUTURE_ACCEPTANCE.md`. No new guest authorization; any later acceptance must pin reviewed commit/hashes and obtain separate explicit approval. Phase 3 production NO-GO.

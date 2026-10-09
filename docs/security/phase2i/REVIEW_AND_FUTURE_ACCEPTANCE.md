@@ -1,0 +1,49 @@
+# Phase 2I — Offline-only preparation for HAOS/Supervisor acceptance
+
+**2026-10-09. Status: OFFLINE MODEL ONLY; VM NOT AUTHORIZED; PRODUCTION NO-GO.**
+
+## Evidence boundary
+
+Historical immutable guest: https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37851915146 (failed HTTP and observer readiness; no known root cause; teardown process and directory receipts passed).
+Full source-policy regression: https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37851968013 (196 original + 211 patched/revised, all pass; source rollback pass).
+Phase 2H independent static findings are preserved in `docs/security/phase2h/OFFLINE_RECOVERY_REVIEW_2026-10-09.md`.
+All Phase 2I code is an inert, pure Python model. It is NOT wired into the Phase 2H VM launcher and cannot boot a guest. CI runs only standard-library unittest and py_compile. This separation is deliberate until new approval and runtime adapter review.
+
+## Confidence-ranked review
+
+| Area | Supported offline | Not proven |
+|---|---|---|
+| Loopback | Original QEMU-UID OUTPUT would reject 127/8; proposed ESTABLISHED TCP loopback exception precedes rejects; synthetic ordered-rule check passes | Actual QEMU process owner and -o lo, reply conntrack state, SYN-ACK delivery, host listener reachability |
+| DNS | QEMU user network gives guest DNS 10.0.2.3 but host-side QEMU resolver destination depends on runner. Loopback/private resolver can be rejected by owner OUTPUT; pure resolver classification tested | Real /etc/resolv.conf and QEMU resolver target during guest boot |
+| Gateway | Default QEMU user network 10.0.2.2 host / 10.0.2.3 DNS; synthetic blocks their host-side private targets | Complete guest-to-host isolation, no alternate route via host networking, real egress counter proofs |
+| IPv4/IPv6 | Synthetic public 80/443, UDP 53/123 allow; RFC1918, CGNAT, link-local, loopback and IPv6 deny. Proposed QEMU lint insists on `ipv6=off` | Kernel iptables/ip6tables efficacy; allowlisting actual bootstrap registries; IPv6 still enabled in previous QEMU command |
+| Readiness | Classifier distinguishes process exit, no listener, TCP refusal/timeout, HTTP 404/other, possible first-boot, Core, and ordered Supervisor/store/install/running milestones. No untrusted body or exception string returned | Classification is not yet connected to QEMU/actual HTTP sockets; `/manifest.json` alone and generic HTTP responses cannot prove Supervisor |
+| Disk/store | `hassos-data` must be a unique ext4 NBD filesystem label; no positional p8 trust; reject legacy-only local path until compatibility demonstrated | Image's real filesystem layout; Supervisor revision/migration on guest; local store reload and installed schema |
+| Cleanup | 15-item independent synthetic post-condition checklist, including child/watchdog/forwarders, NBD, mounts, ACL, chains, UID, firmware/disk/log/temp | Original job's firewall/ACL read-back, future privileged restoration effectiveness |
+
+The ESTABLISHED exception is TCP-specific. It does not permit localhost UDP DNS for a loopback resolver. Also, QEMU user networking has an internal virtual gateway; host rules see QEMU-owned host sockets, not guest's original 10.0.2.x destination. Never interpret a synthetic verdict as kernel isolation proof.
+
+## Version-specific supportability and discovery
+
+| Version/source | Verified from published source | Remaining assumption |
+|---|---|---|
+| HAOS 18.3 official partition spec | Data filesystem label `hassos-data`, mounted at `/mnt/data`; Core is not preinstalled and first boot downloads it | Original p8 positional assumption, contents of downloaded 18.3 image, timing and connectivity |
+| Supervisor 2026.10.1 bootstrap source | Migrates legacy `addons/{core,data,local,git}` into `apps/` only if target absent | Actual guest Supervisor version, whether both paths exist, and migration success |
+| Supervisor 2026.10.1 store code | Reads local apps from `path_apps_local` | Store reload, install and option persistence on true guest are not verified |
+| HA-MCP upstream 8.6.0 pin | SHA-guarded source and packaged tests passed | Real Supervisor add-on build, installed image digest, strict option on restart/reboot |
+
+Sources: https://developers.home-assistant.io/docs/operating-system/partition/ ; https://www.qemu.org/docs/master/system/qemu-manpage.html ; https://github.com/home-assistant/supervisor/blob/2026.10.1/supervisor/bootstrap.py ; https://github.com/home-assistant/supervisor/blob/2026.10.1/supervisor/store/data.py .
+
+## Future single experiment — proposal, not approval
+
+Prerequisite: adapt the inert probe categories to a reviewed, read-only runtime observer; prove they emit only finite enum values and never bodies, URLs, secrets or raw serial. Resolve QEMU DNS via explicit bounded resolver plan, user-mode forwarding, `ipv6=off` and host egress enforcement. Demonstrate data partition label before any offline seeding. Prefer supported local apps source route and real Supervisor store/install endpoints; no arbitrary private data-state writes. Add cleanup independent read-back even for partially initialized firewall chains.
+
+Freeze **exact PR #2 commit SHA after CI** plus SHA-256 of `runner_once.sh`, `single_haos_guest.py` and the unchanged VM-triggering workflow; obtain a second reviewer signoff. Use official HAOS 18.3 OVA QCOW2 SHA256 `fae6a728768cc10aff60d4820bfcd40d64cd77fab82c8bd92af13b3d9d414090` (510014132 compressed bytes), pinned HA-MCP SHA `fc54437a804858732e4bc927add98e202d879a09`.
+
+One new standard *public repository* GitHub-hosted Ubuntu 24.04 runner only; exactly one QEMU/KVM guest, 2 guest vCPU, 4 GiB RAM, 32 GiB sparse logical disk, 11.5 GiB host sparse-usage stop threshold, 43-minute maximum job / 2040-second harness timeout, 780-second initial readiness bound unless a separately reviewed finite staged-time budget is approved. Temporary runner-only KVM ACL, test user, firewall and NBD mount permissions; zero production credentials. Public standard-hosted runner is documented free under current GitHub policy, but repository billing/invoice is not independently verified. No paid resources.
+
+Allow only essential, recorded public bootstrap web and a reviewed DNS/NTP path. Guest/user-mode network must be unable to reach house/LAN/link-local/loopback or unexpected IPv6 paths. Test sanitized observer, first boot, Core, genuine Supervisor API/running; identify add-on in store, install, strict option persistence after app restart and host reboot, positive read and negative policy/approval, secret log protection, failed-config independent admin recovery, full original image+configuration rollback and watchdog bounded behavior. Record exact 16 acceptance cases from Phase 2H. Abort on unknown DNS target, failed isolation/read-back, unexpected hostforward, secrets in sanitized output, supervisor deadlock, unsupported local-app injection, resource bound or failed cleanup. No automatic retry.
+
+**New authorization required:** user must explicitly approve *that* exact immutable commit, hashes and a single additional disposable HAOS guest with temporary runner privileges and the above budget, isolation and no-retry restriction. Approval cannot be implied by this document or by source CI. Any kernel-only networking exercise is a **different** approval (not covered here).
+
+Phase 2G/2H source checks do not establish genuine Supervisor. Hosted unauthorized attachment, real least-privilege and home backup/recovery, network boundaries and production compatibility remain independent NO-GO gates.

@@ -1,0 +1,29 @@
+name: Phase 2I - Synthetic Offline Harness Only
+on:
+  push:
+    branches: [security/ha-mcp-phase2d-candidates]
+    paths:
+      - docs/security/phase2i/**
+      - tests/offline/test_phase2i_harness.py
+      - .github/workflows/phase2i-offline-only.yml
+  pull_request:
+    branches: [security/tunnel-auth-hardening]
+    paths:
+      - docs/security/phase2i/**
+      - tests/offline/test_phase2i_harness.py
+      - .github/workflows/phase2i-offline-only.yml
+permissions: {contents: read}
+jobs:
+  pure-python-models:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - name: Verify pure-Python diagnostics only, without guests or networking
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest discover -s tests/offline -p 'test_phase2i_*.py' -v
+          python3 -B -m py_compile docs/security/phase2i/offline_harness.py
+          git diff --exit-code
