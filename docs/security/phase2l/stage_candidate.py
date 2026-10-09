@@ -12,7 +12,7 @@ from packaging_preflight import inspect_context
 
 SOURCE_FILES = ("config.yaml","Dockerfile","start.py")
 ROOT_FILES = ("pyproject.toml","uv.lock")
-BOOT_FILES = ("phase2k_bootstrap.py","phase2k_policy.json")
+BOOT_FILES = {"bootstrap_policy.py":"phase2k_bootstrap.py", "phase2k_policy.json":"phase2k_policy.json"}
 
 def once(s: str, old: str, new: str) -> str:
     if s.count(old) != 1:
@@ -40,8 +40,8 @@ def stage(source: Path, destination: Path, reference: Path) -> str:
             shutil.copy2(source/"homeassistant-addon"/f,destination/f)
         for f in ROOT_FILES:
             shutil.copy2(source/f,destination/f)
-        for f in BOOT_FILES:
-            shutil.copy2(reference/f,destination/f)
+        for source_name, destination_name in BOOT_FILES.items():
+            shutil.copy2(reference/source_name,destination/destination_name)
         shutil.copytree(src,destination/"src",symlinks=False)
         cfg=destination/"config.yaml"
         s=cfg.read_text(encoding="utf-8")

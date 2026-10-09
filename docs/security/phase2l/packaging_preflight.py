@@ -31,7 +31,7 @@ def inspect_context(staged: Path, reference: Path) -> str:
         if file.is_symlink() or not file.is_file() or file.stat().st_size==0:
             return "BLOCKED_CONTEXT_FILE"
     for name in ("phase2k_bootstrap.py","phase2k_policy.json"):
-        expected=reference/name
+        expected=reference/("bootstrap_policy.py" if name=="phase2k_bootstrap.py" else name)
         if expected.is_symlink() or not expected.is_file() or hash_file(staged/name)!=hash_file(expected):
             return "BLOCKED_PINNED_PACKAGED_FILE"
     try:

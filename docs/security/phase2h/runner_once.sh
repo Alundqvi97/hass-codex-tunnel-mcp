@@ -76,6 +76,7 @@ trap 'exit 143' TERM
 [[ "${RUNNER_OS:-}" == "Linux" ]]
 [[ "${ImageOS:-}" == "ubuntu24" || "${ImageOS:-}" == "ubuntu24.04" || "${ImageOS:-}" == "ubuntu24.04.0" || "${ImageOS:-}" == ubuntu24* ]]
 echo "PHASE2H_RUNNER=STANDARD_UBUNTU_24_04"
+test "$(git -C ha_mcp_pinned rev-parse HEAD)" = fc54437a804858732e4bc927add98e202d879a09
 python3 - <<'PY'
 import json,urllib.request,os
 url="https://api.github.com/repos/Alundqvi97/hass-codex-tunnel-mcp"
@@ -96,6 +97,22 @@ AVAILABLE_KIB="$(df -Pk "$WORK" | awk 'NR==2 {print $4}')"
 TOTAL_KIB="$(awk '/MemTotal/ {print $2}' /proc/meminfo)"
 [[ "$AVAILABLE_KIB" -ge 15000000 && "$TOTAL_KIB" -ge 12000000 && "$(nproc)" -ge 4 ]] || { echo "PHASE2H_RESOURCE_GATE=BLOCKED"; exit 3; }
 echo "PHASE2H_RESOURCE_GATE=PASS"
+
+# Phase 2L fail-closed pre-guest resolver/egress assessment. The manifest
+# cannot yet be produced by a reviewed QEMU resolver-route observer. Without
+# independent route/kernel proof the guard ALWAYS stops before any sudo,
+# firewall change, download, disk mutation or QEMU invocation.
+if ! python3 -B docs/security/phase2l/runner_preflight.py \
+     --resolv-conf /etc/resolv.conf \
+     --manifest "$WORK/phase2l-approved-network.json" \
+     --guest-source docs/security/phase2h/single_haos_guest.py; then
+  echo "PHASE2L_PRE_GUEST=BLOCKED_NOT_AUTHORIZED"
+  exit 3
+fi
+# An externally reviewed observer and exact allow-list are required before
+# this branch is ever enabled in a new, explicitly authorized guest attempt.
+echo "PHASE2L_PRE_GUEST=BLOCKED_UNIMPLEMENTED_EGRESS_PROOF"
+exit 3
 
 # Trusted Ubuntu repository dependencies only, on ephemeral runner.
 sudo apt-get update -qq >/dev/null
@@ -133,12 +150,14 @@ echo "PHASE2H_LOOPBACK_REPLY_ONLY_RULE=CONFIGURED_NOT_LIVE_TESTED"
 for cidr in 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 224.0.0.0/4 240.0.0.0/4; do
   sudo iptables -w 5 -A PHASE2H_GUEST -d "$cidr" -j REJECT
 done
-sudo iptables -w 5 -A PHASE2H_GUEST -p tcp -m multiport --dports 80,443 -j ACCEPT
-sudo iptables -w 5 -A PHASE2H_GUEST -p udp -m multiport --dports 53,123 -j ACCEPT
+# Phase 2L: PUBLIC egress is NOT granted without a reviewed, evidence-backed
+# DNS UDP+TCP resolver, NTP and first-boot web destination allow-list.
+# Existing generic public DNS/web rules were too broad for the next trial.
+# The future guard above refuses every unresolved network manifest.
 sudo iptables -w 5 -A PHASE2H_GUEST -j REJECT
 sudo ip6tables -w 5 -A PHASE2H_GUEST6 -j REJECT
-echo "PHASE2H_GUEST_NETWORK=USER_MODE_NAT_PUBLIC_WEB_DNS_NTP_ONLY"
-echo "PHASE2H_PRIVATE_AND_IPV6_EGRESS=BLOCKED"
+echo "PHASE2H_GUEST_NETWORK=BLOCKED_UNTIL_REVIEWED_DESTINATIONS"
+echo "PHASE2H_PRIVATE_AND_IPV6_EGRESS=CONFIGURED_NOT_LIVE_TESTED"
 
 # Exact upstream source; review candidates are applied only to this checkout.
 test "$(git -C ha_mcp_pinned rev-parse HEAD)" = fc54437a804858732e4bc927add98e202d879a09
@@ -160,31 +179,14 @@ xz --decompress "$WORK/haos_ova-18.3.qcow2.xz"
 qemu-img check "$WORK/haos_ova-18.3.qcow2" >/dev/null
 qemu-img resize "$WORK/haos_ova-18.3.qcow2" 32G >/dev/null
 
-# Stage source/positive policy into the guest's Supervisor local add-on tree
-# using kernel NBD only (not a second libguestfs helper VM).
-mkdir -p "$WORK/addon" "$WORK/mount"
-cp ha_mcp_pinned/homeassistant-addon/{config.yaml,Dockerfile,start.py} "$WORK/addon/"
-cp ha_mcp_pinned/{pyproject.toml,uv.lock} "$WORK/addon/"
-cp -a ha_mcp_pinned/src "$WORK/addon/"
-cp docs/security/phase2k/bootstrap_policy.py "$WORK/addon/phase2k_bootstrap.py"
-cp docs/security/phase2k/phase2k_policy.json "$WORK/addon/phase2k_policy.json"
-python3 - "$WORK/addon" <<'PY'
-from pathlib import Path
-import sys
-p=Path(sys.argv[1])
-cfg=p/"config.yaml"
-s=cfg.read_text()
-assert '  require_strict_tool_policy: false' in s and '  require_strict_tool_policy: bool?' in s
-s=s.replace('slug: "ha_mcp"', 'slug: "ha_mcp_phase2h"')
-s=s.replace('version: "8.5.0"','version: "8.6.0"')
-s=s.replace('name: "Home Assistant MCP Server"','name: "Phase2H Synthetic MCP"')
-s="\n".join(x for x in s.split("\n") if not x.startswith("image:"))
-cfg.write_text(s)
-d=p/"Dockerfile"
-s=d.read_text()
-assert "COPY homeassistant-addon/start.py /" in s
-d.write_text(s.replace("COPY homeassistant-addon/start.py /","COPY start.py /"))
-PY
+# Stage audited build context only; pinned source and helper/template SHA
+# guards run before any NBD mount. Never insert private Supervisor data files.
+mkdir -p "$WORK/mount"
+python3 -B docs/security/phase2l/stage_candidate.py \
+  --source ha_mcp_pinned \
+  --destination "$WORK/addon" \
+  --reference docs/security/phase2k
+echo "PHASE2L_BUILD_CONTEXT=OFFLINE_VERIFIED_NO_IMAGE_BUILD"
 if sudo modprobe nbd max_part=16 2>/dev/null && test -b /dev/nbd0 && sudo qemu-nbd --connect=/dev/nbd0 "$WORK/haos_ova-18.3.qcow2" >/dev/null 2>&1; then
   NBD_CONNECTED=true
   sudo udevadm settle >/dev/null 2>&1 || true

@@ -152,7 +152,7 @@ class PackagingTests(unittest.TestCase):
         actual=ROOT/"docs/security/phase2k"
         for f in ("bootstrap_policy.py","phase2k_policy.json"):
             src=actual/f
-            target=self.ref/("phase2k_bootstrap.py" if f=="bootstrap_policy.py" else f)
+            target=self.ref/f
             target.write_bytes(src.read_bytes())
         self.source=ROOT/"docs/security/phase2k"
         self.make_good()
@@ -166,7 +166,7 @@ class PackagingTests(unittest.TestCase):
         }
         for name,body in content.items():(self.staged/name).write_text(body)
         for n in ("phase2k_bootstrap.py","phase2k_policy.json"):
-            (self.staged/n).write_bytes((self.ref/n).read_bytes())
+            (self.staged/n).write_bytes((self.ref/("bootstrap_policy.py" if n=="phase2k_bootstrap.py" else n)).read_bytes())
         for n in ("__init__.py","server.py","policy/middleware.py"):
             target=self.staged/"src/ha_mcp"/n
             target.parent.mkdir(parents=True,exist_ok=True)
