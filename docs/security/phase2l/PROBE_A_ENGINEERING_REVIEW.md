@@ -1,5 +1,151 @@
 # Probe A — recovered implementation and adversarial engineering review
 
+## Current delivery: disabled OS foundation, 2026-10-09
+
+**Engineering decision: PARTIALLY IMPLEMENTED — EXACT BLOCKERS below.** The
+user-authoritative A1 source gate at `ad5e0c2ba52901c8384597d3cafd26ce3ffb124d`
+is PASSED for disabled OS engineering. It is not reopened by this delivery
+and is not runtime authorization. Both PR #2 HEAD and its named source branch
+matched that commit before work. Older decisions below are historical.
+
+### Implemented source, disconnected and disabled
+
+- `probe_a_linux_launcher.py`: actual Linux `clone3(CLONE_INTO_CGROUP |
+  CLONE_PIDFD)` syscall, retained executable-FD `execve`, root-controlled
+  executable checks, sealed read-only configuration and private anonymous
+  Unix-stream handoff, descriptor closure and fixed environment. The controller
+  child uses the existing irreversible UID/GID 65534 and zero-capability drop
+  **before exec of any controller code**. Linux clears PDEATHSIG on UID change;
+  it is restored and parent identity rechecked after the drop. Child failures
+  hard-stop with `_exit(77)`. A consumed, one-use bootstrap starts observer,
+  guardian and controller in distinct groups; uncertainty after a clone attempt
+  hard-stops the bootstrap with `_exit(76)`. No shell, sudo or fork fallback.
+- The same module implements bounded pipe capture (128 KiB, at most eight
+  seconds), exact source-plan command catalogs including `pgrep`/`getent`,
+  strict cgroup population parsing and group-wide failure termination. A failed
+  capture poisons its executor; it cannot return evidence or retry an uncertain
+  journal operation. pidfd supervision uses the shared 240-second end and
+  60-second cleanup reserve, reaps guardian/controller, requires independent
+  post-guardian audit, stops/reaps observer, and inspects actor groups. Nonzero
+  guardian exit, ambiguous observations or incomplete actor shutdown block.
+- `probe_a_linux_identity.py`: retained pidfd and proc directory, starttime,
+  all UID/GID and capability sets, executable device/inode, freshness checks,
+  and per-stream-chunk SCM_CREDENTIALS. Pre-fork SO_PEERCRED is insufficient.
+  Credential mismatch, descriptor delegation, truncation and SCM_RIGHTS are
+  denied; received descriptors are closed. Existing bounded IPC framing stays
+  unchanged.
+- `probe_a_readonly_broker.py`: fixed operation IDs for exact read commands
+  and cleanup resource keys; no peer-supplied argv, paths, PIDs or write API.
+  Duplicate keys, malformed messages, replay, output overflow and deadlines
+  fail closed. Native reads require contained command execution and inventory
+  verification before/after. Broker service requires bootstrap-bound caller
+  and actual self identity; clients require authenticated observer transport.
+  Receipts identify observer incarnation and inventory, and always carry
+  `UNVERIFIED_NOT_PROBE_PASS`.
+- `probe_a_linux_containment.py`: adapter to the existing
+  `CgroupV2Containment` contract; worker and root peer have distinct groups and
+  separate native bounded executors, permitting the existing READY handshake.
+  Entire groups, including detached descendants, are termination targets.
+  Strict resource readback and independent numeric-UID absence remain required.
+  Guardian/read-only commands also use pre-exec group attachment. No cgroup
+  creation or post-Popen migration is added.
+- `probe_a_os_inventory.py`: externally signed canonical inventories covering
+  disjoint source, executable, loader, libcap, libc/NSS, NSS configuration,
+  Python, transitive dependency, kernel and cgroup categories. Every role has
+  a distinct signed device/inode group and complete argv vectors. Mutation,
+  missing assets, unsafe ownership/path aliases, hash/fact drift or absent
+  reviewer verification blocks. Inventory approval is separate from runtime
+  approval. No signing key, approved inventory, verifier, authorization or
+  dependency pin is bundled; image metadata is not accepted as evidence.
+- The unchanged case table now lives in `probe_contract.py`; controller,
+  guardian and workload import that inert contract. Privileged module imports
+  no longer load controller code. This preserves the case order and behavior,
+  existing journal, emergency deny barrier and intentionally blocked PASS.
+  New modules are included in the existing source attestation inventory.
+
+```mermaid
+flowchart TD
+    B[Trusted root bootstrap and pidfd supervisor]
+    G[Independent root guardian: reviewed cleanup journal]
+    O[Independent root observer: fixed read-only API]
+    C[Controller: UID/GID 65534, all caps zero, NNP]
+    K[Kernel procfs, cgroups and firewall observations]
+    W[Numeric-UID workers and root peer: separate cgroups]
+    B -->|atomic clone3 and pinned FD exec| G
+    B -->|atomic clone3 and pinned FD exec| O
+    B -->|irreversible drop before exec| C
+    C <-->|bounded authenticated Unix IPC| G
+    C <-->|bounded authenticated read RPC| O
+    G -->|exact contained subprocesses| W
+    O -->|fixed contained reads| K
+    B -->|reap guardian, audit, stop observer| O
+    O --> E[UNVERIFIED evidence; trusted PASS remains blocked]
+```
+
+### Exact integration blockers and kernel acceptance still UNVERIFIED
+
+1. **Actor entrypoints/readiness and sealed identity handoff are interfaces.**
+   No runnable root bootstrap or role entrypoint is installed, and the old
+   `ForkGuardianLauncher` is not silently replaced or activated. Actor config
+   assembly must bind the same deadlines, exact endpoints, source snapshot and
+   post-exec process incarnations before admitting controller work. Guardian
+   entrypoint must preserve its existing EOF/deadline/signal journal behavior.
+   An unprivileged client may be unable to inspect a root observer's `/proc/exe`
+   under ptrace restrictions; the reviewed handoff must solve this without
+   weakening identity checks. Current implementation fails closed.
+2. **Native attestation/provisioning are interfaces.** The external verifier,
+   reviewer trust root, dependency closure collector, native kernel-fact
+   reader, one-attempt authorization ledger and nondelegated cgroup provisioner
+   are not bundled. Common symlinked executable paths and writable development
+   source trees intentionally cannot satisfy `root_asset`. Reviewed alias
+   binding and a root-controlled immutable runtime deployment are subsequent
+   work, not permission to change this workspace's ownership or capabilities.
+3. **The observer API is read-only; OS restriction is unverified.** Linux
+   CAP_NET_ADMIN is not read-only. Root actor/command capability reduction,
+   filesystem/cgroup escape prevention, quotas, seccomp/LSM policy and NSS/tool
+   network-egress confinement require reviewed native enforcement. Signed
+   paths and an allowlisted RPC do not prove these kernel properties. No
+   privileged acceptance test has been run.
+4. **Complete evidence composition remains an interface and trusted PASS is
+   intentionally unavailable.** Future independent observations must bind
+   real PID/starttime/executable/credentials, cgroup membership and descendants,
+   exact firewall ownership and per-case counter deltas, guardian exit/reaping,
+   both-family restoration, UID/account/listener/file/resolver absence, and
+   final observer/actor shutdown. Worker text and API boolean callbacks cannot
+   substitute for those observations. Inventory signatures authenticate
+   reviewed content, not kernel enforcement or immutable host operation.
+5. **Recovery has explicit limits.** Guardian owns journaled cleanup on
+   controller EOF/crash or the shared deadline. Supervisor never blindly
+   rewrites firewall state after guardian failure. Poisoned command execution,
+   guardian SIGKILL, loss of cgroup/firewall access, simultaneous actor death
+   and complete GitHub runner destruction can leave cleanup uncertain; all
+   block evidence. A process cannot recover after its host is destroyed.
+
+### Validation and next smallest delivery
+
+The authoritative Phase 2L workflow remains unchanged, including upstream
+`fc54437a804858732e4bc927add98e202d879a09`. The added suite covers native syscall
+arguments through DI only, failure hard-stops, drop-before-exec, post-drop
+PDEATHSIG, FD hygiene, request/identity/output bounds, inventory ambiguity,
+detached-descendant refusal and lifecycle classification. Real nonprivileged
+checks exercise self pidfd/procfs and anonymous Unix IPC credentials/FD
+rejection. These are source regressions, never kernel isolation proof. Final
+test counts, immutable commit and CI receipts belong to the delivery report.
+
+**Next smallest delivery:** implement the reviewed sealed role configuration
+and post-exec identity/readiness handoff with disabled role entrypoints and
+explicit native confinement/attestation preconditions. Keep activation absent;
+then obtain independent review of that exact source before separately approved
+kernel acceptance. Do not restart completed remediation or add a project phase.
+
+No Probe A, root/capability experiment, firewall/cgroup mutation, VM, QEMU,
+production access, paid service or historical VM workflow activation occurred.
+All workflow files and `PROJECT_DESIGN_BLUEPRINT.md` remain byte-for-byte
+unchanged. Full securely authorized Home Assistant administration remains the
+product goal. PRs remain draft/unmerged; HAOS/Supervisor and production NO-GO.
+
+## Historical review records
+
 **Date:** 2026-10-09. **Decision: NOT READY.** No Probe A runtime authorization is requested, implied or consumed. No VM, QEMU, firewall or Home Assistant was touched. This document supplements the existing PROBE_APPROVAL_PACKAGE.md; it does not supersede Phase 2J's 16 genuine Supervisor acceptance gates.
 
 ## Recovery

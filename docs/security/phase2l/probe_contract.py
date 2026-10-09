@@ -9,6 +9,16 @@ from dataclasses import dataclass
 import ipaddress
 import re
 
+# Shared inert case contract. Privileged modules must not import controller
+# code, even to obtain a constant; controller execution happens only after drop.
+CASES = (
+    ("approved-udp", "ipv4", 2), ("approved-tcp", "ipv4", 1),
+    ("alternate-udp", "ipv4", 3), ("alternate-tcp", "ipv4", 3),
+    ("private", "ipv4", 3), ("link-local", "ipv4", 3),
+    ("ipv6-loopback", "ipv6", 0), ("loopback-new", "ipv4", 3),
+    ("public-web", "ipv4", 3), ("loopback-established", "ipv4", 0),
+)
+
 class Refused(ValueError):
     pass
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from probe_contract import validate_plan
 from probe_a_client import admissible_result
-from probe_a_controller import CASES
+from probe_contract import CASES
 
 class WorkloadDenied(RuntimeError):
     pass

@@ -12,7 +12,7 @@ import json
 import signal
 import time
 
-from probe_contract import validate_plan, CLEANUP_READBACKS
+from probe_contract import CASES, validate_plan, CLEANUP_READBACKS
 from probe_a_exec_adapter import ExactArgvGate
 from probe_a_observer import KernelReadback
 from probe_a_recovery import recover_owned, inspect_partial, emergency_deny_only
@@ -95,7 +95,7 @@ class GuardianCore:
         if method == "counters" and argument in ("ipv4", "ipv6"):
             self.observer.require_active(deadline, final=True)
             return self.observer.counters(argument, deadline)
-        if method == "exercise" and argument in tuple(x[0] for x in __import__("probe_a_controller").CASES):
+        if method == "exercise" and argument in tuple(x[0] for x in CASES):
             self.observer.require_active(deadline, final=True)
             self.client_started = True
             return self.work.exercise(argument, self.plan, deadline) is True
@@ -310,7 +310,7 @@ class GuardianChannel:
                     next_cleanup_at = self.clock()
                     continue
                 elif method == "exercise" and arg not in tuple(
-                        c[0] for c in __import__("probe_a_controller").CASES):
+                        c[0] for c in CASES):
                     fault = True
                     disconnected = True
                     next_cleanup_at = self.clock()

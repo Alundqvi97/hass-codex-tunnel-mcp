@@ -32,6 +32,9 @@ SOURCE_NAMES=(
     "probe_a_runner.py", "probe_a_worker.py", "probe_a_workload.py",
     "probe_a_client_process.py", "probe_a_resources.py",
     "probe_a_privilege.py", "probe_a_containment.py", "probe_a_ipc.py",
+    "probe_a_linux_identity.py", "probe_a_linux_launcher.py",
+    "probe_a_readonly_broker.py", "probe_a_os_inventory.py",
+    "probe_a_linux_containment.py",
 )
 PINNED=BINARY_PATHS+CONFIG_PATHS+tuple(str(Path(__file__).resolve().parent / f) for f in SOURCE_NAMES)
 

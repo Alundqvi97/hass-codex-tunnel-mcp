@@ -1,6 +1,42 @@
 # Security implementation plan
 
-Updated 2026-10-08. Repository: Alundqvi97/hass-codex-tunnel-mcp. This work is independent of home-infra-control-plane.
+Updated 2026-10-09. Repository: Alundqvi97/hass-codex-tunnel-mcp. This work is independent of home-infra-control-plane.
+
+## Current Probe A OS engineering delivery
+
+The user-authoritative source gate at `ad5e0c2ba52901c8384597d3cafd26ce3ffb124d`
+is PASSED for disabled engineering. PR #2 and its source branch were checked at
+that exact commit before work; the 266-test offline baseline is retained.
+No runtime approval follows and completed source remediation is not restarted.
+
+Implemented, disconnected and disabled: native atomic clone3/cgroup and pidfd
+exec/supervision primitives; retained executable-FD exec after controller UID/
+GID/capability drop; strict descriptor handoff and parent-death checks; exact
+bounded guardian/read-command capture; identity-bound read-only Unix broker;
+native worker/root-peer containment adapter; externally reviewed dependency/
+kernel inventory with reject-on-drift; nonprivileged and DI regressions.
+Privileged imports obtain the unchanged case list from the inert contract and
+do not load controller code. The existing journal, deny-first emergency barrier,
+absolute deadline, bounded framing and blocked trusted PASS are preserved.
+
+**Decision: PARTIALLY IMPLEMENTED — EXACT BLOCKERS:** disabled role entrypoints
+and sealed readiness/identity/deadline handoff; native fact/dependency collector,
+signature trust root and one-attempt runtime authorization; nondelegated cgroup
+provisioning, root actor/command confinement and NSS egress enforcement;
+independently trusted complete kernel/post-guardian/observer-shutdown evidence.
+No privileged kernel acceptance has occurred. Root/CAP_NET_ADMIN observation
+has a read-only API, not proven kernel read-only privileges. Complete runner
+destruction and guardian SIGKILL remain unrecoverable/uncertain cases.
+
+**Next smallest delivery:** reviewed sealed configuration and post-exec actor
+identity/readiness handoff with disabled entrypoints and native restriction
+preconditions, followed by independent source review. No new project phase,
+privileged workflow, runtime activation or trusted PASS composer is introduced.
+See the current section of `phase2l/PROBE_A_ENGINEERING_REVIEW.md`; final counts,
+immutable commit and CI receipts are reported with this delivery. Historical
+phase records below are preserved. Workflows, original VM workflow and the full
+administrator `PROJECT_DESIGN_BLUEPRINT.md` remain unchanged. Draft PRs stay
+unmerged; HAOS/Supervisor acceptance and production remain NO-GO.
 
 ## Phase status
 
