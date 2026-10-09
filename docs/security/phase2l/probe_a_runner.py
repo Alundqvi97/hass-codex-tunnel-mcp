@@ -11,6 +11,7 @@ from __future__ import annotations
 import multiprocessing
 import os
 import time
+from probe_a_ipc import socket_channel_pair
 
 from probe_contract import validate_plan
 from probe_a_controller import control
@@ -77,7 +78,8 @@ class ForkGuardianLauncher:
     """
     def __init__(self, *, backend_factory, post_observer_factory=None,
                  controller_drop=drop_controller, root_check=os.geteuid,
-                 context_factory=multiprocessing.get_context, clock=time.monotonic):
+                 context_factory=multiprocessing.get_context,
+                 transport_pair_factory=socket_channel_pair, clock=time.monotonic):
         if not callable(backend_factory):
             raise RunnerDenied("MISSING_REVIEWED_BACKEND")
         if not callable(controller_drop):
@@ -89,6 +91,9 @@ class ForkGuardianLauncher:
         self.backend_factory=backend_factory
         self.root_check=root_check
         self.context_factory=context_factory
+        if not callable(transport_pair_factory):
+            raise RunnerDenied("MISSING_BOUNDED_IPC_TRANSPORT")
+        self.transport_pair_factory=transport_pair_factory
         self.clock=clock
         self.child=None
         self.parent_observer=None
@@ -122,7 +127,10 @@ class ForkGuardianLauncher:
         self.parent_observer.versions=observer.versions
         self.parent_resources=resources
         ctx=self.context_factory("fork")
-        parent,child=ctx.Pipe(duplex=True)
+        # A single AF_UNIX SOCK_STREAM framing contract replaces
+        # multiprocessing.Connection entirely. Both sides are nonblocking,
+        # and every transaction has an absolute monotonic deadline.
+        parent,child=self.transport_pair_factory(clock=self.clock)
         # The child holds the backend; the controller never receives root I/O.
         def child_main():
             interrupted=[False]
@@ -180,14 +188,23 @@ class ForkGuardianLauncher:
                 raise RunnerDenied("WORK_WINDOW_EXPIRED_AFTER_DROP")
             return parent
         except BaseException:
-            # Close the parent IPC on any launch/drop/identity failure. The
-            # surviving guardian observes EOF and owns any cleanup; the
-            # OneShotRunner still performs post-guardian independent audit.
-            try: parent.close()
-            except BaseException: pass
-            try: child.close()
-            except BaseException: pass
-            raise RunnerDenied("GUARDIAN_LAUNCH_OR_DROP_FAILED") from None
+            # Irreversible fail-stop. We may still be root after a failed
+            # controller privilege reduction, or a child may have started
+            # before a process.start() error. A catchable Python exception,
+            # return code or sys.exit() is UNSAFE here.
+            #
+            # Closing both sockets causes surviving guardian-side EOF
+            # recovery under its own deadline. This parent CANNOT claim a
+            # successful post-guardian audit after hard termination.
+            try:
+                try: parent.close()
+                except BaseException: pass
+                try: child.close()
+                except BaseException: pass
+            finally:
+                os._exit(77)
+            # Only reached if os._exit was incorrectly replaced by a mock.
+            raise RunnerDenied("IMPOSSIBLE_FATAL_BOOTSTRAP_RETURN")
 
     def wait_for_exit(self, *, deadline):
         if self.child is None:

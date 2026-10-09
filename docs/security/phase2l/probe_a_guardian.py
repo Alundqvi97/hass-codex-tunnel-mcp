@@ -16,6 +16,7 @@ from probe_contract import validate_plan, CLEANUP_READBACKS
 from probe_a_exec_adapter import ExactArgvGate
 from probe_a_observer import KernelReadback
 from probe_a_recovery import recover_owned, inspect_partial, emergency_deny_only
+from probe_a_ipc import IpcDenied
 
 
 
@@ -182,10 +183,11 @@ class GuardianCore:
 
 
 class GuardianChannel:
-    """Interface receives ('method', arg, deadline) or EOF; sends safe reply.
+    """JSON RPC over shared, nonblocking, four-byte-length-framed IPC.
 
-    poll(timeout)->bool, recv_bytes(limit)->bytes, send_bytes(bytes). Caller must provide a
-    distinct OS process for actual independence. No live channel by default.
+    The real launcher supplies BoundedSocketIPC (AF_UNIX socketpair).
+    Both recv_bytes and send_bytes require absolute work-window deadlines.
+    Test-only synthetic channels must implement this same bounded API.
     """
     def __init__(self, core, *, clock=time.monotonic, sleep=time.sleep):
         self.core = core
@@ -241,7 +243,9 @@ class GuardianChannel:
                     continue
                 remaining = max(0, end-self.clock())
                 try:
-                    ready = channel.poll(min(0.20, remaining))
+                    # Never poll across the work/cleanup boundary.
+                    ready = channel.poll(min(0.20, remaining,
+                                             max(0,work_end-self.clock())))
                 except BaseException:
                     fault = True
                     disconnected = True
@@ -250,14 +254,16 @@ class GuardianChannel:
                 if not ready:
                     continue
                 try:
-                    wire = channel.recv_bytes(256)
+                    # A readable header is not a complete frame. The
+                    # transport bounds the entire header+payload transaction.
+                    wire = channel.recv_bytes(256,deadline=work_end)
                     request = json.loads(wire.decode("utf-8", "strict"))
                 except EOFError:
                     cancelled = True
                     disconnected = True
                     next_cleanup_at = self.clock()
                     continue
-                except (OSError, ValueError, UnicodeError):
+                except (OSError, ValueError, UnicodeError, IpcDenied):
                     fault = True
                     disconnected = True
                     next_cleanup_at = self.clock()
@@ -325,15 +331,20 @@ class GuardianChannel:
                         min(requested_end, work_end)
                         if method not in ("stop", "cleanup")
                         else min(requested_end, end))
+                    # Even cleanup responses may not consume the guardian's
+                    # reserved recovery time. The controller can rely on
+                    # independent post-guardian evidence instead.
                     channel.send_bytes(
                         json.dumps({"ok": True, "value": value},
-                                   separators=(",", ":")).encode("utf-8"))
+                                   separators=(",", ":")).encode("utf-8"),
+                        deadline=work_end)
                     if method == "cleanup":
                         cleanup_requested = True
                         next_cleanup_at = self.clock() + retry_seconds
                 except BaseException:
                     try:
-                        channel.send_bytes(b'{"ok":false,"value":null}')
+                        channel.send_bytes(b'{"ok":false,"value":null}',
+                                           deadline=work_end)
                     except BaseException:
                         pass
                     fault = True
@@ -380,12 +391,14 @@ class RemoteIO:
         payload=json.dumps({"method":method,"value":value,"deadline":deadline},separators=(",",":")).encode("utf-8")
         if len(payload)>256:
             raise GuardianDenied("MESSAGE_TOO_LARGE")
-        self.channel.send_bytes(payload)
-        if not self.channel.poll(min(8, max(0, deadline-self.clock()))):
-            raise GuardianDenied("GUARDIAN_UNRESPONSIVE")
+        # The same absolute RPC deadline bounds send, frame header, complete
+        # reply and any partial/readable payload. No Connection framing is used.
         try:
-            reply = json.loads(self.channel.recv_bytes(300000).decode("utf-8","strict"))
-        except (EOFError, OSError):
+            self.channel.send_bytes(payload,deadline=deadline)
+            reply = json.loads(
+                self.channel.recv_bytes(300000,deadline=deadline)
+                .decode("utf-8","strict"))
+        except (EOFError, OSError, IpcDenied, UnicodeError, ValueError):
             raise GuardianDenied("GUARDIAN_DISCONNECTED") from None
         if type(reply) is not dict or set(reply)!={"ok","value"} or reply["ok"] is not True:
             raise GuardianDenied("GUARDIAN_REFUSED")

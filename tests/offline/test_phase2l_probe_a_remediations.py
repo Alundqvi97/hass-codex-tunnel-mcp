@@ -162,7 +162,9 @@ class RemediationSafetyTests(unittest.TestCase):
         launcher=ForkGuardianLauncher(backend_factory=backend,
                    post_observer_factory=lambda plan:lambda a,d:Reply(0,""),
                    controller_drop=drop,root_check=lambda:0,
-                   context_factory=lambda _:fake,clock=lambda:1)
+                   context_factory=lambda _:fake,
+                   transport_pair_factory=lambda *,clock:fake.Pipe(),
+                   clock=lambda:1)
         # Simulate the host /proc fields while exercising the real verifier.
         status=("Uid:\t65534 65534 65534 65534\n"
                 "Gid:\t65534 65534 65534 65534\nGroups:\t\n"

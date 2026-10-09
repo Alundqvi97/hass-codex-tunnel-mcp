@@ -212,9 +212,9 @@ class FloodTests(unittest.TestCase):
                 self.polls+=1
                 clock.advance(timeout)
                 return True
-            def recv_bytes(self,limit):
+            def recv_bytes(self,limit,*,deadline=None):
                 return b'{"method":"snapshot","value":null,"deadline":200}'
-            def send_bytes(self,data):pass
+            def send_bytes(self,data,*,deadline=None):pass
             def close(self):self.closed=True
         core=Expensive()
         link=Flood()

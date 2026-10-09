@@ -191,11 +191,11 @@ class AdditionalSecurityTests(unittest.TestCase):
             model=Model(); model.calls=[]
             class Link:
                 def poll(self,timeout):return True
-                def recv_bytes(self,maxlen):
+                def recv_bytes(self,maxlen,*,deadline=None):
                     self.assert_limit=maxlen
                     return wire
                 def close(self):pass
-                def send_bytes(self,p):raise AssertionError("never reply")
+                def send_bytes(self,p,*,deadline=None):raise AssertionError("never reply")
             GuardianChannel(model,clock=lambda:1).serve(Link(),end=241)
             self.assertTrue(model.cleaned)
             self.assertEqual(model.calls,[])
@@ -206,9 +206,9 @@ class AdditionalSecurityTests(unittest.TestCase):
     def test_json_snapshot_rehydrates_as_tuple(self):
         class Link:
             def __init__(self):self.sent=[]
-            def send_bytes(self,data):self.sent.append(json.loads(data))
+            def send_bytes(self,data,*,deadline=None):self.sent.append(json.loads(data))
             def poll(self,t):return True
-            def recv_bytes(self,maxsize):return b'{"ok":true,"value":["first","second"]}'
+            def recv_bytes(self,maxsize,*,deadline=None):return b'{"ok":true,"value":["first","second"]}'
         channel=Link()
         remote=RemoteIO(channel,PLAN,clock=lambda:1)
         self.assertEqual(remote.snapshot(),("first","second"))

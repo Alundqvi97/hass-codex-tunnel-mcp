@@ -197,6 +197,7 @@ class PrivilegeGateTests(unittest.TestCase):
             controller_drop=wrapped_drop,
             root_check=lambda:0,
             context_factory=lambda mode:fake,
+            transport_pair_factory=lambda *,clock:fake.Pipe(),
             clock=clock
         )
         return launcher,fake,events
@@ -205,9 +206,11 @@ class PrivilegeGateTests(unittest.TestCase):
         runner,ctx,events=self.launcher(drop=lambda:True)
         with patch("probe_a_privilege.Path.read_text",
                    return_value=SAFE_STATUS.replace("65534 65534 65534 65534",
-                                                    "0 0 0 0",1)):
+                                                    "0 0 0 0",1)), \
+             patch("probe_a_runner.os._exit",side_effect=RunnerDenied("MOCKED_HARD_EXIT")) as hard_exit:
             with self.assertRaises(RunnerDenied):
                 runner.launch(P,200,140)
+        hard_exit.assert_called_once_with(77)
         self.assertTrue(ctx.process.started)
         self.assertTrue(ctx.parent.closed)
         self.assertTrue(ctx.child.closed)
@@ -224,9 +227,11 @@ class PrivilegeGateTests(unittest.TestCase):
         for status in mismatches:
             with self.subTest(status=status.splitlines()[0]):
                 runner,ctx,_=self.launcher(drop=lambda:True)
-                with patch("probe_a_privilege.Path.read_text",return_value=status):
+                with patch("probe_a_privilege.Path.read_text",return_value=status), \
+                     patch("probe_a_runner.os._exit",side_effect=RunnerDenied("MOCKED_HARD_EXIT")) as hard_exit:
                     with self.assertRaises(RunnerDenied):
                         runner.launch(P,200,140)
+                hard_exit.assert_called_once_with(77)
                 self.assertTrue(ctx.parent.closed)
                 self.assertTrue(ctx.child.closed)
 
@@ -234,9 +239,11 @@ class PrivilegeGateTests(unittest.TestCase):
         for drop in (lambda:False, lambda:None,
                      lambda:(_ for _ in ()).throw(RuntimeError("synthetic"))):
             runner,ctx,_=self.launcher(drop=drop)
-            with patch("probe_a_privilege.Path.read_text",return_value=SAFE_STATUS):
+            with patch("probe_a_privilege.Path.read_text",return_value=SAFE_STATUS), \
+                 patch("probe_a_runner.os._exit",side_effect=RunnerDenied("MOCKED_HARD_EXIT")) as hard_exit:
                 with self.assertRaises(RunnerDenied):
                     runner.launch(P,200,140)
+            hard_exit.assert_called_once_with(77)
             self.assertTrue(ctx.parent.closed)
             self.assertTrue(ctx.child.closed)
 

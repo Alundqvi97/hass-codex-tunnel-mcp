@@ -169,7 +169,7 @@ class GuardianTests(unittest.TestCase):
         c.handle("issue",P.setup[0],10)
         class Dropped:
             def poll(self,seconds):return True
-            def recv_bytes(self,limit):raise EOFError()
+            def recv_bytes(self,limit,*,deadline=None):raise EOFError()
             def close(self):pass
         GuardianChannel(c,clock=lambda:1).serve(Dropped(),end=241)
         self.assertEqual(m.snapshot(10),(BASE,BASE))

@@ -204,7 +204,9 @@ class GuardianProcessLifecycleTests(unittest.TestCase):
         launcher=ForkGuardianLauncher(backend_factory=backend,
                     post_observer_factory=lambda p:lambda *a:Reply(0,""),
                     controller_drop=lambda:True,root_check=lambda:0,
-                    context_factory=lambda _:ctx,clock=lambda:1)
+                    context_factory=lambda _:ctx,
+                    transport_pair_factory=lambda *,clock:ctx.Pipe(),
+                    clock=lambda:1)
         with patch("probe_a_runner.verify_unprivileged",return_value=True):
             launcher.launch(P,200,140)
         self.assertTrue(ctx.proc.started)
@@ -347,10 +349,10 @@ class SnapshotCutoffTests(unittest.TestCase):
                 clock.advance(0.1)
                 self.polls+=1
                 return True
-            def recv_bytes(self,limit):
+            def recv_bytes(self,limit,*,deadline=None):
                 return json.dumps({"method":"snapshot",
                                    "value":None,"deadline":239}).encode()
-            def send_bytes(self,wire):pass
+            def send_bytes(self,wire,*,deadline=None):pass
             def close(self):self.closed=True
         core=FloodCore()
         pipe=Flood()
