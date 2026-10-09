@@ -1,0 +1,28 @@
+name: Phase 2J - Pure Offline Acceptance Model
+on:
+  push:
+    branches: [security/ha-mcp-phase2d-candidates]
+    paths:
+      - docs/security/phase2j/**
+      - tests/offline/test_phase2j_*.py
+      - .github/workflows/phase2j-offline-only.yml
+  pull_request:
+    branches: [security/tunnel-auth-hardening]
+    paths:
+      - docs/security/phase2j/**
+      - tests/offline/test_phase2j_*.py
+      - .github/workflows/phase2j-offline-only.yml
+permissions: {contents: read}
+jobs:
+  offline-state-machine:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - name: Run pure standard-library state and adversarial tests
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest discover -s tests/offline -p 'test_phase2j_*.py' -v
+          python3 -B -m py_compile docs/security/phase2j/acceptance.py
+          git diff --exit-code
