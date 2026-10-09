@@ -183,10 +183,15 @@ class GuardianChannel:
         self.clock = clock
         self.sleep = sleep
 
-    def serve(self, channel, *, end, cleanup_reserve=60):
-        if not 45 <= cleanup_reserve <= 90 or end-self.clock() > 240:
+    def serve(self, channel, *, end, cleanup_reserve=60, cleanup_cutoff=None):
+        if (not 45 <= cleanup_reserve <= 90 or
+                type(end) not in (int,float) or
+                end-self.clock() > 240 or end <= self.clock()):
             raise GuardianDenied("INVALID_SUPERVISOR_DEADLINE")
-        work_end = end-cleanup_reserve
+        work_end = end-cleanup_reserve if cleanup_cutoff is None else cleanup_cutoff
+        if (type(work_end) not in (int,float) or
+                end-work_end !=cleanup_reserve):
+            raise GuardianDenied("SUPERVISOR_CUTOFF_MISMATCH")
         # Each invocation re-observes ownership. The core's before-write
         # journals prevent an uncertain firewall operation being replayed.
         next_cleanup_at = work_end
@@ -206,11 +211,19 @@ class GuardianChannel:
                         # ownership-checked continuation within the deadline.
                         pass
                     next_cleanup_at = self.clock() + retry_seconds
-                if disconnected:
+                if recovering:
+                    # Recovery is exclusively guardian-owned. Never service
+                    # snapshots, counters or other controller requests inside
+                    # the reserved cleanup window, even under IPC flooding.
+                    if not disconnected:
+                        disconnected = True
+                        try:
+                            channel.close()
+                        except BaseException:
+                            pass
                     if self.core.cleanup_state == "POST_AUDIT_REQUIRED":
                         break
                     now = self.clock()
-                    # No polling on a broken IPC channel and no tight loop.
                     remaining = min(end-now, next_cleanup_at-now, 0.20)
                     if remaining > 0:
                         self.sleep(remaining)

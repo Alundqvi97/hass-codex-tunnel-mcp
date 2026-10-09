@@ -207,7 +207,7 @@ class PrivilegeGateTests(unittest.TestCase):
                    return_value=SAFE_STATUS.replace("65534 65534 65534 65534",
                                                     "0 0 0 0",1)):
             with self.assertRaises(RunnerDenied):
-                runner.launch(P,200)
+                runner.launch(P,200,140)
         self.assertTrue(ctx.process.started)
         self.assertTrue(ctx.parent.closed)
         self.assertTrue(ctx.child.closed)
@@ -226,7 +226,7 @@ class PrivilegeGateTests(unittest.TestCase):
                 runner,ctx,_=self.launcher(drop=lambda:True)
                 with patch("probe_a_privilege.Path.read_text",return_value=status):
                     with self.assertRaises(RunnerDenied):
-                        runner.launch(P,200)
+                        runner.launch(P,200,140)
                 self.assertTrue(ctx.parent.closed)
                 self.assertTrue(ctx.child.closed)
 
@@ -236,7 +236,7 @@ class PrivilegeGateTests(unittest.TestCase):
             runner,ctx,_=self.launcher(drop=drop)
             with patch("probe_a_privilege.Path.read_text",return_value=SAFE_STATUS):
                 with self.assertRaises(RunnerDenied):
-                    runner.launch(P,200)
+                    runner.launch(P,200,140)
             self.assertTrue(ctx.parent.closed)
             self.assertTrue(ctx.child.closed)
 
@@ -249,7 +249,7 @@ class PrivilegeGateTests(unittest.TestCase):
             events.append("read-proc")
             return SAFE_STATUS
         with patch("probe_a_privilege.Path.read_text",side_effect=verify_file):
-            parent=runner.launch(P,200)
+            parent=runner.launch(P,200,140)
         self.assertIs(parent,ctx.parent)
         self.assertEqual(events,["drop","read-proc"])
         self.assertEqual(order,["preflight","drop"])

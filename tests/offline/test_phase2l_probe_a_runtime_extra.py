@@ -100,16 +100,25 @@ class AdditionalSecurityTests(unittest.TestCase):
             with self.assertRaises(PrivilegeDenied):
                 verify_unprivileged(read_text=lambda p, s=wrong:s)
         calls=[]
-        self.assertTrue(drop_controller(getuid=lambda:0,
-                 prctl=lambda: calls.append("nnp") or 0,
+        class Caps:
+            def thread_count(self):calls.append("threads");return 1
+            def last_capability(self):calls.append("last");return 1
+            def no_new_privs(self):calls.append("nnp");return True
+            def clear_ambient(self):calls.append("ambient");return True
+            def bounding_member(self,c):calls.append(("bound",c));return c==0
+            def drop_bounding(self,c):calls.append(("drop",c));return True
+            def clear_process_sets(self):calls.append("capset");return True
+        self.assertTrue(drop_controller(getuid=lambda:0,capability_ops=Caps(),
                  setgroups=lambda v:calls.append(("groups",v)),
                  setgid=lambda *v:calls.append(("gid",v)),
                  setuid=lambda *v:calls.append(("uid",v)),
                  verify=lambda *a:calls.append("verify") or True))
-        self.assertEqual(calls,["nnp",("groups",[]),
-                               ("gid",(65534,)*3),("uid",(65534,)*3),"verify"])
+        self.assertEqual(calls,["threads","last","nnp","ambient",
+                                ("bound",0),("drop",0),("bound",1),
+                                ("groups",[]),("gid",(65534,)*3),
+                                ("uid",(65534,)*3),"capset","verify"])
         with self.assertRaises(PrivilegeDenied):
-            drop_controller(getuid=lambda:65534,prctl=lambda:0)
+            drop_controller(getuid=lambda:65534,capability_ops=Caps())
 
     def test_readonly_observer_does_not_expose_guardian_write(self):
         from probe_a_privilege import ReadOnlyPostObserver, PrivilegeDenied
@@ -226,7 +235,8 @@ class AdditionalSecurityTests(unittest.TestCase):
              patch("probe_a_stream.os.killpg") as kill:
             with self.assertRaises(StreamFailure):
                 capture(("/usr/bin/true",),2,spawn=lambda *a,**kw:Child(),
-                        selector_factory=Selector,clock=lambda:1)
+                        selector_factory=Selector,clock=lambda:1,
+                        group_owner=lambda pid:True)
             kill.assert_called_once_with(81712,__import__("signal").SIGKILL)
         self.assertEqual(MAX_BYTES,131072)
 

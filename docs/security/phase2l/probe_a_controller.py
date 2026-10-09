@@ -33,7 +33,8 @@ class Outcome:
         # Label-only, not a kernel attestation.
         return "PROBE_A="+self.label
 
-def control(plan,io,clock,*,budget_seconds=240,cleanup_reserve_seconds=60):
+def control(plan,io,clock,*,budget_seconds=240,cleanup_reserve_seconds=60,
+            absolute_deadline=None, cleanup_cutoff=None):
     """I/O adapter protocol:
     io.preflight(plan), io.snapshot()->(str4,str6),
     io.issue(Command,deadline)->bool, io.counters(family)->tuple,
@@ -49,8 +50,21 @@ def control(plan,io,clock,*,budget_seconds=240,cleanup_reserve_seconds=60):
     if type(budget_seconds) is not int or type(cleanup_reserve_seconds) is not int or budget_seconds>240 or budget_seconds<120 or not 45<=cleanup_reserve_seconds<=90 or budget_seconds-cleanup_reserve_seconds<30:
         return Outcome("BLOCKED_BUDGET",0,0,0)
     start=clock()
-    deadline=start+budget_seconds
-    work_end=deadline-cleanup_reserve_seconds
+    if absolute_deadline is None:
+        if cleanup_cutoff is not None:
+            return Outcome("BLOCKED_UNPAIRED_CUTOFF",0,0,0)
+        deadline=start+budget_seconds
+        work_end=deadline-cleanup_reserve_seconds
+    else:
+        # A caller must supply the same frozen absolute deadline and cutoff
+        # passed to the guardian. Launcher time comes out of this budget.
+        if (type(absolute_deadline) not in (int,float) or
+                type(cleanup_cutoff) not in (int,float) or
+                not start < absolute_deadline <= start+budget_seconds or
+                absolute_deadline-cleanup_cutoff != cleanup_reserve_seconds):
+            return Outcome("BLOCKED_ABSOLUTE_DEADLINE",0,0,0)
+        deadline=absolute_deadline
+        work_end=cleanup_cutoff
     setup=0; completed=0; checks=0
     label="BLOCKED_PREFLIGHT"
     before=None

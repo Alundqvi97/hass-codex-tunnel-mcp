@@ -170,7 +170,7 @@ class RemediationSafetyTests(unittest.TestCase):
                 "CapEff:\t0000000000000000\nCapBnd:\t0000000000000000\n"
                 "CapAmb:\t0000000000000000\nNoNewPrivs:\t1\n")
         with patch("probe_a_privilege.Path.read_text",return_value=status):
-            parent=launcher.launch(P,200)
+            parent=launcher.launch(P,200,140)
         self.assertTrue(fake.process.started)
         self.assertFalse(parent.closed)
         self.assertEqual(calls,["preflight","drop"])

@@ -46,7 +46,7 @@ class RestrictedHost:
         except BaseException:
             raise HostBlocked("FAILED_WITHOUT_RAW_LOGS") from None
 
-def bounded_process(argv,timeout,*,reviewed_plan):
+def bounded_process(argv,timeout,*,reviewed_plan,privileged_capture=None):
     """Effectful only if called explicitly after separate approval.
 
     No shell. Does not guarantee clean-up after SIGKILL or runner cancellation,
@@ -74,6 +74,11 @@ def bounded_process(argv,timeout,*,reviewed_plan):
     privileged=argv[0].startswith("/usr/sbin/")
     if privileged and os.geteuid()!=0:
         raise HostBlocked("HOST_PRIVILEGE_NOT_GUARDIAN_ROOT")
+    # A verified session group is useful for local failure handling but
+    # cannot contain detached descendants. The separately reviewed OS-backed
+    # command cgroup/supervisor is mandatory before any privileged spawn.
+    if privileged and not callable(privileged_capture):
+        raise HostBlocked("PRIVILEGED_COMMAND_CONTAINMENT_NOT_APPROVED")
     # Running through sudo -n gave an unprivileged controller a possible
     # alternative privileged command path; use direct root-owned execution
     # only inside the separately forked guardian.
@@ -81,6 +86,7 @@ def bounded_process(argv,timeout,*,reviewed_plan):
     try:
         # Streamed hard cap is enforced while the child runs; no unbounded
         # subprocess.run(..., PIPE) buffering and no stderr exposure.
-        return capture(cmd, timeout)
+        return (privileged_capture(cmd, timeout) if privileged
+                else capture(cmd, timeout))
     except BaseException:
         raise HostBlocked("STREAMED_COMMAND_FAILED") from None
