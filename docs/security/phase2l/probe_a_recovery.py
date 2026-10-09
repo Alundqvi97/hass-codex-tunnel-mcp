@@ -199,8 +199,8 @@ def emergency_deny_only(plan, baseline, *, snapshot, execute, deadline, clock,
             if not present:
                 continue
             if command.argv in previously:
-                failed=True  # already attempted, no second mutation
-                continue
+                failed=True  # unresolved earlier write: preserve deny barrier
+                break
             attempted.append(command.argv)
             if on_attempt is not None:
                 on_attempt(command.argv)
