@@ -7,6 +7,9 @@ from __future__ import annotations
 import subprocess
 import time
 import os
+import re
+import stat
+from pathlib import Path
 from probe_a_stream import capture, StreamFailure
 from probe_contract import validate_plan, emergency_deny_commands, emergency_barrier_command
 from probe_a_exec_adapter import Reply, checked_reply, RUN_LIMIT_SECONDS
@@ -15,6 +18,43 @@ class HostBlocked(RuntimeError):
     pass
 
 MAX_OUTPUT=131072
+NSSWITCH="/etc/nsswitch.conf"
+MAX_NSS_BYTES=65536
+
+
+def require_local_passwd_nss(*, read_text=None, lstat=None):
+    """Reject NSS sources that might perform out-of-scope network lookups.
+
+    getent passwd UID is approved only when the sole passwd service is
+    files. Runtime review must additionally pin NSS configuration, libc,
+    libnss_files and the loader. This is a source preflight, not proof of
+    immutable OS configuration or absence of NSS implementation flaws.
+    """
+    reader=read_text or (lambda p: Path(p).read_text(encoding="ascii"))
+    stat_file=lstat or os.lstat
+    try:
+        st=stat_file(NSSWITCH)
+        if (not stat.S_ISREG(st.st_mode) or st.st_uid!=0 or
+                st.st_mode & 0o022):
+            raise HostBlocked("UNTRUSTED_NSS_OWNERSHIP")
+        config=reader(NSSWITCH)
+        if (type(config) is not str or not config.isascii() or
+                "\x00" in config or len(config.encode("ascii"))>MAX_NSS_BYTES):
+            raise HostBlocked("UNTRUSTED_NSS_FORMAT")
+    except (OSError, UnicodeError, ValueError):
+        raise HostBlocked("UNREADABLE_NSS_POLICY") from None
+    services=[]
+    for raw in config.splitlines():
+        body=raw.split("#",1)[0].strip()
+        if re.match(r"^passwd\s*:",body):
+            if not re.fullmatch(r"passwd\s*:\s*files\s*",body):
+                raise HostBlocked("NSS_EXTERNAL_PASSWD_SERVICE")
+            services.append(body)
+    if len(services)!=1:
+        raise HostBlocked("NSS_PASSWD_POLICY_AMBIGUOUS")
+    return True
+
+
 SAVE4=("/usr/sbin/iptables-save","-t","filter")
 SAVE6=("/usr/sbin/ip6tables-save","-t","filter")
 VERSION4=("/usr/sbin/iptables","-V")
@@ -71,22 +111,19 @@ def bounded_process(argv,timeout,*,reviewed_plan,privileged_capture=None):
     ): raise HostBlocked("BINARY_NOT_ALLOWED")
     if type(timeout) not in (int,float) or not 0<timeout<=RUN_LIMIT_SECONDS:
         raise HostBlocked("INVALID_DEADLINE")
-    privileged=argv[0].startswith("/usr/sbin/")
-    if privileged and os.geteuid()!=0:
-        raise HostBlocked("HOST_PRIVILEGE_NOT_GUARDIAN_ROOT")
-    # A verified session group is useful for local failure handling but
-    # cannot contain detached descendants. The separately reviewed OS-backed
-    # command cgroup/supervisor is mandatory before any privileged spawn.
-    if privileged and not callable(privileged_capture):
+    # This host boundary is guardian-root-only. An unprivileged read-only
+    # observer has its own separately authorized and audited OS broker.
+    # Executable directories do NOT determine process authority.
+    if os.geteuid()!=0:
+        raise HostBlocked("GUARDIAN_ROOT_IDENTITY_REQUIRED")
+    if not callable(privileged_capture):
         raise HostBlocked("PRIVILEGED_COMMAND_CONTAINMENT_NOT_APPROVED")
-    # Running through sudo -n gave an unprivileged controller a possible
-    # alternative privileged command path; use direct root-owned execution
-    # only inside the separately forked guardian.
-    cmd=argv
+    if argv[0]=="/usr/bin/getent":
+        require_local_passwd_nss()
     try:
-        # Streamed hard cap is enforced while the child runs; no unbounded
-        # subprocess.run(..., PIPE) buffering and no stderr exposure.
-        return (privileged_capture(cmd, timeout) if privileged
-                else capture(cmd, timeout))
+        # ALL root-executed tools, including pgrep and getent, must enter the
+        # reviewed atomic process-tree containment backend. No direct Popen
+        # fallback or path-based exception is permitted.
+        return checked_reply(privileged_capture(argv, timeout))
     except BaseException:
-        raise HostBlocked("STREAMED_COMMAND_FAILED") from None
+        raise HostBlocked("CONTAINED_COMMAND_FAILED") from None

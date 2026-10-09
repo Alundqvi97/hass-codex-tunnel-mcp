@@ -18,8 +18,17 @@ from probe_a_observer import KernelReadback
 from probe_a_recovery import recover_owned, inspect_partial, emergency_deny_only
 
 
+
 class GuardianDenied(RuntimeError):
     pass
+
+
+# Guardian-internal lifecycle claims are NEVER independent kernel evidence.
+LIFECYCLE_COMPLETE = "POST_CLEANUP_AUDIT_REQUIRED"
+LIFECYCLE_CANCELLED = "CONTROLLER_DISCONNECTED_CLEANUP_ATTEMPTED"
+LIFECYCLE_DEADLINE = "DEADLINE_CLEANUP_ATTEMPTED"
+LIFECYCLE_INCOMPLETE = "CLEANUP_NOT_VERIFIED"
+LIFECYCLE_FAULT = "SUPERVISION_FAULT"
 
 
 class GuardianCore:
@@ -198,6 +207,8 @@ class GuardianChannel:
         retry_seconds = 0.5
         disconnected = False
         cleanup_requested = False
+        cancelled = False
+        fault = False
         try:
             while self.clock() < end:
                 now = self.clock()
@@ -207,9 +218,9 @@ class GuardianChannel:
                     try:
                         self.core.cleanup(end)
                     except BaseException:
-                        # An interrupted cleanup remains eligible for
-                        # ownership-checked continuation within the deadline.
-                        pass
+                        # Continue safely through journal + new ownership reads,
+                        # but preserve that this was a supervision fault.
+                        fault = True
                     next_cleanup_at = self.clock() + retry_seconds
                 if recovering:
                     # Recovery is exclusively guardian-owned. Never service
@@ -220,7 +231,7 @@ class GuardianChannel:
                         try:
                             channel.close()
                         except BaseException:
-                            pass
+                            fault = True
                     if self.core.cleanup_state == "POST_AUDIT_REQUIRED":
                         break
                     now = self.clock()
@@ -232,6 +243,7 @@ class GuardianChannel:
                 try:
                     ready = channel.poll(min(0.20, remaining))
                 except BaseException:
+                    fault = True
                     disconnected = True
                     next_cleanup_at = self.clock()
                     continue
@@ -240,7 +252,13 @@ class GuardianChannel:
                 try:
                     wire = channel.recv_bytes(256)
                     request = json.loads(wire.decode("utf-8", "strict"))
-                except (EOFError, OSError, ValueError, UnicodeError):
+                except EOFError:
+                    cancelled = True
+                    disconnected = True
+                    next_cleanup_at = self.clock()
+                    continue
+                except (OSError, ValueError, UnicodeError):
+                    fault = True
                     disconnected = True
                     next_cleanup_at = self.clock()
                     continue
@@ -249,6 +267,7 @@ class GuardianChannel:
                         type(request["method"]) is not str or
                         type(request["deadline"]) not in (int, float) or
                         not self.clock() < request["deadline"] <= end):
+                    fault = True
                     disconnected = True
                     next_cleanup_at = self.clock()
                     continue
@@ -257,38 +276,46 @@ class GuardianChannel:
                 requested_end = request["deadline"]
                 if method not in ("preflight", "snapshot", "issue", "counters",
                                   "exercise", "stop", "cleanup", "cleanup_readback"):
+                    fault = True
                     disconnected = True
                     next_cleanup_at = self.clock()
                     continue
                 if method == "issue":
                     if type(arg) is not int or not 0 <= arg < len(self.core.plan.setup):
+                        fault = True
                         disconnected = True
                         next_cleanup_at = self.clock()
                         continue
                     arg = self.core.plan.setup[arg]
                 elif method == "preflight":
                     if arg != "START":
+                        fault = True
                         disconnected = True
                         next_cleanup_at = self.clock()
                         continue
                 elif method in ("snapshot", "stop", "cleanup") and arg is not None:
+                    fault = True
                     disconnected = True
                     next_cleanup_at = self.clock()
                     continue
                 elif method == "counters" and arg not in ("ipv4", "ipv6"):
+                    fault = True
                     disconnected = True
                     next_cleanup_at = self.clock()
                     continue
                 elif method == "exercise" and arg not in tuple(
                         c[0] for c in __import__("probe_a_controller").CASES):
+                    fault = True
                     disconnected = True
                     next_cleanup_at = self.clock()
                     continue
                 elif method == "cleanup_readback" and arg not in CLEANUP_READBACKS:
+                    fault = True
                     disconnected = True
                     next_cleanup_at = self.clock()
                     continue
                 if recovering and method not in ("stop", "cleanup", "cleanup_readback", "snapshot"):
+                    fault = True
                     disconnected = True
                     next_cleanup_at = self.clock()
                     continue
@@ -296,7 +323,7 @@ class GuardianChannel:
                     value = self.core.handle(
                         method, arg,
                         min(requested_end, work_end)
-                        if method not in ("stop", "cleanup", "cleanup_readback", "snapshot")
+                        if method not in ("stop", "cleanup")
                         else min(requested_end, end))
                     channel.send_bytes(
                         json.dumps({"ok": True, "value": value},
@@ -309,21 +336,33 @@ class GuardianChannel:
                         channel.send_bytes(b'{"ok":false,"value":null}')
                     except BaseException:
                         pass
+                    fault = True
                     disconnected = True
                     next_cleanup_at = self.clock()
         except BaseException:
-            pass
+            fault = True
         finally:
             try:
                 if (self.clock() < end and
                         self.core.cleanup_state != "POST_AUDIT_REQUIRED"):
                     self.core.cleanup(end)
             except BaseException:
-                pass
+                fault = True
             try:
                 channel.close()
             except BaseException:
-                pass
+                fault = True
+        # A normal return is possible only after owned cleanup and readbacks.
+        # Parent must STILL independently observe guardian exit and host state.
+        if self.core.cleanup_state != "POST_AUDIT_REQUIRED":
+            return LIFECYCLE_INCOMPLETE
+        if fault:
+            return LIFECYCLE_FAULT
+        if cancelled:
+            return LIFECYCLE_CANCELLED
+        if not cleanup_requested:
+            return LIFECYCLE_DEADLINE
+        return LIFECYCLE_COMPLETE
 
 
 class RemoteIO:

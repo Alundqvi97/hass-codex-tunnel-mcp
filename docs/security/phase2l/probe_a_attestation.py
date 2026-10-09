@@ -23,6 +23,7 @@ BINARY_PATHS=(
     "/usr/bin/setpriv", "/usr/bin/python3", "/usr/bin/sudo",
     "/usr/bin/getent", "/usr/bin/pgrep",
 )
+CONFIG_PATHS=("/etc/nsswitch.conf", "/etc/passwd")
 SOURCE_NAMES=(
     "probe_contract.py", "probe_a_attestation.py", "probe_a_client.py",
     "probe_a_dns.py", "probe_a_controller.py", "probe_a_exec_adapter.py",
@@ -32,7 +33,7 @@ SOURCE_NAMES=(
     "probe_a_client_process.py", "probe_a_resources.py",
     "probe_a_privilege.py", "probe_a_containment.py",
 )
-PINNED=BINARY_PATHS+tuple(str(Path(__file__).resolve().parent / f) for f in SOURCE_NAMES)
+PINNED=BINARY_PATHS+CONFIG_PATHS+tuple(str(Path(__file__).resolve().parent / f) for f in SOURCE_NAMES)
 
 MAX_FILE=20*1024*1024
 

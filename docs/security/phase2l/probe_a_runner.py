@@ -14,7 +14,11 @@ import time
 
 from probe_contract import validate_plan
 from probe_a_controller import control
-from probe_a_guardian import GuardianCore, GuardianChannel, RemoteIO, installed_signal_abort
+from probe_a_guardian import (
+    GuardianCore, GuardianChannel, RemoteIO, installed_signal_abort,
+    LIFECYCLE_COMPLETE, LIFECYCLE_CANCELLED, LIFECYCLE_DEADLINE,
+    LIFECYCLE_INCOMPLETE, LIFECYCLE_FAULT
+)
 from probe_a_privilege import drop_controller, verify_unprivileged, ReadOnlyPostObserver, PrivilegeDenied
 
 
@@ -121,22 +125,38 @@ class ForkGuardianLauncher:
         parent,child=ctx.Pipe(duplex=True)
         # The child holds the backend; the controller never receives root I/O.
         def child_main():
+            interrupted=[False]
+            exit_code=13
             try:
                 parent.close()
-                os.setsid()  # separate from caller's process group (not CI job kill proof)
+                os.setsid()  # separate session is NOT a CI job survival guarantee
                 command,work,resources=self.backend_factory(plan)
                 core=GuardianCore(plan,command=command,work=work,resources=resources,
                                   clock=self.clock)
-                installed_signal_abort(lambda: None)
-                GuardianChannel(core,clock=self.clock).serve(
+                installed_signal_abort(lambda: interrupted.__setitem__(0,True))
+                state=GuardianChannel(core,clock=self.clock).serve(
                     child,end=deadline,cleanup_cutoff=cleanup_cutoff)
+                # Zero is possible ONLY after normal verified guardian lifecycle.
+                # It is still not trusted kernel evidence or Probe A PASS.
+                if interrupted[0] or state==LIFECYCLE_CANCELLED:
+                    exit_code=10
+                elif state==LIFECYCLE_DEADLINE:
+                    exit_code=11
+                elif state==LIFECYCLE_INCOMPLETE:
+                    exit_code=12
+                elif state==LIFECYCLE_COMPLETE:
+                    exit_code=0
             except BaseException:
-                # No stdout or raw command output; OS kill of THIS guardian
-                # cannot be recovered from within this same actor.
-                pass
+                # Includes rogue SystemExit(0): exceptions cannot forge a
+                # normal lifecycle. Never expose raw exception content.
+                exit_code=13
             finally:
-                try: child.close()
-                except BaseException: pass
+                try:
+                    child.close()
+                except BaseException:
+                    exit_code=13
+            if exit_code:
+                raise SystemExit(exit_code) from None
         process=ctx.Process(target=child_main,daemon=False,name="p2a-owned-guardian")
         if self.clock() >= cleanup_cutoff:
             parent.close()
@@ -174,9 +194,18 @@ class ForkGuardianLauncher:
             raise RunnerDenied("NOT_STARTED")
         remaining=max(0,deadline-self.clock())
         self.child.join(timeout=remaining)
-        if self.child.is_alive() or self.child.exitcode != 0:
-            return "BLOCKED_GUARDIAN_NOT_CONFIRMED_EXITED"
-        return "GUARDIAN_EXITED_NEEDS_EXTERNAL_KERNEL_READBACK"
+        if self.child.is_alive():
+            return "BLOCKED_GUARDIAN_STILL_ALIVE"
+        exit_code=self.child.exitcode
+        if exit_code==0:
+            return "GUARDIAN_EXITED_NEEDS_EXTERNAL_KERNEL_READBACK"
+        if exit_code==10 or exit_code == -15:
+            return "BLOCKED_GUARDIAN_CANCELLED"
+        if exit_code==11:
+            return "BLOCKED_GUARDIAN_DEADLINE"
+        if exit_code==12:
+            return "BLOCKED_GUARDIAN_CLEANUP_UNVERIFIED"
+        return "BLOCKED_GUARDIAN_UNEXPECTED_FAILURE"
 
 
     def verify_after(self, plan, deadline):
@@ -188,8 +217,9 @@ class ForkGuardianLauncher:
         if (self.child is None or self.parent_observer is None or
                 self.parent_resources is None or plan!=self.parent_observer.plan):
             return "BLOCKED_NO_INDEPENDENT_BASELINE"
-        if self.wait_for_exit(deadline)!="GUARDIAN_EXITED_NEEDS_EXTERNAL_KERNEL_READBACK":
-            return "BLOCKED_GUARDIAN_ALIVE_OR_FAILED"
+        lifecycle=self.wait_for_exit(deadline)
+        if lifecycle!="GUARDIAN_EXITED_NEEDS_EXTERNAL_KERNEL_READBACK":
+            return lifecycle
         try:
             import os as _os
             pid=self.child.pid
