@@ -56,7 +56,9 @@ class ProposedEgressTests(unittest.TestCase):
         self.assertIn("-d 1.1.1.1/32 -p udp --dport 123 -j ACCEPT",p.ipv4_restore)
         self.assertNotIn("--dport 80 -j ACCEPT",p.ipv4_restore)
         self.assertNotIn("-p tcp --dport 22 -j ACCEPT",p.ipv4_restore)
-        self.assertTrue(p.ipv4_restore.endswith("-A PHASE2H_GUEST -j REJECT\nCOMMIT\n"))
+        self.assertTrue(p.ipv4_restore.endswith("# INERT COMMIT\n"))
+        self.assertNotIn("\n*filter\n",p.ipv4_restore)
+        self.assertTrue(all(x.startswith("# INERT ") for x in p.ipv4_restore.splitlines()))
     def test_guest_ipv6_and_host_ipv6_denied(self):
         p=self.good()
         self.assertIn("ipv6=off",p.qemu_netdev)

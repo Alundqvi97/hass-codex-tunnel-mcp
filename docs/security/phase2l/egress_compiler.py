@@ -145,10 +145,19 @@ def compile_proposal(plan: Mapping, *, now_epoch: int) -> Compiled:
         f"-I OUTPUT 1 -m owner --uid-owner {plan['owner_uid']} -j {CHAIN6}",
         f"-A {CHAIN6} -j REJECT","COMMIT",
     ]
-    return Compiled(PROPOSED,netdev,resolver,expiry,"\n".join(out)+"\n","\n".join(v6)+"\n",required_cleanup)
+    # Emit NON-RESTORABLE inert preview text. Never create a loadable table
+    # payload from synthetic input; use probe_contract for scoped review.
+    def inert(lines):
+        return "\n".join("# INERT " + line for line in lines) + "\n"
+    return Compiled(PROPOSED,netdev,resolver,expiry,inert(out),inert(v6),required_cleanup)
 
 def handle_answer_change(compiled: Compiled, *, current_epoch: int, new_addresses_equal: bool) -> str:
     """Any stale/change requires stop + full revalidation, never auto-expand."""
     if type(current_epoch) is not int or current_epoch>=compiled.expiry_epoch or new_addresses_equal is not True:
         return "BLOCKED_STOP_AND_REVIEW_REPLACEMENT"
     return "OFFLINE_UNEXPIRED_SNAPSHOT_NOT_OBSERVED"
+
+# SECURITY: These *_restore strings are deliberately NON-APPLICABLE legacy
+# review artifacts; iptables-restore without --noflush flushes the filter
+# table, and --noflush can still flush redeclared user chains. All future
+# probe commands must use only scoped per-rule operations in probe_contract.
