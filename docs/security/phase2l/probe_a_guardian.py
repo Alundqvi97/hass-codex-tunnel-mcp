@@ -8,6 +8,7 @@ There is NO implicit launcher or CLI in this module.
 """
 from __future__ import annotations
 
+import json
 import signal
 import time
 
@@ -53,7 +54,7 @@ class GuardianCore:
         if self.clock() >= deadline or (self.cleaned and method not in ("cleanup_readback", "snapshot")):
             raise GuardianDenied("NO_MORE_WORK")
         if method == "preflight":
-            if self.started or argument != self.plan:
+            if self.started or argument != "START":
                 raise GuardianDenied("PREFLIGHT_NOT_ONCE")
             if self.resources.preflight() is not True:
                 raise GuardianDenied("RESOURCE_PREFLIGHT_FAILED")
@@ -130,7 +131,7 @@ class GuardianCore:
 class GuardianChannel:
     """Interface receives ('method', arg, deadline) or EOF; sends safe reply.
 
-    poll(timeout)->bool, recv()->request, send(reply). Caller must provide a
+    poll(timeout)->bool, recv_bytes(limit)->bytes, send_bytes(bytes). Caller must provide a
     distinct OS process for actual independence. No live channel by default.
     """
     def __init__(self, core, *, clock=time.monotonic):
@@ -151,16 +152,36 @@ class GuardianChannel:
                 if not channel.poll(min(0.20, remaining)):
                     continue
                 try:
-                    request = channel.recv()
-                except (EOFError, OSError):
+                    wire = channel.recv_bytes(256)
+                    request = json.loads(wire.decode("utf-8", "strict"))
+                except (EOFError, OSError, ValueError, UnicodeError):
                     break
-                if (not isinstance(request, tuple) or len(request) != 3 or
-                        request[0] not in ("preflight", "snapshot", "issue", "counters",
-                                          "exercise", "stop", "cleanup", "cleanup_readback") or
-                        type(request[2]) not in (int, float) or
-                        not self.clock() < request[2] <= end):
+                if (type(request) is not dict or
+                        set(request) != {"method", "value", "deadline"} or
+                        type(request["method"]) is not str or
+                        type(request["deadline"]) not in (int, float) or
+                        not self.clock() < request["deadline"] <= end):
                     break
-                method, arg, requested_end = request
+                method=request["method"]
+                arg=request["value"]
+                requested_end=request["deadline"]
+                if method not in ("preflight", "snapshot", "issue", "counters",
+                                  "exercise", "stop", "cleanup", "cleanup_readback"):
+                    break
+                if method=="issue":
+                    if type(arg) is not int or not 0<=arg<len(self.core.plan.setup):
+                        break
+                    arg=self.core.plan.setup[arg]
+                elif method=="preflight":
+                    if arg!="START":break
+                elif method in ("snapshot","stop","cleanup") and arg is not None:
+                    break
+                elif method=="counters" and arg not in ("ipv4","ipv6"):
+                    break
+                elif method=="exercise" and arg not in tuple(c[0] for c in __import__("probe_a_controller").CASES):
+                    break
+                elif method=="cleanup_readback" and arg not in CLEANUP_READBACKS:
+                    break
                 if self.clock() >= work_end and method not in ("stop", "cleanup", "cleanup_readback", "snapshot"):
                     break
                 if done and method not in ("cleanup_readback", "snapshot"):
@@ -169,12 +190,12 @@ class GuardianChannel:
                     value = self.core.handle(method, arg, min(requested_end, work_end)
                                              if method not in ("stop","cleanup","cleanup_readback","snapshot")
                                              else min(requested_end, end))
-                    channel.send(("OK", value))
+                    channel.send_bytes(json.dumps({"ok":True,"value":value},separators=(",",":")).encode("utf-8"))
                     if method == "cleanup":
                         done = True
                 except BaseException:
                     try:
-                        channel.send(("BLOCKED", None))
+                        channel.send_bytes(b'{"ok":false,"value":null}')
                     except BaseException:
                         pass
                     break
@@ -193,32 +214,47 @@ class GuardianChannel:
 
 class RemoteIO:
     """Controller-side narrow RPC interface. No root access."""
-    def __init__(self, channel, *, clock=time.monotonic):
+    def __init__(self, channel, plan, *, clock=time.monotonic):
+        if validate_plan(plan)!="OFFLINE_SAFE_SCOPED_PLAN_NOT_KERNEL_VERIFIED":
+            raise GuardianDenied("INVALID_REMOTE_PLAN")
+        self.plan=plan
         self.channel=channel
         self.clock=clock
 
     def _call(self, method, value, deadline):
         if self.clock() >= deadline:
             raise GuardianDenied("REMOTE_DEADLINE")
-        self.channel.send((method, value, deadline))
+        payload=json.dumps({"method":method,"value":value,"deadline":deadline},separators=(",",":")).encode("utf-8")
+        if len(payload)>256:
+            raise GuardianDenied("MESSAGE_TOO_LARGE")
+        self.channel.send_bytes(payload)
         if not self.channel.poll(min(8, max(0, deadline-self.clock()))):
             raise GuardianDenied("GUARDIAN_UNRESPONSIVE")
         try:
-            reply = self.channel.recv()
+            reply = json.loads(self.channel.recv_bytes(300000).decode("utf-8","strict"))
         except (EOFError, OSError):
             raise GuardianDenied("GUARDIAN_DISCONNECTED") from None
-        if not isinstance(reply, tuple) or len(reply)!=2 or reply[0]!="OK":
+        if type(reply) is not dict or set(reply)!={"ok","value"} or reply["ok"] is not True:
             raise GuardianDenied("GUARDIAN_REFUSED")
-        return reply[1]
+        return reply["value"]
 
     def preflight(self, plan):
-        return self._call("preflight",plan,self.clock()+8)
+        if plan!=self.plan: raise GuardianDenied("REMOTE_PLAN_MISMATCH")
+        return self._call("preflight","START",self.clock()+8)
     def snapshot(self):
-        return self._call("snapshot",None,self.clock()+8)
+        result=self._call("snapshot",None,self.clock()+8)
+        if (type(result) is not list or len(result)!=2 or
+                any(type(x) is not str for x in result)):
+            raise GuardianDenied("BAD_KERNEL_SNAPSHOT_SHAPE")
+        return tuple(result)
     def issue(self,command,deadline):
-        return self._call("issue",command,deadline) is True
+        if command not in self.plan.setup: raise GuardianDenied("UNREVIEWED_REMOTE_COMMAND")
+        return self._call("issue",self.plan.setup.index(command),deadline) is True
     def counters(self,family):
-        return self._call("counters",family,self.clock()+8)
+        rows=self._call("counters",family,self.clock()+8)
+        if type(rows) is not list or len(rows)>16 or not rows:
+            raise GuardianDenied("BAD_COUNTER_SHAPE")
+        return tuple(tuple(row) for row in rows)
     def exercise(self,case,deadline):
         return self._call("exercise",case,deadline) is True
     def stop(self,deadline):

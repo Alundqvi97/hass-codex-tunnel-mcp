@@ -42,7 +42,7 @@ class OneShotRunner:
         channel=None
         try:
             channel=self.launcher.launch(self.plan,deadline)
-            outcome=control(self.plan,RemoteIO(channel,clock=self.clock),self.clock)
+            outcome=control(self.plan,RemoteIO(channel,self.plan,clock=self.clock),self.clock)
             # A channel result is NOT kernel proof, and final process exit /
             # post-guardian readback must be independently established.
             return outcome.receipt()
@@ -117,7 +117,7 @@ class ForkGuardianLauncher:
         return "GUARDIAN_EXITED_NEEDS_EXTERNAL_KERNEL_READBACK"
 
 
-def reviewed_boundary_factory(plan):
+def reviewed_boundary_factory(plan, *, attestor):
     """Concrete low-level wiring, effectful ONLY when guardian explicitly runs.
 
     Every firewall command must cross RestrictedHost's exact argv gate. The
@@ -128,12 +128,25 @@ def reviewed_boundary_factory(plan):
     from probe_a_client_process import ClientProcess
     from probe_a_resources import LocalResourceReadback
 
-    restricted=RestrictedHost(
-        plan,
-        call=lambda argv,seconds: bounded_process(argv,seconds,reviewed_plan=plan),
-    )
+    if attestor is None or attestor.verify() is not True:
+        raise RunnerDenied("UNPINNED_EXECUTION_BOUNDARY")
+    def guarded_command(argv,seconds):
+        if attestor.verify() is not True:
+            raise RunnerDenied("HOST_DRIFT_BEFORE_COMMAND")
+        reply=bounded_process(argv,seconds,reviewed_plan=plan)
+        if attestor.verify() is not True:
+            raise RunnerDenied("HOST_DRIFT_AFTER_COMMAND")
+        return reply
+    restricted=RestrictedHost(plan,call=guarded_command)
     command=lambda argv,deadline: restricted.execute(argv,deadline=deadline)
     client=ClientProcess(plan)
-    work=FixedWorkload(plan,invoke=client,stop=client.stop)
+    def guarded_client(*args):
+        if attestor.verify() is not True:
+            raise RunnerDenied("HOST_DRIFT_BEFORE_CLIENT")
+        reply=client(*args)
+        if attestor.verify() is not True:
+            raise RunnerDenied("HOST_DRIFT_AFTER_CLIENT")
+        return reply
+    work=FixedWorkload(plan,invoke=guarded_client,stop=client.stop)
     resources=LocalResourceReadback(plan.scope)
     return command,work,resources

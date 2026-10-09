@@ -157,7 +157,7 @@ class GuardianTests(unittest.TestCase):
         c.handle("issue",P.setup[0],10)
         class Dropped:
             def poll(self,seconds):return True
-            def recv(self):raise EOFError()
+            def recv_bytes(self,limit):raise EOFError()
             def close(self):pass
         GuardianChannel(c,clock=lambda:1).serve(Dropped(),end=241)
         self.assertEqual(m.snapshot(10),(BASE,BASE))
@@ -195,7 +195,7 @@ class WorkloadTests(unittest.TestCase):
         def stream(argv,timeout,**kwargs):
             kwargs["on_spawn"](4321)
             return Reply(0,"DNS_UDP_MATCHED_NXDOMAIN\n")
-        p=ClientProcess(P,stream=stream,check_uid=lambda pid,uid:False,clock=lambda:1)
+        p=ClientProcess(P,stream=stream,check_uid=lambda pid,uid:False,clock=lambda:1,sleep=lambda _:None)
         with self.assertRaises(ClientProcessDenied):
             p(exact_argv(P,"approved-udp"),10,P.uid,None)
     def test_uid_procfs_evidence_not_self_report(self):

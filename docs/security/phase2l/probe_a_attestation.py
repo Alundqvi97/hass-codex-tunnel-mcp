@@ -1,0 +1,62 @@
+"""Explicit review-time runner/image/binary drift gate for future Probe A.
+
+No embedded approval manifest exists. Production command access cannot be
+wired through reviewed_boundary_factory without externally supplied exact
+hashes and an expected Ubuntu runner image marker. The marker itself is
+platform-provided metadata, not cryptographic host attestation.
+"""
+from __future__ import annotations
+
+import hashlib
+import os
+import re
+from pathlib import Path
+
+from probe_a_workload import WORKER
+
+class AttestationDenied(RuntimeError):
+    pass
+
+BINARY_PATHS=(
+    "/usr/sbin/iptables", "/usr/sbin/ip6tables",
+    "/usr/sbin/iptables-save", "/usr/sbin/ip6tables-save",
+    "/usr/bin/setpriv", "/usr/bin/python3", "/usr/bin/sudo",
+)
+SOURCE_NAMES=(
+    "probe_contract.py", "probe_a_attestation.py", "probe_a_client.py",
+    "probe_a_dns.py", "probe_a_controller.py", "probe_a_exec_adapter.py",
+    "probe_a_kernel.py", "probe_a_observer.py", "probe_a_os_boundary.py",
+    "probe_a_stream.py", "probe_a_recovery.py", "probe_a_guardian.py",
+    "probe_a_runner.py", "probe_a_worker.py", "probe_a_workload.py",
+    "probe_a_client_process.py", "probe_a_resources.py",
+)
+PINNED=BINARY_PATHS+tuple(str(Path(__file__).resolve().parent / f) for f in SOURCE_NAMES)
+
+MAX_FILE=20*1024*1024
+
+
+class DigestGate:
+    def __init__(self, expected, *, image_version, read_bytes=None, environ=None):
+        if (not isinstance(expected, dict) or set(expected)!=set(PINNED) or
+                any(not isinstance(v,str) or not re.fullmatch("[0-9a-f]{64}",v) for v in expected.values()) or
+                not isinstance(image_version,str) or
+                not re.fullmatch(r"[0-9]{8}\.[0-9]+(?:\.[0-9]+)?",image_version)):
+            raise AttestationDenied("INCOMPLETE_IMMUTABLE_REVIEW_MANIFEST")
+        self.expected=dict(expected)
+        self.image_version=image_version
+        self.read_bytes=read_bytes or (lambda p: Path(p).read_bytes())
+        self.environ=environ if environ is not None else os.environ
+
+    def verify(self):
+        if self.environ.get("ImageOS")!="ubuntu24" or self.environ.get("ImageVersion")!=self.image_version:
+            raise AttestationDenied("RUNNER_IMAGE_DRIFT")
+        for path in PINNED:
+            try:
+                data=self.read_bytes(path)
+            except (OSError, ValueError):
+                raise AttestationDenied("BINARY_UNREADABLE") from None
+            if not isinstance(data,bytes) or len(data)>MAX_FILE:
+                raise AttestationDenied("BINARY_UNBOUNDED")
+            if hashlib.sha256(data).hexdigest()!=self.expected[path]:
+                raise AttestationDenied("BINARY_OR_SOURCE_DRIFT")
+        return True
