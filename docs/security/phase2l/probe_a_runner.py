@@ -217,7 +217,7 @@ class ForkGuardianLauncher:
         if (self.child is None or self.parent_observer is None or
                 self.parent_resources is None or plan!=self.parent_observer.plan):
             return "BLOCKED_NO_INDEPENDENT_BASELINE"
-        lifecycle=self.wait_for_exit(deadline)
+        lifecycle=self.wait_for_exit(deadline=deadline)
         if lifecycle!="GUARDIAN_EXITED_NEEDS_EXTERNAL_KERNEL_READBACK":
             return lifecycle
         try:
