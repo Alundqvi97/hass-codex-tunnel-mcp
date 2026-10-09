@@ -10,7 +10,7 @@ import re
 import time
 
 from probe_a_exec_adapter import Reply, checked_reply
-from probe_a_kernel import bounded, compare_after, expect_active, parse_packets, InvalidEvidence
+from probe_a_kernel import bounded, normalize_snapshot, compare_after, expect_active, parse_packets, InvalidEvidence
 from probe_a_os_boundary import SAVE4, SAVE6, VERSION4, VERSION6
 from probe_contract import CLEANUP_READBACKS, validate_plan
 
@@ -40,8 +40,8 @@ class KernelReadback:
         return reply.stdout
 
     def snapshot(self, deadline):
-        return (bounded(self._query(SAVE4, deadline)),
-                bounded(self._query(SAVE6, deadline)))
+        return (normalize_snapshot(self._query(SAVE4, deadline), family="ipv4"),
+                normalize_snapshot(self._query(SAVE6, deadline), family="ipv6"))
 
     def preflight(self, deadline):
         if self.baseline is not None:

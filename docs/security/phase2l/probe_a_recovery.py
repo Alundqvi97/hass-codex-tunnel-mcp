@@ -32,7 +32,7 @@ def _family(active, baseline, chain, uid, *, ipv6=False, dns=None):
     raw = [tokens(line) for kind, line in owned if kind == "rule"]
     if len(definitions) > 1 or len(hooks) > 1:
         raise RecoveryDenied("AMBIGUOUS_OWNERSHIP")
-    if definitions and definitions != [":" + chain + " - [0:0]"]:
+    if definitions and definitions[0] not in (":" + chain + " - [0:0]", ":" + chain + " - [COUNTERS]"):
         raise RecoveryDenied("CHAIN_DEFINITION_DRIFT")
     if (hooks or raw) and not definitions:
         raise RecoveryDenied("ORPHANED_RULE_OR_HOOK")
