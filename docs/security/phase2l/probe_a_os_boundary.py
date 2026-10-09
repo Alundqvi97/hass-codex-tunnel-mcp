@@ -6,6 +6,7 @@ post-termination watchdog are still MISSING.
 from __future__ import annotations
 import subprocess
 import time
+from probe_a_stream import capture, StreamFailure
 from probe_contract import validate_plan
 from probe_a_exec_adapter import Reply, checked_reply, RUN_LIMIT_SECONDS
 
@@ -72,16 +73,8 @@ def bounded_process(argv,timeout,*,reviewed_plan):
     privileged=argv[0].startswith("/usr/sbin/")
     cmd=("/usr/bin/sudo","-n",*argv) if privileged else argv
     try:
-        completed=subprocess.run(
-            cmd,input=b"",stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
-            shell=False,check=False,timeout=timeout,
-            env={"PATH":"/usr/sbin:/usr/bin:/bin","LC_ALL":"C"},
-        )
-    except (OSError,subprocess.TimeoutExpired):
-        raise HostBlocked("PROCESS_FAILED") from None
-    if len(completed.stdout)>MAX_OUTPUT:
-        raise HostBlocked("TOO_MUCH_OUTPUT")
-    try: data=completed.stdout.decode("utf-8","strict")
-    except UnicodeDecodeError:
-        raise HostBlocked("NON_UTF8_OUTPUT") from None
-    return Reply(completed.returncode,data)
+        # Streamed hard cap is enforced while the child runs; no unbounded
+        # subprocess.run(..., PIPE) buffering and no stderr exposure.
+        return capture(cmd, timeout)
+    except BaseException:
+        raise HostBlocked("STREAMED_COMMAND_FAILED") from None

@@ -21,7 +21,7 @@ class StreamFailure(RuntimeError):
 
 
 def capture(argv, timeout, *, spawn=subprocess.Popen, selector_factory=selectors.DefaultSelector,
-            clock=time.monotonic):
+            clock=time.monotonic, on_spawn=None, on_chunk=None):
     if (not isinstance(argv, tuple) or not argv
             or any(not isinstance(x, str) or not x or "\x00" in x for x in argv)
             or type(timeout) not in (int, float) or not 0 < timeout <= 8):
@@ -39,6 +39,8 @@ def capture(argv, timeout, *, spawn=subprocess.Popen, selector_factory=selectors
         )
         if child.stdout is None:
             raise StreamFailure("PIPE_UNAVAILABLE")
+        if on_spawn is not None:
+            on_spawn(child.pid)
         os.set_blocking(child.stdout.fileno(), False)
         selector = selector_factory()
         selector.register(child.stdout, selectors.EVENT_READ)
@@ -55,6 +57,10 @@ def capture(argv, timeout, *, spawn=subprocess.Popen, selector_factory=selectors
                 if len(data) + len(chunk) > MAX_BYTES:
                     raise StreamFailure("CAPTURE_OVERFLOW")
                 data.extend(chunk)
+                if on_chunk is not None:
+                    on_chunk(bytes(data))
+                if clock() >= end:
+                    raise StreamFailure("CAPTURE_TIMEOUT")
         remaining = end - clock()
         if remaining <= 0:
             raise StreamFailure("CAPTURE_TIMEOUT")
