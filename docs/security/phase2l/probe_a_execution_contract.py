@@ -59,7 +59,8 @@ class OwnedScopeSet:
                       "delegated", "children", "members", "populated", "atomic", "pidfd"}
             if (type(record) is not dict or set(record) != fields
                     or record["context"] != self.context.identifier or record["role"] != role
-                    or record["identity"] != list(group.identity) or record["version"] != 2
+                    or record["identity"] != list(group.identity) or type(record["version"]) is not int or record["version"] != 2
+                    or type(record["owner"]) is not list or any(type(n) is not int for n in record["owner"])
                     or record["owner"] != [0, 0, 0o700]
                     or record["ancestry"] != ["/sys/fs/cgroup", "p2a-" + self.context.plan.scope, role]
                     or record["delegated"] is not False or record["children"] != []
@@ -238,7 +239,8 @@ class ReviewedExecutionContract:
                 or observed.uids != (uid,)*4 or observed.gids != (uid,)*4 or observed.groups
                 or any(observed.capabilities) or observed.no_new_privs != 1):
             return False  # a setpriv transition may still be in progress
-        target = self.inventory.document["aliases"].get("/usr/bin/python3", "/usr/bin/python3")
+        alias = self.inventory.document["aliases"].get("/usr/bin/python3")
+        target = alias["target"] if alias is not None else "/usr/bin/python3"
         expected = self.inventory.document["metadata"][target]
         if observed.executable != (expected["device"], expected["inode"]):
             raise ExecutionDenied("WRONG_WORKER_INTERPRETER")

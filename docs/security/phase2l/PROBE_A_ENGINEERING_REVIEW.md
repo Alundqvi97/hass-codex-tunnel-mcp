@@ -64,7 +64,8 @@ administrator `PROJECT_DESIGN_BLUEPRINT.md` are unchanged.
    runner image/kernel. Deploy the source in a root-controlled immutable mount;
    this writable development checkout is unsuitable for privileged execution.
 2. An approved read-only collector records canonical path and alias-to-target
-   bindings, root ownership/modes, device/inode/size and SHA-256 for every source
+   bindings (including symlink lstat identity and every parent directory), root
+   ownership/modes, device/inode/size and SHA-256 for every source
    module, Python interpreter/entrypoint, executable, loader, libcap, glibc/NSS,
    Python runtime and transitive dependency. Inspect ELF metadata without
    executing untrusted `ldd` or arbitrary binaries. Include `/etc/nsswitch.conf`,
@@ -98,10 +99,10 @@ including upstream `fc54437a804858732e4bc927add98e202d879a09`. Reused the existi
 security environment; no new environment publication or authentication change.
 All patched fixtures, caches, compilation output and logs are outside the repo.
 
-Current Phase 2L result: **421 passed, zero failed/skipped**. Broader offline
-regressions: **557 passed, one optional Home Assistant schema skipped**, zero
+Current Phase 2L result: **424 passed, zero failed/skipped**. Broader offline
+regressions: **560 passed, one optional Home Assistant schema skipped**, zero
 failed. Python source compilation, shell syntax and whitespace checks passed.
-Validation logs: `/tmp/probe-a-offline.MJolwx` (development instance only).
+Validation logs: `/tmp/probe-a-offline.gYP5aY` (development instance only).
 GitHub CI receipts are recorded in the immutable delivery receipt below.
 Tests use synthetic identities, fake FDs/observations and injected failures;
 no real clone3, privilege drop, firewall/cgroup operation or live Probe A occurs.
@@ -117,6 +118,9 @@ A separate adversarial self-review corrected verifier-exception fail-open
 paths, failed-ledger activation, missed fast-child registration, executable-FD
 inode mismatch, root service FD timing, missing independent baseline release,
 controller self-observation and interrupted supervisor cleanup reporting.
+A final follow-up binds symlink and parent-directory identities before/after
+asset reads, rejects same-target link replacement/unsafe parents, and rejects
+boolean ownership fields that could otherwise compare equal to root UID 0.
 **No confirmed unresolved source defect remains from that pass.** This is not
 qualified independent security certification. Trusted external callbacks are
 part of the reviewed computing base, never worker-provided proof.

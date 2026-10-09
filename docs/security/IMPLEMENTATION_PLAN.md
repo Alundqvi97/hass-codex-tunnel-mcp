@@ -20,7 +20,7 @@ barrier, irreversible controller drop and no-trusted-PASS gates are preserved.
 Default activation remains absent; no CLI, environment opt-in or automatic
 privileged workflow was introduced. Every incomplete result remains blocked.
 
-Phase 2L expanded result: **421 passing offline tests**. Final broader results,
+Phase 2L expanded result: **424 passing offline tests**. Final broader results,
 compilation, immutable source SHA and GitHub CI receipts are recorded in the
 current `phase2l/PROBE_A_ENGINEERING_REVIEW.md` delivery section. The authoritative
 Phase 2L workflow and its pinned upstream commit are unchanged. A separate

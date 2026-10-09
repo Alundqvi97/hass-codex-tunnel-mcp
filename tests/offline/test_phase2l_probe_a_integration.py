@@ -439,6 +439,9 @@ class AuthorizationTests(unittest.TestCase):
 class ContainmentIntegrationTests(unittest.TestCase):
     def test_all_separate_scopes_and_preflight(self):
         s,_=scopes();self.assertTrue(s.preflight());self.assertTrue(s.cleanup_observed())
+    def test_boolean_owner_cannot_alias_root_uid(self):
+        s,records=scopes();records["guardian"]["owner"]=[False,False,0o700]
+        with self.assertRaises(ExecutionDenied):s.preflight()
     def test_partial_provisioning_denied(self):
         s,_=scopes();del s.groups["peer"]
         with self.assertRaises(KeyError):s.preflight()
@@ -584,10 +587,28 @@ class IntegratedInventoryTests(unittest.TestCase):
         doc,options,assets,metadata=inventory_fixture();alias="/usr/bin/python3";target="/reviewed/python-real"
         assets[target]=assets[alias];metadata[target]=dict(metadata[alias]);doc["inventory"]["files"][target]=doc["inventory"]["files"][alias]
         doc["inventory"]["categories"]["python_runtime"].append(target);doc["metadata"][target]=dict(metadata[target]);doc["dependencies"][target]=[]
-        doc["aliases"][alias]=target;options["read_alias"]=lambda _:target
+        record={"target":target,"device":1,"inode":900,"uid":0,"gid":0,"mode":stat.S_IFLNK|0o777,
+            "parents":[{"path":p,"device":1,"inode":n,"uid":0,"gid":0,"mode":stat.S_IFDIR|0o755} for n,p in enumerate(("/","/usr","/usr/bin"),1)]}
+        doc["aliases"][alias]=record;options["read_alias"]=lambda _:deepcopy(record)
         i=IntegratedInventory(doc,b"synthetic",**options);self.assertTrue(i.verify())
-        i.read_alias=lambda _:"/evil"
+        i.read_alias=lambda _:dict(record,target="/evil")
         with self.assertRaises(InventoryDenied):i.verify()
+    def test_same_target_alias_inode_replacement_and_unsafe_parent_denied(self):
+        doc,options,_,_=inventory_fixture();alias="/usr/bin/python3";target="/usr/bin/pgrep"
+        record={"target":target,"device":1,"inode":900,"uid":0,"gid":0,"mode":stat.S_IFLNK|0o777,
+            "parents":[{"path":p,"device":1,"inode":n,"uid":0,"gid":0,"mode":stat.S_IFDIR|0o755} for n,p in enumerate(("/","/usr","/usr/bin"),1)]}
+        doc["aliases"][alias]=deepcopy(record);options["read_alias"]=lambda _:deepcopy(record)
+        i=IntegratedInventory(doc,b"synthetic",**options);self.assertTrue(i.verify());record["inode"]+=1
+        with self.assertRaises(InventoryDenied):i.verify()
+        doc["aliases"][alias]["parents"][1]["mode"]=stat.S_IFDIR|0o777
+        with self.assertRaises(InventoryDenied):IntegratedInventory(doc,b"synthetic",**options)
+    def test_alias_changed_between_asset_reads_denied(self):
+        doc,options,_,_=inventory_fixture();alias="/usr/bin/python3";target="/usr/bin/pgrep"
+        record={"target":target,"device":1,"inode":900,"uid":0,"gid":0,"mode":stat.S_IFLNK|0o777,
+            "parents":[{"path":p,"device":1,"inode":n,"uid":0,"gid":0,"mode":stat.S_IFDIR|0o755} for n,p in enumerate(("/","/usr","/usr/bin"),1)]}
+        doc["aliases"][alias]=record
+        options["read_alias"]=Mock(side_effect=[deepcopy(record),dict(record,inode=901)])
+        with self.assertRaises(InventoryDenied):IntegratedInventory(doc,b"synthetic",**options).verify()
 
 
 class EvidenceTests(unittest.TestCase):

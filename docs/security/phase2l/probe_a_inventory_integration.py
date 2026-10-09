@@ -53,8 +53,21 @@ class IntegratedInventory:
                     or metadata["uid"] != 0 or metadata["mode"] & 0o022
                     or not stat.S_ISREG(metadata["mode"])):
                 raise InventoryDenied("UNCONTROLLED_RUNTIME_ASSET")
-        for alias, target in d["aliases"].items():
+        for alias, record in d["aliases"].items():
+            if (type(record) is not dict or set(record) != {"target", "device", "inode", "uid", "gid", "mode", "parents"}
+                    or any(type(record[k]) is not int or record[k] < 0 for k in ("device", "inode", "uid", "gid", "mode"))
+                    or record["uid"] != 0 or not stat.S_ISLNK(record["mode"])
+                    or type(record["parents"]) is not list):
+                raise InventoryDenied("UNREVIEWED_SYMLINK_IDENTITY")
+            target = record["target"]
             absolute(alias); absolute(target)
+            parent_paths = ["/"] + ["/"+"/".join(alias.split("/")[1:n]) for n in range(2,len(alias.split("/")))]
+            if (len(record["parents"]) != len(parent_paths)
+                    or any(type(p) is not dict or set(p) != {"path","device","inode","uid","gid","mode"}
+                        or p["path"] != path or any(type(p[k]) is not int or p[k] < 0 for k in ("device","inode","uid","gid","mode"))
+                        or p["uid"] != 0 or not stat.S_ISDIR(p["mode"]) or p["mode"] & 0o022
+                        for p,path in zip(record["parents"],parent_paths))):
+                raise InventoryDenied("ALIAS_ANCESTRY_NOT_ROOT_CONTROLLED")
             if alias not in files or target not in files or alias == target or target in d["aliases"]:
                 raise InventoryDenied("ALIAS_CHAIN_OR_UNINVENTORIED_TARGET")
             if self.base.document["files"][alias] != self.base.document["files"][target]:
@@ -83,14 +96,19 @@ class IntegratedInventory:
     def _asset(self, path):
         if not callable(self.read_asset) or not callable(self.inspect_asset):
             raise InventoryDenied("TRUSTED_ASSET_READER_MISSING")
-        target = self.document["aliases"].get(path, path)
-        if path != target and (not callable(self.read_alias) or self.read_alias(path) != target):
+        alias = self.document["aliases"].get(path)
+        target = alias["target"] if alias is not None else path
+        # The trusted no-follow alias reader returns the complete lstat and
+        # parent-directory record, not merely a resolved pathname. Symlink
+        # permission bits are ignored by Linux; parent ownership is essential.
+        if alias is not None and (not callable(self.read_alias) or self.read_alias(path) != alias):
             raise InventoryDenied("SYMLINK_OR_EXECUTABLE_ALIAS_DRIFT")
         expected = self.document["metadata"][target]
         if self.inspect_asset(target) != expected:
             raise InventoryDenied("RUNTIME_METADATA_DRIFT")
         result = self.read_asset(target)
-        if self.inspect_asset(target) != expected or type(result) is not bytes or len(result) != expected["size"]:
+        if (self.inspect_asset(target) != expected or type(result) is not bytes or len(result) != expected["size"]
+                or alias is not None and self.read_alias(path) != alias):
             raise InventoryDenied("RUNTIME_ASSET_CHANGED_DURING_VERIFICATION")
         return result
 
@@ -121,7 +139,8 @@ class IntegratedInventory:
 
     def authorize_exec(self, spec, approval):
         self.verify()
-        target = self.document["aliases"].get(spec.argv[0], spec.argv[0])
+        alias = self.document["aliases"].get(spec.argv[0])
+        target = alias["target"] if alias is not None else spec.argv[0]
         st = os.fstat(spec.executable_fd)
         expected = self.document["metadata"].get(target)
         if expected is None or {"device":st.st_dev,"inode":st.st_ino,"uid":st.st_uid,"gid":st.st_gid,
