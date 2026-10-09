@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import pathlib
+import re
 import socket
 import secrets
 import subprocess
@@ -157,7 +158,7 @@ def supervisor_verify(h,base):
         state=h._wait_supervisor_running(ws,timeout=300)
         version=info.get("version","unknown")
         report("SUPERVISOR_API","PASS")
-        report("SUPERVISOR_VERSION",str(version).replace("\n","")[:25])
+        report("SUPERVISOR_VERSION",version if isinstance(version,str) and re.fullmatch(r"20[0-9]{2}\.[0-9]{1,2}\.[0-9]{1,2}",version) else "NOT_VERIFIED")
         report("SUPERVISOR_RUNNING","PASS" if state else "NOT_VERIFIED")
         if not state:
             raise RuntimeError("SupervisorNotRunning")
@@ -245,14 +246,14 @@ def main():
         try:
             ws=supervisor_verify(h,base)
         except Exception as e:
-            report("SUPERVISOR_API","BLOCKED_"+type(e).__name__)
+            report("SUPERVISOR_API","BLOCKED_EXCEPTION")
             return 4
         try:
             if os.environ.get("PHASE2H_LOCAL_ADDON_SEEDED")=="true":
                 try:
                     test_addon(ws)
                 except Exception as e:
-                    report("CANDIDATE_ADDON_TEST","BLOCKED_"+type(e).__name__)
+                    report("CANDIDATE_ADDON_TEST","BLOCKED_EXCEPTION")
             else:
                 report("CANDIDATE_ADDON_TEST","BLOCKED_NO_SAFE_SEED")
             report("TESTED_SUPERVISOR_LEVEL","REAL_GUEST_API")
@@ -277,5 +278,5 @@ if __name__=="__main__":
     try:
         sys.exit(main())
     except Exception as exc:
-        report("HARNESS_ERROR",type(exc).__name__)
+        report("HARNESS_ERROR","BLOCKED_EXCEPTION")
         sys.exit(5)

@@ -72,3 +72,8 @@ Production Phase 3 is **NO-GO**. Phase 4 unauthorized. PRs remain drafts.
 ### Offline Supervisor v2 API-sequence guard
 
 Published Supervisor 2026.10.1 routes confirm POST /store/reload, GET /store/apps/{slug}, POST /store/apps/{slug}/install, and GET/POST /apps/{slug}/info/options/start as applicable; legacy v1 routes also exist. The pure Phase 2J installation_plan.py refuses other Supervisor versions until explicitly reviewed; it never connects to an API. Separate store discovery, install, strict schema, option readback and runtime steps must all be observed. Even all successful mocked responses produce only SYNTHETIC_ONLY_NOT_INSTALLED. Direct legacy data-folder seeding remains unresolved. Source: https://github.com/home-assistant/supervisor/blob/2026.10.1/supervisor/api/__init__.py .
+
+
+### Future-only sanitized receipt hardening
+
+The unexecuted guest adapter now restricts the displayed Supervisor version to a numeric yyyy.m.p pattern (otherwise NOT_VERIFIED), and substitutes fixed BLOCKED_EXCEPTION codes for exception class names. This closes another potential diagnostic-data disclosure route without running QEMU or changing the VM-triggering workflow. Static offline tests enforce these invariants. The guest still returns nonzero on incomplete acceptance; the model does not grant production readiness.
