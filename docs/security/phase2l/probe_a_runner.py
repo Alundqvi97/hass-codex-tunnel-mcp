@@ -40,11 +40,14 @@ class OneShotRunner:
                 self.verify_activation(self.plan, approval) is not True):
             return "BLOCKED_DISABLED_OR_UNAPPROVED"
         deadline=self.clock()+240
+        cleanup_cutoff=deadline-60
         channel=None
         status="BLOCKED_SUPERVISION_FAILURE"
         try:
-            channel=self.launcher.launch(self.plan,deadline)
-            outcome=control(self.plan,RemoteIO(channel,self.plan,clock=self.clock),self.clock)
+            channel=self.launcher.launch(self.plan,deadline,cleanup_cutoff)
+            outcome=control(
+                self.plan, RemoteIO(channel,self.plan,clock=self.clock),self.clock,
+                absolute_deadline=deadline,cleanup_cutoff=cleanup_cutoff)
             status=outcome.receipt()
         except BaseException:
             status="BLOCKED_SUPERVISION_FAILURE"
@@ -87,11 +90,14 @@ class ForkGuardianLauncher:
         self.parent_observer=None
         self.parent_resources=None
 
-    def launch(self, plan, deadline):
+    def launch(self, plan, deadline, cleanup_cutoff=None):
         if (self.child is not None or not callable(self.post_observer_factory)
                 or self.root_check()!=0 or
                 validate_plan(plan)!="OFFLINE_SAFE_SCOPED_PLAN_NOT_KERNEL_VERIFIED" or
-                not self.clock()<deadline<=self.clock()+240):
+                type(deadline) not in (int,float) or
+                type(cleanup_cutoff) not in (int,float) or
+                deadline-cleanup_cutoff!=60 or
+                not self.clock()<cleanup_cutoff<deadline<=self.clock()+240):
             raise RunnerDenied("GUARDIAN_LAUNCH_REFUSED")
         # Independent parent pre-change inventory BEFORE any guardian writes.
         from probe_a_observer import KernelReadback
@@ -102,6 +108,8 @@ class ForkGuardianLauncher:
         observer.preflight(deadline)
         post_read=self.post_observer_factory(plan)
         read_only=ReadOnlyPostObserver(plan,read=post_read)
+        if self.clock() >= cleanup_cutoff:
+            raise RunnerDenied("BOOTSTRAP_CONSUMED_WORK_WINDOW")
         # Preflight uses the privileged bootstrap; after the drop every
         # post-guardian observation passes through an independent read-only
         # broker and checks real unprivileged controller identity.
@@ -120,7 +128,8 @@ class ForkGuardianLauncher:
                 core=GuardianCore(plan,command=command,work=work,resources=resources,
                                   clock=self.clock)
                 installed_signal_abort(lambda: None)
-                GuardianChannel(core,clock=self.clock).serve(child,end=deadline)
+                GuardianChannel(core,clock=self.clock).serve(
+                    child,end=deadline,cleanup_cutoff=cleanup_cutoff)
             except BaseException:
                 # No stdout or raw command output; OS kill of THIS guardian
                 # cannot be recovered from within this same actor.
@@ -129,6 +138,10 @@ class ForkGuardianLauncher:
                 try: child.close()
                 except BaseException: pass
         process=ctx.Process(target=child_main,daemon=False,name="p2a-owned-guardian")
+        if self.clock() >= cleanup_cutoff:
+            parent.close()
+            child.close()
+            raise RunnerDenied("BOOTSTRAP_CONSUMED_WORK_WINDOW")
         try:
             process.start()
             self.child=process
@@ -143,6 +156,8 @@ class ForkGuardianLauncher:
             # No injectable verification callback is accepted here.
             if verify_unprivileged() is not True:
                 raise RunnerDenied("CONTROLLER_IDENTITY_UNVERIFIED")
+            if self.clock() >= cleanup_cutoff:
+                raise RunnerDenied("WORK_WINDOW_EXPIRED_AFTER_DROP")
             return parent
         except BaseException:
             # Close the parent IPC on any launch/drop/identity failure. The
