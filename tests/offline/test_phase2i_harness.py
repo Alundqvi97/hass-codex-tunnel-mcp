@@ -102,6 +102,19 @@ class OfflineHarnessTests(unittest.TestCase):
         self.assertEqual(model.planned_cleanup_actions({}), ())
         self.assertEqual(model.classify_probe(listener=False,status=404), 'HTTP_404')
 
+    def test_runner_label_and_teardown_guards_only(self):
+        future = ROOT / 'docs/security/phase2h/runner_once.sh'
+        if not future.is_file():
+            self.skipTest('Future runner not present in scratch')
+        source = future.read_text()
+        self.assertIn('PHASE2I_DATA_PARTITION_LABEL', source)
+        self.assertIn('sudo blkid -o device -t LABEL=hassos-data', source)
+        self.assertIn('PHASE2I_IPV4_CHAIN_REMOVED', source)
+        self.assertIn('PHASE2I_IPV6_CHAIN_REMOVED', source)
+        self.assertIn('PHASE2I_TEMPORARY_USER_REMOVED', source)
+        self.assertIn('PHASE2I_KVM_ACL_REMOVED', source)
+        self.assertIn('WATCH_PID', source)
+
     def test_vm_trigger_guard_from_source(self):
         workflow=(ROOT/'.github/workflows/phase2h-haos-vm-once.yml')
         if not workflow.is_file():self.skipTest('GitHub workflow not mounted locally')

@@ -15,6 +15,10 @@ cleanup() {
   exit_code=$?
   trap - EXIT INT TERM
   set +e
+  if [[ -n "${WATCH_PID:-}" ]]; then
+    kill "$WATCH_PID" >/dev/null 2>&1 || true
+    wait "$WATCH_PID" >/dev/null 2>&1 || true
+  fi
   sudo pkill -u "$GUEST_USER" qemu-system-x86_64 >/dev/null 2>&1 || true
   sleep 2
   if [[ "$MOUNTED" == true ]]; then sudo umount "$WORK/mount" >/dev/null 2>&1; fi
@@ -30,6 +34,33 @@ cleanup() {
   [[ -z "$(pgrep -u "$GUEST_USER" qemu-system-x86_64 2>/dev/null)" ]] && echo "PHASE2H_GUEST_PROCESS_CLEANUP=PASS" || echo "PHASE2H_GUEST_PROCESS_CLEANUP=NOT_VERIFIED"
   sudo setfacl -x "u:$GUEST_USER" /dev/kvm >/dev/null 2>&1 || true
   sudo userdel "$GUEST_USER" >/dev/null 2>&1 || true
+  # Every temporary privileged resource needs an independent read-back.
+  # Failure to inspect is NOT_VERIFIED, never falsely PASS.
+  if v4state="$(sudo iptables-save 2>/dev/null)"; then
+    [[ "$v4state" != *PHASE2H_GUEST* ]] && echo "PHASE2I_IPV4_CHAIN_REMOVED=PASS" || echo "PHASE2I_IPV4_CHAIN_REMOVED=NOT_VERIFIED"
+  else
+    echo "PHASE2I_IPV4_CHAIN_REMOVED=NOT_VERIFIED"
+  fi
+  if v6state="$(sudo ip6tables-save 2>/dev/null)"; then
+    [[ "$v6state" != *PHASE2H_GUEST6* ]] && echo "PHASE2I_IPV6_CHAIN_REMOVED=PASS" || echo "PHASE2I_IPV6_CHAIN_REMOVED=NOT_VERIFIED"
+  else
+    echo "PHASE2I_IPV6_CHAIN_REMOVED=NOT_VERIFIED"
+  fi
+  if [[ -e /dev/kvm ]] && acl="$(sudo getfacl -cp /dev/kvm 2>/dev/null)"; then
+    [[ "$acl" != *"user:$GUEST_USER:"* ]] && echo "PHASE2I_KVM_ACL_REMOVED=PASS" || echo "PHASE2I_KVM_ACL_REMOVED=NOT_VERIFIED"
+  else
+    echo "PHASE2I_KVM_ACL_REMOVED=NOT_VERIFIED"
+  fi
+  if getent passwd "$GUEST_USER" >/dev/null; then
+    echo "PHASE2I_TEMPORARY_USER_REMOVED=NOT_VERIFIED"
+  else
+    echo "PHASE2I_TEMPORARY_USER_REMOVED=PASS"
+  fi
+  if mountpoint -q "$WORK/mount"; then
+    echo "PHASE2I_MOUNT_REMOVED=NOT_VERIFIED"
+  else
+    echo "PHASE2I_MOUNT_REMOVED=PASS"
+  fi
   sudo rm -rf -- "$WORK"
   [[ ! -e "$WORK" ]] && echo "PHASE2H_TEMPORARY_VM_FILES_REMOVED=PASS" || echo "PHASE2H_TEMPORARY_VM_FILES_REMOVED=FAIL"
   echo "PHASE2H_PUBLIC_ARTIFACT_OR_CACHE_UPLOAD=NONE"
@@ -87,8 +118,9 @@ echo "PHASE2H_KVM_ACCESS_PERMISSION=PASS"
 # No bridged adapter. Only public IPv4 HTTPS/HTTP, DNS and NTP egress.
 # RFC1918, loopback, link-local, multicast, IPv6 and all other ports denied.
 sudo iptables -w 5 -N PHASE2H_GUEST
-sudo ip6tables -w 5 -N PHASE2H_GUEST6
 RULES_CONFIGURED=true
+# The EXIT trap must also clean up a partially constructed rule set.
+sudo ip6tables -w 5 -N PHASE2H_GUEST6
 sudo iptables -w 5 -I OUTPUT 1 -m owner --uid-owner "$GUEST_USER" -j PHASE2H_GUEST
 sudo ip6tables -w 5 -I OUTPUT 1 -m owner --uid-owner "$GUEST_USER" -j PHASE2H_GUEST6
 # Allow only return traffic on loopback TCP connections that the test host
@@ -153,7 +185,60 @@ PY
 if sudo modprobe nbd max_part=16 2>/dev/null && test -b /dev/nbd0 && sudo qemu-nbd --connect=/dev/nbd0 "$WORK/haos_ova-18.3.qcow2" >/dev/null 2>&1; then
   NBD_CONNECTED=true
   sudo udevadm settle >/dev/null 2>&1 || true
-  if test -b /dev/nbd0p8 && sudo mount /dev/nbd0p8 "$WORK/mount" >/dev/null 2>&1; then
+  # Never trust positional /dev/nbd0p8: require one matching data label.
+  mapfile -t DATA_CANDIDATES < <(sudo blkid -o device -t LABEL=hassos-data 2>/dev/null | grep -E '^/dev/nbd0p[0-9]+
+    MOUNTED=true
+    sudo mkdir -p "$WORK/mount/supervisor/addons/local/ha_mcp_phase2h" "$WORK/mount/supervisor/addons/data/local_ha_mcp_phase2h"
+    sudo cp -a "$WORK/addon/." "$WORK/mount/supervisor/addons/local/ha_mcp_phase2h/"
+    printf '%s\n' '{"schema_version":2,"rule_effect":"allow","rules":[{"tool_name":"ha_get_overview","when":[],"remember_minutes":0}]}' | sudo tee "$WORK/mount/supervisor/addons/data/local_ha_mcp_phase2h/tool_policy.json" >/dev/null
+    sudo chmod 0600 "$WORK/mount/supervisor/addons/data/local_ha_mcp_phase2h/tool_policy.json"
+    sudo umount "$WORK/mount"
+    MOUNTED=false
+    GUEST_SEEDED=true
+  fi
+  sudo qemu-nbd --disconnect /dev/nbd0 >/dev/null 2>&1 || true
+  NBD_CONNECTED=false
+fi
+export PHASE2H_LOCAL_ADDON_SEEDED="$GUEST_SEEDED"
+echo "PHASE2H_SUPERVISOR_LOCAL_ADDON_SOURCE_SEEDED=$GUEST_SEEDED"
+[[ "$GUEST_SEEDED" == true ]] || { echo "PHASE2I_DATA_STAGING=BLOCKED_NO_GUEST_LAUNCH"; exit 3; }
+sudo chown "$GUEST_USER:$GUEST_USER" "$WORK/haos_ova-18.3.qcow2"
+cp /usr/share/OVMF/OVMF_VARS_4M.fd "$WORK/OVMF_VARS_4M.fd"
+sudo chown "$GUEST_USER:$GUEST_USER" "$WORK/OVMF_VARS_4M.fd"
+chmod 755 "$WORK"
+sudo touch "$WORK/serial-private.log"
+sudo chown "$GUEST_USER:$GUEST_USER" "$WORK/serial-private.log"
+echo "PHASE2H_VM_GUEST_LIMIT=ONE"
+# If a filesystem quota is hit, stop this guest; no retry on another host.
+(
+  while true; do
+    sleep 20
+    [[ -d "$WORK" ]] || break
+    amount="$(du -sk "$WORK/haos_ova-18.3.qcow2" 2>/dev/null | awk '{print $1}')"
+    if [[ "${amount:-0}" -gt 11500000 ]]; then
+      echo "PHASE2H_SPARSE_DISK_BOUND_EXCEEDED=BLOCKED"
+      sudo pkill -u "$GUEST_USER" qemu-system-x86_64 || true
+      break
+    fi
+  done
+) &
+WATCH_PID="$!"
+set +e
+timeout --signal=TERM --kill-after=20s 2040s python3 docs/security/phase2h/single_haos_guest.py
+result="$?"
+set -e
+kill "$WATCH_PID" >/dev/null 2>&1 || true
+wait "$WATCH_PID" >/dev/null 2>&1 || true
+echo "PHASE2H_SINGLE_VM_RUN_EXIT=$result"
+exit "$result"
+ || true)
+  if [[ "${#DATA_CANDIDATES[@]}" -ne 1 ]] || [[ "$(sudo blkid -s TYPE -o value "${DATA_CANDIDATES[0]}" 2>/dev/null)" != "ext4" ]]; then
+    echo "PHASE2I_DATA_PARTITION_LABEL=BLOCKED"
+    exit 3
+  fi
+  DATA_DEVICE="${DATA_CANDIDATES[0]}"
+  echo "PHASE2I_DATA_PARTITION_LABEL=PASS"
+  if sudo mount "$DATA_DEVICE" "$WORK/mount" >/dev/null 2>&1; then
     MOUNTED=true
     sudo mkdir -p "$WORK/mount/supervisor/addons/local/ha_mcp_phase2h" "$WORK/mount/supervisor/addons/data/local_ha_mcp_phase2h"
     sudo cp -a "$WORK/addon/." "$WORK/mount/supervisor/addons/local/ha_mcp_phase2h/"
