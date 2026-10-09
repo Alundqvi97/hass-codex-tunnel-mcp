@@ -129,10 +129,11 @@ class AdditionalSecurityTests(unittest.TestCase):
 
     def test_ipv6_default_reject_encoding_is_narrowly_accepted(self):
         from probe_a_recovery import inspect_partial,RecoveryDenied
-        base="*filter\\n:INPUT ACCEPT [0:0]\\n:FORWARD ACCEPT [0:0]\\n:OUTPUT ACCEPT [0:0]\\nCOMMIT\\n"
+        nl=chr(10)
+        base=nl.join(["*filter",":INPUT ACCEPT [0:0]",":FORWARD ACCEPT [0:0]",":OUTPUT ACCEPT [0:0]","COMMIT",""])
         chain=PLAN.chain6
-        active=base.replace("COMMIT\\n",
-            f":{chain} - [0:0]\\n-A {chain} -j REJECT --reject-with icmp6-port-unreachable\\nCOMMIT\\n")
+        active=base.replace("COMMIT"+nl,
+            nl.join([f":{chain} - [0:0]",f"-A {chain} -j REJECT --reject-with icmp6-port-unreachable","COMMIT",""]))
         self.assertTrue(inspect_partial(PLAN,(base,base),(base,active))[1].chain)
         with self.assertRaises(RecoveryDenied):
             inspect_partial(PLAN,(base,base),(base,active.replace("icmp6-port-unreachable","icmp6-adm-prohibited")))
