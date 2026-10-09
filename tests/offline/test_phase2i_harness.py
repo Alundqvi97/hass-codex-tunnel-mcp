@@ -115,6 +115,54 @@ class OfflineHarnessTests(unittest.TestCase):
         self.assertIn('PHASE2I_KVM_ACL_REMOVED', source)
         self.assertIn('WATCH_PID', source)
 
+    def test_future_guest_main_never_promotes_partial_acceptance(self):
+        # Importing this module is inert: main() is guarded by __name__.
+        import contextlib
+        import io
+        import os
+        from unittest.mock import patch
+        future = ROOT / 'docs/security/phase2h/single_haos_guest.py'
+        spec = importlib.util.spec_from_file_location('phase2i_guest_future', future)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+
+        class NoGuestProcess:
+            def poll(self):
+                return 0  # Already stopped; prevents termination branches.
+
+        class FakeWS:
+            def __exit__(self, *args):
+                return False
+
+        for injected in (None, RuntimeError('synthetic dummy failure')):
+            output = io.StringIO()
+            with (patch.object(mod, 'upstream_loader', return_value=object()),
+                  patch.object(mod, 'launch_guest', return_value=NoGuestProcess()),
+                  patch.object(mod, 'boot_wait', return_value='http://127.0.0.1:18123'),
+                  patch.object(mod, 'supervisor_verify', return_value=FakeWS()),
+                  patch.object(mod, 'test_addon', side_effect=injected),
+                  patch.dict(os.environ, {'PHASE2H_LOCAL_ADDON_SEEDED':'true'}),
+                  contextlib.redirect_stdout(output)):
+                result = mod.main()
+            self.assertEqual(result, 6)
+            self.assertIn('PHASE2H_FULL_SUPERVISOR_ACCEPTANCE=BLOCKED_INCOMPLETE_16_CASES',
+                          output.getvalue())
+            self.assertNotIn('synthetic dummy failure', output.getvalue())
+
+        with (patch.object(mod, 'upstream_loader', return_value=object()),
+              patch.object(mod, 'launch_guest', return_value=NoGuestProcess()),
+              patch.object(mod, 'boot_wait', return_value='http://127.0.0.1:18123'),
+              patch.object(mod, 'supervisor_verify', return_value=FakeWS()),
+              patch.object(mod, 'test_addon', side_effect=AssertionError('never execute test')),
+              patch.dict(os.environ, {'PHASE2H_LOCAL_ADDON_SEEDED':'false'}),
+              contextlib.redirect_stdout(io.StringIO())):
+            self.assertEqual(mod.main(), 6)
+
+    def test_supervisor_false_running_state_is_not_success(self):
+        src = (ROOT/'docs/security/phase2h/single_haos_guest.py').read_text()
+        self.assertIn('raise RuntimeError("SupervisorNotRunning")', src)
+        self.assertIn('return 6', src)
+
     def test_vm_trigger_guard_from_source(self):
         workflow=(ROOT/'.github/workflows/phase2h-haos-vm-once.yml')
         if not workflow.is_file():self.skipTest('GitHub workflow not mounted locally')

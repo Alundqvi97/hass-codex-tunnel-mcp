@@ -159,6 +159,8 @@ def supervisor_verify(h,base):
         report("SUPERVISOR_API","PASS")
         report("SUPERVISOR_VERSION",str(version).replace("\n","")[:25])
         report("SUPERVISOR_RUNNING","PASS" if state else "NOT_VERIFIED")
+        if not state:
+            raise RuntimeError("SupervisorNotRunning")
         return ws
     except Exception:
         ws.__exit__(None,None,None)
@@ -254,7 +256,12 @@ def main():
             else:
                 report("CANDIDATE_ADDON_TEST","BLOCKED_NO_SAFE_SEED")
             report("TESTED_SUPERVISOR_LEVEL","REAL_GUEST_API")
-            return 0
+            # Most of the 16 mandatory acceptance cases remain unimplemented.
+            # A responding Supervisor and an attempted add-on test are not a
+            # successful release gate. Keep this nonzero until every case is
+            # explicitly observed and reviewed; no implicit success on return.
+            report("FULL_SUPERVISOR_ACCEPTANCE","BLOCKED_INCOMPLETE_16_CASES")
+            return 6
         finally:
             ws.__exit__(None,None,None)
     finally:
