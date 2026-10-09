@@ -31,9 +31,17 @@ def stage(source: Path, destination: Path, reference: Path) -> str:
     src=source/"src"
     if not src.is_dir() or src.is_symlink():
         raise ValueError("MISSING_SRC")
-    # Deny symlinks anywhere in the staged tree.
-    if any(x.is_symlink() for x in src.rglob("*")):
-        raise ValueError("SRC_SYMLINK_NOT_ALLOWED")
+    # The pinned upstream source includes one documentation-only alias:
+    # src/ha_mcp/settings_ui/CLAUDE.md -> AGENTS.md. It is not a runtime
+    # dependency or a Docker COPY input; exclude that exact symlink, but
+    # continue to reject every other link (especially source code links).
+    doc_alias = src / "ha_mcp" / "settings_ui" / "CLAUDE.md"
+    allowed_alias = doc_alias.is_symlink() and doc_alias.readlink() == Path("AGENTS.md")
+    links = [x for x in src.rglob("*") if x.is_symlink()]
+    if links != [doc_alias] or not allowed_alias:
+        raise ValueError("SRC_SYMLINK_SET_NOT_PINNED")
+    def ignore_alias(directory, names):
+        return {"CLAUDE.md"} if Path(directory) == doc_alias.parent and "CLAUDE.md" in names else set()
     destination.mkdir(parents=True,exist_ok=False)
     try:
         for f in SOURCE_FILES:
@@ -42,7 +50,7 @@ def stage(source: Path, destination: Path, reference: Path) -> str:
             shutil.copy2(source/f,destination/f)
         for source_name, destination_name in BOOT_FILES.items():
             shutil.copy2(reference/source_name,destination/destination_name)
-        shutil.copytree(src,destination/"src",symlinks=False)
+        shutil.copytree(src,destination/"src",symlinks=False,ignore=ignore_alias)
         cfg=destination/"config.yaml"
         s=cfg.read_text(encoding="utf-8")
         s=once(s,'slug: "ha_mcp"','slug: "ha_mcp_phase2h"')
