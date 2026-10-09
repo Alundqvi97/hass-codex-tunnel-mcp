@@ -51,16 +51,20 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(self.run_init(),"NOT_ARMED")
         self.assertFalse((self.data/"tool_policy.json").exists())
     def test_unsafe_options_block(self):
+        baseline=self.options.copy()
         for key,value in (("require_strict_tool_policy",False),
                           ("enable_tool_security_policies",False),
                           ("enable_security_policy_tool",True),
                           ("bootstrap_reviewed_policy","true"),
                           ("require_strict_tool_policy",None)):
             with self.subTest(key=key,value=value):
-                self.options[key]=value;self.save_options()
+                self.options=baseline.copy()
+                self.options[key]=value
+                self.save_options()
                 with self.assertRaises(ValueError):self.run_init()
                 self.assertFalse((self.data/"tool_policy.json").exists())
-                self.options[key]={"bootstrap_reviewed_policy":"bogus"}.get(key,True) if key!="enable_security_policy_tool" else False
+        self.options=baseline.copy()
+        self.save_options()
     def test_broken_template_never_installs(self):
         self.package.write_text('{"rule_effect":"require_approval","rules":[]}')
         with self.assertRaises(ValueError):self.run_init()
@@ -147,9 +151,5 @@ class PatchTests(unittest.TestCase):
         source=(ROOT/".github/workflows/phase2h-haos-vm-once.yml").read_text()
         self.assertIn("paths: [.github/workflows/phase2h-haos-vm-once.yml]",source)
         self.assertNotIn("workflow_dispatch",source)
-    def test_synthetic_install_order_never_proves_supervisor(self):
-        other=load("phase2j_install_for2k","installation_plan.py") if False else None
-        self.assertIsNone(other)
-
 if __name__=="__main__":
     unittest.main()
