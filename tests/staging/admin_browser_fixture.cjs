@@ -35,6 +35,7 @@ process.once('SIGTERM', () => {
     await context.route('**/*', route => ownedOrigin(route.request().url()) ? route.continue() : route.abort());
     const page = await context.newPage();
     page.on('pageerror', error => console.error('BROWSER_PAGE_ERROR='+scrub(error.message)));
+    page.on('websocket', socket => socket.on('socketerror', error => console.error('BROWSER_WS_ERROR='+scrub(error))));
     page.on('console', message => { if (/^FIXTURE_(?:LOGIN_STAGE|OWNER_CODE)=[a-z_-]+$/.test(message.text())) console.log(message.text()); });
     checkpoint('panel-load');
     // A normal HTML document gives PKCE/auth a defined loopback origin; HA's

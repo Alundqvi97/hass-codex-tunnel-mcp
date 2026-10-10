@@ -39,6 +39,19 @@ jobs:
         run: |
           python -B scripts/development/package.py "$RUNNER_TEMP/native-admin.zip"
           python -B scripts/development/package.py --verify "$RUNNER_TEMP/native-admin.zip" > "$RUNNER_TEMP/native-admin-manifest.json"
+      - name: Sandboxed actual owner panel and native login
+        env:
+          ADMIN_RELEASE_ARCHIVE: '${{ runner.temp }}/native-admin.zip'
+          PYTHONDONTWRITEBYTECODE: '1'
+          PYTHONPYCACHEPREFIX: '${{ runner.temp }}/admin-pycache'
+        run: |
+          mkdir "$RUNNER_TEMP/admin-browser"
+          cp tests/staging/browser/package*.json "$RUNNER_TEMP/admin-browser/"
+          npm ci --prefix "$RUNNER_TEMP/admin-browser" --ignore-scripts --no-audit --no-fund
+          export NODE_PATH="$RUNNER_TEMP/admin-browser/node_modules"
+          export ADMIN_BROWSER_EXECUTABLE="$(command -v google-chrome)"
+          test -n "$ADMIN_BROWSER_EXECUTABLE"
+          python -B -m unittest discover -s tests/staging -p 'test_admin_browser.py' -v
       - name: Native MCP, owner approval, state, faults and process restart
         env:
           ADMIN_RELEASE_ARCHIVE: '${{ runner.temp }}/native-admin.zip'
@@ -76,19 +89,6 @@ jobs:
           bash -n scripts/development/install.sh
           git diff --check
           git diff --exit-code
-      - name: Sandboxed actual owner panel and native login
-        env:
-          ADMIN_RELEASE_ARCHIVE: '${{ runner.temp }}/native-admin.zip'
-          PYTHONDONTWRITEBYTECODE: '1'
-          PYTHONPYCACHEPREFIX: '${{ runner.temp }}/admin-pycache'
-        run: |
-          mkdir "$RUNNER_TEMP/admin-browser"
-          cp tests/staging/browser/package*.json "$RUNNER_TEMP/admin-browser/"
-          npm ci --prefix "$RUNNER_TEMP/admin-browser" --ignore-scripts --no-audit --no-fund
-          export NODE_PATH="$RUNNER_TEMP/admin-browser/node_modules"
-          export ADMIN_BROWSER_EXECUTABLE="$(command -v google-chrome)"
-          test -n "$ADMIN_BROWSER_EXECUTABLE"
-          python -B -m unittest discover -s tests/staging -p 'test_admin_browser.py' -v
       - name: Verified official client, loopback control plane only
         env:
           ADMIN_RELEASE_ARCHIVE: '${{ runner.temp }}/native-admin.zip'
