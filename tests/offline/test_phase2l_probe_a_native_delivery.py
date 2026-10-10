@@ -198,7 +198,12 @@ class NativeAssetFixtures(unittest.TestCase):
         expected=self.reader.expected[self.path];expected['parents'][-1]['inode']+=1
         with self.assertRaises(Exception):self.reader.read_asset(self.path)
     def test_same_bytes_different_inode_symlink_and_writable_asset_rejected(self):
-        os.unlink(self.path);Path(self.path).write_bytes(b'fixture');os.chmod(self.path,0o400)
+        # Create while the original inode is still allocated. Immediate unlink/
+        # recreate can reuse that inode on ext4 and fail to test substitution.
+        replacement=self.path+'.replacement'
+        Path(replacement).write_bytes(b'fixture');os.chmod(replacement,0o400)
+        self.assertNotEqual(os.stat(replacement).st_ino,os.stat(self.path).st_ino)
+        os.replace(replacement,self.path)
         with self.assertRaises(Exception):self.reader.read_asset(self.path)
         os.unlink(self.path);os.symlink('/etc/passwd',self.path)
         with self.assertRaises(Exception):self.reader.collect(self.path)
