@@ -36,6 +36,54 @@ This uses the separately locked Playwright1.62.1 development client outside the 
 
 The fresh-checkout receipt and exact counts/checksums are in `docs/security/NATIVE_ADMIN_EVIDENCE.json`. Do not count repeated tests as independent coverage. Use `docs/security/RECOVERY_DESIGN.md` for the selected connection, restart, update and restore gates. The old unpublished cloud draft is not a production dependency and was not republished.
 
+## Bounded disposable staging
+
+Use the existing environment above and the verified release archive. No new
+installer or permanent service is needed:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 /workspace/.cloud-environment/admin-development/venv/bin/python -B scripts/development/staging.py --archive artifacts/native-admin-0.2.0.zip --seconds 900
+```
+
+For the already hash-verified Linux amd64 official v0.0.16 binary, add
+`--official-client /path/to/tunnel-client`. This starts only the existing local
+fake control plane and retained manager, never an OpenAI connection. The helper
+rejects a different candidate/client digest and an unreviewed/main checkout.
+The Python executable can be replaced with the compatible checked-in setup's
+venv on another permitted development machine; this is not a production path.
+
+Core binds loopback, installs the actual archive, serves the native frontend
+and custom approval panel assets, and creates only named synthetic automation,
+script/helper/dashboard and synthetic switch entities. A pending repair remains
+unapproved. The random synthetic owner login resides in a0600 file inside its
+0700 temporary directory; never print/copy it into Git or chat. Onboarding metadata
+is a preconfigured synthetic fixture, avoiding native onboarding's unrelated
+Internet integrations. It does not claim a real person's browser onboarding.
+
+Stop with Ctrl-C in the owning foreground terminal, or SIGTERM to the exact PID
+in its ready record. Expiry (maximum900 seconds after readiness) also stops the
+owned client, closes Core and removes state/credentials. Cleanup failure is an
+error, not a passing result. Startup has a45-second observation deadline and
+signals interrupt startup before readiness. Partial Core setup uses forced stop.
+Cleanup verifies stopped Core, closed client/listeners and a reaped tunnel child.
+Its10-second per-component observation limit is not a hard process kill deadline:
+the retained manager preserves ownership during cancellation-resistant teardown,
+which can delay runner exit. A timeout reports incomplete and never PASS; this
+helper does not add a watchdog or promise kernel enforcement. Listener/connection
+audits sample this process and its actual official child; they are not OS network
+confinement. Abrupt host termination/suspension cannot guarantee
+that a deadline runs: inspect and retire owned residual state before resuming.
+Do not use nohup/disown, a system service or worktree as an onboarding workaround.
+
+Codex publication/snapshots preserve files, not a guaranteed running service.
+This cloud currently returns CONNECT403 for api.openai.com and the official
+documentation pages, and its Chromium sandbox cannot launch. Existing public
+nonprivileged CI supplies actual sandboxed panel acceptance. A current task's
+loopback test is not a hosted/iPhone connection or a persistent test server.
+See the existing runbook's cloud staging receipt and separate hosted approval
+row before any account action or change of test host. Setup draft saving is
+distinct from publication; no environment/security setting was changed.
+
 ## Execution restrictions
 
 No live Probe A, root/sudo, capability change, firewall/cgroup mutation, privileged container, Docker socket/host network, QEMU/HAOS/VM, household/production access, real OAuth/key/tunnel configuration, paid resource, workflow dispatch/retry, host reboot, merge or environment publication. Only this task's nonprivileged loopback instances, synthetic identities/state and owned child processes may run or be removed. Do not edit application/lock/workflow/production files as a side effect of setup. Missing proof stays missing; compilation or synthetic evidence does not establish kernel enforcement, hosted ChatGPT/iPhone or HAOS acceptance.

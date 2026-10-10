@@ -48,6 +48,139 @@ Rows are separate authorizations; accepting one does not authorize the others.
 
 The owner accepted the explicit named-object staging scope/window. The smallest next decision is separate exact authorization for the isolated hosted test row. It is not permission to deploy or a request to repeat completed source engineering.
 
+## Codex Cloud disposable staging receipt — 2026-10-10
+
+Recovered PR2 at `d3dd1e41d60320e13b1758abbc7f681d721360b3`, open/draft/unmerged,
+with no intervening changes or dirty work. The actual GitHub0.2.0 archive was
+downloaded again from immutable source `d0983cbdb422bb4089a846f1aa34d814432aa735`
+and verified as `deb0a0507f8a3105c4c5f14fcb7eabb3952a5dd5d48fabcdff180548df3981d8`.
+Application/components, dependency lock and release archive are unchanged.
+
+The existing125-package Python3.14.2/Core2026.10.0 environment passed dependency
+checking. Final checked-in setup reproduced59 installed-archive native tests in133.699s, including
+script/helper/dashboard operations, denial/replay/expiry/revocation, actual
+process restarts, interruption/reconciliation and native backup restoration.
+Actual officialv0.0.16 client contract passed in1.984s against the local fake
+control plane. Five scheduling iterations had0failures/0duplicate writes; this
+is bounded fault coverage, not a stability soak. The same setup also passed489
+Phase2L tests in0.703s and633 broader regressions in5.11s, with one optional
+legacy selector skip in the separate security venv. Setup preserved the working
+tree/index and used the existing hash lock/TLS; it did not create a second installer.
+No retained historical counts
+are added to these fresh results.
+
+`scripts/development/staging.py` reuses the existing installed-archive fixture
+and manager. One bounded foreground invocation creates loopback-only Core,
+native frontend/panel assets and only `codex_staging_fault`,
+`codex_staging_script`, `codex_staging_helper`, `codex-staging-board` and the
+synthetic switch fixture. It creates a0700 temporary directory with a0600
+random synthetic native login file. All runtime auth/storage stays outside Git.
+Synthetic preconfigured onboarding metadata avoids activating unrelated native
+onboarding Internet integrations; real owner onboarding is not claimed.
+
+Actual ready listener inspection showed only127.0.0.1. A fresh native HTTP PKCE
+login issued a distinct connector, which failed privileged REST. The deliberate
+division-by-zero automation was diagnosed through actual traces, denied before
+approval, repaired after one exact native owner WebSocket approval, read back,
+rolled back and restored. Connector and native refresh credentials were revoked.
+Intentional SIGTERM reaped the owned official client and removed private state
+and login data. Final separate staging acceptance took6.689s; it is not an extra
+independent native-suite total. Final five-second expiry also removed its state.
+Initial staging helper cleanup/landing-page assumptions and a harness proposal
+that repeated the automation ID were corrected; the latter received the existing
+`automation_id_is_target` denial with no mutation. No product defect was found
+and no application workaround was introduced.
+
+Separate read-only review corrected interrupted-startup handling and partial
+Core cleanup in the staging helper. Stops cancel startup, checked boundaries
+prevent readiness after interruption, and a45-second startup observation deadline
+is explicit. Forced Core shutdown, actual closed listeners/client and reaped
+manager child are verified before cleanup success. Early/partial startup signal
+and injected startup deadline acceptance are recorded separately: all4 lifecycle
+tests passed in18.003s, including retained private state on uncertain cleanup. Cancellation-
+resistant manager ownership means10-second cleanup observation is not a hard
+overall process-exit limit; incomplete observation cannot report PASS. No new
+watchdog is added. Socket audits of Core/actual official child and fixed local
+flags are source/observed isolation, not kernel network confinement.
+
+Cloud Chromium failed sandbox startup (1requested browser test failed,1.677s).
+No sandbox disabling/system repair was attempted. Existing immutable candidate
+CI38068489555 passed the actual sandboxed owner panel, full native/package tests
+and official client. Serving the full native frontend here is not a new browser
+interaction result. The existing development CI adds only the same bounded
+loopback staging command and4 startup/cleanup regressions; triggers and privileged/VM workflows are unchanged.
+
+### Capability and hosted prerequisites
+
+The cloud proxy returns CONNECT403 for `api.openai.com/v1/tunnels` and all three
+requested OpenAI documentation pages, including the narrow approved anonymous
+read-only exception check. These are proxy denials, not OpenAI auth responses.
+Current official GitHub source was read at
+`b91e6c992dfd33e5c5ea94b00449c527c110851e` (permissions/onboarding/architecture/
+configuration), alongside the selectedv0.0.16 CLI/release source
+`5f99daabd4aa4a77049e6d81d54a0d8c18335397`. Current web-page contents remain
+unreadable here; current master is a reference, not an untested upgrade.
+
+Codex's onboarding contract explicitly says snapshots do not guarantee surviving
+processes/connections/runtime authentication. No callable hosting/lease/resume
+capability establishes availability after this task. Detached processes or a
+suspended task are not supported replacements. Real interactive hosting is
+**not established in this cloud**. All owned staging processes are stopped
+after verification. A new task can reproduce files/startup; it cannot be promised
+the same running service, port or authority.
+
+The smallest alternative is a temporary foreground session on an **existing
+nonproduction computer with supported Codex shell access**, kept awake only for
+the test. The agent can install the isolated tested toolchain, verify the archive,
+start/stop Core and its one manager, then remove owned state. It is not a dedicated
+test server or permanent always-on dependency. No such host has been identified
+or accessed; do not substitute production Ubuntu/home-infra or alter lab
+isolation. Linux amd64 is the tested helper/client environment; another OS needs
+the matching verified official artifact/toolchain before execution. A local
+browser on that computer handles owner approval while iPhone uses ChatGPT. No
+public HA API/owner interface or extra tunnel channel is proposed. An all-iPhone
+owner-panel workflow remains separate acceptance, not silently proven.
+
+The existing hosted approval row now requires the following **single consolidated
+decision**, with separate authorization boundaries still intact:
+
+| Required prerequisite/action | Exact limit and owner involvement |
+|---|---|
+| Temporary host | Identify and authorize one already available nonproduction computer with agent access, verified outbound OpenAI HTTPS and an uninterrupted test session. Agent handles installation/run/cleanup; no manual server build, paid host, public ingress or persistent service. If none exists, hosting remains the blocker. |
+| Platform organization and ChatGPT workspace | Supply non-secret intended organization/workspace IDs and intended account. Codex Cloud membership does not establish either. Verify current eligibility in the actual account; stop if payment/subscription change is needed. |
+| One new test tunnel and runtime key | Separately authorize creation of only a new named isolated tunnel, associated with that organization/workspace, selected NoOAuth. Use Platform's account UI: creator Read+Manage; runtime principal and ChatGPT operator Read+Use, preferably per-tunnel. Restricted runtime key gets only Tunnels Read+Use; no admin key in the daemon. Enter it only through the chosen host's supported secure native configuration/secret input, never chat/Git. Current cloud draft has no runtime secret binding; proxy placeholders are not assumed to be raw daemon credentials. |
+| ChatGPT and iPhone | Owner attaches only the new test tunnel in ChatGPT's connection settings and performs the actual conversation/iPhone steps. Verify six correct tools, unapproved denial, one native owner-approved repair/readback/rollback and disconnect recovery. With an existing separately permitted not-entitled identity, verify workspace/share denial. No existing connection changes or new account purchase. |
+| Cleanup and budget | $0incremental; stop instead of purchasing access. Stop/reap owned Core/client, revoke native connection/key, remove the new ChatGPT test connection and test tunnel, and remove owned runtime state after preserving sanitized results. HAOS/production remain separately NOT AUTHORIZED. |
+
+Prepared configuration is inert: it is not imported or activated. After that
+exact authorization, use the retained native wrapper with values from the new
+private state; never run a second standalone client alongside its manager:
+
+```json
+{
+  "enabled": false,
+  "authentication_on_platform": "NoOAuth",
+  "platform_organization_id": "OWNER_SELECTED_ORGANIZATION",
+  "chatgpt_workspace_id": "OWNER_SELECTED_WORKSPACE",
+  "wrapper_entry_after_authorization": {
+    "tunnel_id": "NEW_TEST_TUNNEL_ID_FROM_PLATFORM",
+    "api_key": "ENTER_ONLY_IN_HOST_SECURE_NATIVE_CONFIGURATION",
+    "ha_mcp_url": "OWNED_LITERAL_LOOPBACK_ORIGIN/api/hass_codex_admin/mcp",
+    "admin_connection_id": "NEW_NATIVE_OWNER_ISSUED_CONNECTION_ID",
+    "control_plane_base_url": "https://api.openai.com",
+    "control_plane_url_path": "",
+    "auto_update_tunnel_client": false
+  }
+}
+```
+
+NoOAuth relies on separately verified Platform/workspace access, not anonymous
+administration. The manager resolves the opaque local connector privately and
+injects it only for scoped MCP discovery/calls; a broad HA token is never used.
+Forwarded caller headers are not human approval. The runtime key goes only to
+the control plane; native owner login/approval remains independent. No real
+tunnel/key/app association/account change has been performed.
+
 ## Historical tunnel recovery proposal — preserved
 
 # Tunnel-client v0.0.15 crash resilience — isolated follow-up design

@@ -103,3 +103,7 @@ jobs:
           chmod 700 "$RUNNER_TEMP/admin-official-client/tunnel-client"
           export ADMIN_OFFICIAL_CLIENT="$RUNNER_TEMP/admin-official-client/tunnel-client"
           python -B -m unittest discover -s tests/staging -p 'test_admin_official_transport.py' -v
+          # Bounded foreground staging, synthetic native frontend and private
+          # state; this helper has no hosted mode and removes state on expiry.
+          python -B scripts/development/staging.py --archive "$ADMIN_RELEASE_ARCHIVE" --official-client "$ADMIN_OFFICIAL_CLIENT" --seconds 1
+          python -B -m unittest discover -s tests/staging -p 'test_admin_staging.py' -v

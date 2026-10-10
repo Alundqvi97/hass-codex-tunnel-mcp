@@ -922,5 +922,194 @@
     "default_configuration": "Production/default remains unaccepted; no live config or connection was changed",
     "hosted_haos_production": "Separate authorizations remain pending; policy/scope consent does not authorize these",
     "full_product": "Accepted staging subset does not mark Blueprint full administration complete"
+  },
+  "codex_cloud_staging_2026_10_10": {
+    "starting_sha": "d3dd1e41d60320e13b1758abbc7f681d721360b3",
+    "candidate_source_sha": "d0983cbdb422bb4089a846f1aa34d814432aa735",
+    "archive_sha256": "deb0a0507f8a3105c4c5f14fcb7eabb3952a5dd5d48fabcdff180548df3981d8",
+    "archive_retrieved_from_immutable_github": true,
+    "pr": "2 open/draft/unmerged; ancestry verified, dirty work preserved, normal history only",
+    "runtime": {
+      "python": "3.14.2",
+      "core": "2026.10.0",
+      "administrator": "0.2.0",
+      "official_client": "v0.0.16",
+      "client_binary_sha256": "01260ee973d5510861bc32979739561edd33869f99f9f8cd324f6d0da5b2e692",
+      "production_components_changed": false,
+      "locks_changed": false
+    },
+    "fresh_validation": {
+      "native": {
+        "passed": 59,
+        "failed": 0,
+        "skipped": 0,
+        "seconds": 133.699,
+        "installed_archive": true
+      },
+      "phase2l": {
+        "passed": 489,
+        "failed": 0,
+        "seconds": 0.703
+      },
+      "broader": {
+        "passed": 633,
+        "skipped": 1,
+        "seconds": 5.11,
+        "skip": "Optional legacy HA selector absent in separate security venv"
+      },
+      "launcher_lifecycle": {
+        "passed": 4,
+        "seconds": 18.003,
+        "cases": [
+          "stop before initialization",
+          "stop during partial Core setup",
+          "startup deadline never ready",
+          "uncertain teardown preserves owned private state until explicit recovery"
+        ]
+      },
+      "official_client": {
+        "passed": 1,
+        "seconds": 1.984,
+        "actual_manager_and_client": true,
+        "substituted_boundary": "loopback metadata/poll/response control plane; no hosted connection"
+      },
+      "cloud_browser": {
+        "failed": 1,
+        "seconds": 1.677,
+        "cause": "Chromium sandbox launch unavailable; no sandbox disabling"
+      },
+      "checks": [
+        "Python compile with external pycache",
+        "shell/node syntax",
+        "dependency compatibility/hash lock/TLS",
+        "validation worktree/index unchanged",
+        "git diff --check",
+        "protected source/archive/Blueprint/VM triggers unchanged"
+      ]
+    },
+    "single_staging_instance": {
+      "passed": [
+        "connector denied privileged REST while native owner works",
+        "actual broken automation trace diagnosis",
+        "one exact native owner repair approval, mutation, readback and rollback",
+        "native owner credential and connector revocation",
+        "intentional stop reaped owned child and removed private state/credentials"
+      ],
+      "duration_seconds": 6.689,
+      "hosted": false,
+      "browser_UI": false,
+      "live_household_or_OpenAI_credentials": false
+    },
+    "reliability": {
+      "iterations": 5,
+      "failed": 0,
+      "duplicate_writes": 0,
+      "seconds": 0.85,
+      "task_and_rollback_ms": [
+        133.24,
+        133.17,
+        134.55,
+        158.06,
+        149.73
+      ],
+      "scope": "bounded varied scheduling, not a soak; repeated suites are not added coverage"
+    },
+    "three_operation_repair": {
+      "approvals": 1,
+      "execute_ms": 61.55,
+      "rollback_ms": 81.25
+    },
+    "staging_helper": {
+      "path": "scripts/development/staging.py",
+      "listener": "127.0.0.1",
+      "runtime_state": "task-owned external directory0700; synthetic login0600",
+      "foreground_ready_lifetime_seconds_maximum": 900,
+      "startup_observation_seconds": 45,
+      "cleanup_observation_seconds_per_step": 10,
+      "hard_process_exit_bound": false,
+      "uncertain_cleanup": "no PASS; retain private state; inspect/recover only owned processes/resources",
+      "actual_successful_stop_and_expiry": "owned client reaped; Core listener closed; private credentials/state removed",
+      "synthetic_objects": [
+        "codex_staging_fault",
+        "codex_staging_script",
+        "codex_staging_helper",
+        "codex-staging-board",
+        "switch.synthetic_lamp",
+        "switch.synthetic_second_lamp"
+      ],
+      "network_claim": "source guard plus actual socket inspection; not kernel confinement"
+    },
+    "cloud_hosting": {
+      "interactive_hosted_suitability": "NOT ESTABLISHED",
+      "openai_https": "CONNECT403 through cloud proxy, including narrow approved anonymous exception",
+      "references_https": "three current OpenAI webpages CONNECT403; not read successfully",
+      "persistence": "onboarding snapshot contract does not guarantee processes/connections/runtime auth; no supported lease/resume hosting tool",
+      "no_unsupported_keepalive": true,
+      "all_task_staging_services_stopped": true,
+      "environment_published": false,
+      "auth_network_settings_changed": false
+    },
+    "official_reference": {
+      "current_github_source": "b91e6c992dfd33e5c5ea94b00449c527c110851e",
+      "selected_client_source": "5f99daabd4aa4a77049e6d81d54a0d8c18335397",
+      "facts": "Platform organization, ChatGPT workspace and CodexCloud membership distinct. Creator Read+Manage; restricted runtime principal and intended ChatGPT operator Read+Use, preferably per tunnel. Workspace association and actual NoOAuth denial/positive acceptance remain external. No real key/tunnel/account modification."
+    },
+    "separate_review": {
+      "mode": "existing read-only adversarial reviewer; not certification",
+      "confirmed_launcher_issues_corrected": [
+        "startup stop did not cancel initialization",
+        "partial Core forced cleanup",
+        "cleanup observation cannot prove hard process-exit deadline",
+        "private-state finalization must not erase uncertain cleanup evidence"
+      ],
+      "final_review": "no further confirmed blocker in reviewed staging paths",
+      "application_defects_found": []
+    },
+    "starting_sha_ci": {
+      "sha": "d3dd1e41d60320e13b1758abbc7f681d721360b3",
+      "native_sandboxed_panel": {
+        "run": 38068489555,
+        "conclusion": "success"
+      },
+      "D": {
+        "run": 38068489534,
+        "conclusion": "success"
+      },
+      "I": {
+        "run": 38068489562,
+        "conclusion": "success"
+      },
+      "J": {
+        "run": 38068489574,
+        "conclusion": "success"
+      },
+      "K": {
+        "run": 38068489598,
+        "conclusion": "success"
+      },
+      "L": {
+        "run": 38068489565,
+        "conclusion": "success"
+      },
+      "E": {
+        "run": 38068486635,
+        "conclusion": "success"
+      },
+      "F": {
+        "run": 38068486643,
+        "conclusion": "success"
+      },
+      "scanner": {
+        "run": 38068490861,
+        "conclusion": "failure",
+        "clean_review": false,
+        "paid_or_retry": false
+      }
+    },
+    "new_commit_ci": "Observe actual immutable staging-source SHA in PR2 after normal push; existing success is not evidence of new CI.",
+    "next_decision": "One already available nonproduction computer with supported Codex access and session lifetime; non-secret Platformorg/workspace/account identification; separately authorize only new isolated tunnel/restricted runtime key/test connection and actual owner ChatGPT/iPhone actions. Agent handles isolated installation/run/cleanup; zero incremental budget; no production/HAOS authorization.",
+    "hosted_chatgpt_iphone": "NOT AUTHORIZED / NOT PERFORMED / NOT VERIFIED",
+    "production_haos_probe": "NOT AUTHORIZED / NOT PERFORMED",
+    "durable_delivery": "This committed sanitized receipt and checksum inventory; runtime credentials/logins/databases not committed. Existing archive unchanged."
   }
 }
