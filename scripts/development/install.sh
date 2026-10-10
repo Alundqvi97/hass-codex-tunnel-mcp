@@ -288,4 +288,3 @@ cmp "$run_dir/index.before" "$run_dir/index.after"
 check_base "$repo_dir"
 printf 'Offline validation completed; logs and generated fixtures: %s\n' "$run_dir"
 printf 'No live Probe A/OS proof or runtime authorization follows from these results.\n'
-
