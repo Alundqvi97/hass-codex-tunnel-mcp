@@ -774,6 +774,12 @@
       "browser_push_run": 38066970514,
       "browser_push": "failure",
       "failure": "Menu/control labels included option text; exact field label unavailable. Explicit HTML label-for control IDs correct production accessibility; body35s, assertions and sandbox unchanged."
+    },
+    {
+      "sha": "fc984cfe2b21e6593748ed8707db5c13933be9f1",
+      "browser_pr_run": 38067182614,
+      "browser_pr": "failure",
+      "failure": "Menu selection progressed; subsequent password field absent. Added bounded sanitized actual DOM diagnostic. Also corrected fixture multiline literal to an actual line break; expected assertion unchanged."
     }
   ],
   "multi_step_repair": {

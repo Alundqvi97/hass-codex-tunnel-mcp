@@ -162,6 +162,10 @@ process.once('SIGTERM', () => {
     await flowCard.getByLabel('next_step_id', {exact:true}).selectOption('0');
     await flowCard.getByRole('button', {name:'Continue in native HA', exact:true}).click();
     const pin = flowCard.getByLabel('pin', {exact:true});
+    try { await pin.waitFor({timeout:5000}); } catch (error) {
+      const facts = await page.evaluate(() => ({labels:[...document.querySelectorAll('hass-codex-admin label')].map(label => label.textContent), message:document.querySelector('hass-codex-admin > p:last-of-type')?.textContent}));
+      console.error('NATIVE_FORM_DIAGNOSTIC='+scrub(JSON.stringify(facts))); throw error;
+    }
     if (await pin.getAttribute('type') !== 'password') throw new Error('native secret selector was visible input');
     await pin.fill(process.env.ADMIN_BROWSER_PASSWORD);
     const continueNative = flowCard.getByRole('button', {name:'Continue in native HA', exact:true});
