@@ -71,6 +71,7 @@ class ActorPreparation:
     pending: PendingRoleConfiguration
     startup: object
     configuration: RoleConfiguration | None = None
+    owner: object | None = None
 
 
 class ReviewedActorFactory:
@@ -176,7 +177,10 @@ class IntegratedBootstrap:
                 # the actual exec identity on every IPC chunk, not SO_PEERCRED.
                 channel = BoundedSocketIPC(CredentialSocket(prepared.startup, binding), clock=self.clock)
                 coordinator.register(role, config, binding, channel, actors[role])
-                for _, fd in prepared.spec.inherited: os.close(fd)
+                if prepared.owner is not None:
+                    prepared.owner.close() # numeric slot reuse remains uncertain
+                else:
+                    for _, fd in prepared.spec.inherited: os.close(fd)
                 prepared.pending.reader = None
                 coordinator.await_ready(role)
             coordinator.release_work(before_controller=evidence_audit.before_controller)

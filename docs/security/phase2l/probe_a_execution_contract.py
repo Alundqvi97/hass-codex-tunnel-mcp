@@ -14,10 +14,18 @@ from probe_a_os_inventory import ROLES
 # CAP_SETGID/SETUID/SETPCAP, NET_ADMIN and SYS_PTRACE are needed only
 # by the fixed trusted assembly/metadata interfaces. No role may receive
 # SYS_ADMIN, DAC_OVERRIDE, SYS_MODULE, NET_RAW or arbitrary bounding authority.
-ROLE_CAPABILITY_LIMITS = {"guardian":sum(1<<n for n in (6,7,8,12,21)),
-    "observer":sum(1<<n for n in (8,12,21)), "read-command":1<<12,
-    "guardian-command":1<<12, "controller":0, "peer":0, "worker":0}
-WORKER_BOOTSTRAP_LIMIT = sum(1<<n for n in (6,7,8))
+CAP_SETGID, CAP_SETUID, CAP_SETPCAP = 6, 7, 8
+CAP_NET_ADMIN, CAP_SYS_PTRACE, CAP_SYS_ADMIN = 12, 19, 21
+# Linux include/uapi/linux/capability.h, checked against the available header.
+# SETUID/GID: fixed worker drop; SETPCAP: descendant bounding reduction;
+# NET_ADMIN: fixed firewall commands; SYS_PTRACE: proc/exe metadata across UID
+# and dumpability boundaries, NOT ptrace/process_vm/pidfd_getfd permission.
+ROLE_CAPABILITY_LIMITS = {"guardian":sum(1<<n for n in
+    (CAP_SETGID,CAP_SETUID,CAP_SETPCAP,CAP_NET_ADMIN,CAP_SYS_PTRACE)),
+    "observer":sum(1<<n for n in (CAP_SETPCAP,CAP_NET_ADMIN,CAP_SYS_PTRACE)),
+    "read-command":1<<CAP_NET_ADMIN,"guardian-command":1<<CAP_NET_ADMIN,
+    "controller":0,"peer":0,"worker":0}
+WORKER_BOOTSTRAP_LIMIT = sum(1<<n for n in (CAP_SETGID,CAP_SETUID,CAP_SETPCAP))
 
 
 class ExecutionDenied(SessionDenied):

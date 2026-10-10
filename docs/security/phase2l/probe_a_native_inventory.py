@@ -108,6 +108,27 @@ class NativeAssetReader:
         if info != self.expected.get(path): raise InventoryDenied("NATIVE_ASSET_METADATA_OR_ANCESTRY_DRIFT")
         return info
 
+    def open_verified_fd(self,path):
+        """Bind subsequent native loading/exec to the bytes actually verified."""
+        expected_data=self.read_asset(path)
+        descriptors,parents,name=self._walk(path)
+        fd=None
+        try:
+            fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK|os.O_CLOEXEC,dir_fd=descriptors[-1])
+            before=os.fstat(fd)
+            info=dict(metadata(before),parents=parents)
+            if info!=self.expected.get(path) or before.st_nlink!=1:
+                raise InventoryDenied('LOADING_DESCRIPTOR_METADATA_SUBSTITUTION')
+            actual=os.pread(fd,MAX_ASSET+1,0)
+            if actual!=expected_data or metadata(os.fstat(fd))!=metadata(before):
+                raise InventoryDenied('LOADING_DESCRIPTOR_BYTES_SUBSTITUTION')
+            self.inspect_asset(path);self._time()
+            result,fd=fd,None
+            return result
+        finally:
+            if fd is not None:os.close(fd)
+            for item in reversed(descriptors):os.close(item)
+
     def read_alias(self, path):
         descriptors, parents, name = self._walk(path)
         try:

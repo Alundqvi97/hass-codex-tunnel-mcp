@@ -41,7 +41,8 @@ SOURCE_NAMES=(
     "probe_a_native_ledger.py", "probe_a_native_inventory.py", "probe_a_native_verifier.py",
     "probe_a_native_scopes.py", "probe_a_native_policy.py", "probe_a_native_evidence.py",
     "probe_a_native_assembly.py", "probe_a_native_deadline.py", "probe_a_deadline_guard.c",
-    "probe_a_native_resources.py",
+    "probe_a_native_resources.py", "probe_a_native_package.py", "probe_a_native_trace.py", "probe_a_trace.bpf.c",
+    "probe_a_native_credentials.py",
 )
 PINNED=BINARY_PATHS+CONFIG_PATHS+tuple(str(Path(__file__).resolve().parent / f) for f in SOURCE_NAMES)
 

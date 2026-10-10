@@ -143,9 +143,12 @@ class ActorReadinessCoordinator:
             for role in ("observer", "guardian", "controller"):
                 actor = self.actors[role]
                 actor.control_sequence = 1
-                actor.channel.send_bytes(canonical({"v": 1, "context": self.context.identifier,
+                release={"v": 1, "context": self.context.identifier,
                     "role": role, "seq": 1, "command": "RUN",
-                    "controller": identity_record(self.actors["controller"].config.identity)}), deadline=self.context.cutoff)
+                    "controller": identity_record(self.actors["controller"].config.identity)}
+                if 'guardian-audit' in dict(self.actors['observer'].config.descriptors):
+                    release['actors']={r:identity_record(a.config.identity) for r,a in self.actors.items()}
+                actor.channel.send_bytes(canonical(release), deadline=self.context.cutoff)
                 if before_controller is not None and role != "controller":
                     # The native integrated path starts independent services
                     # and observes RUNNING before taking the baseline barrier.
@@ -211,14 +214,25 @@ class RoleStartup:
             raise CoordinationDenied("STARTUP_REPLAY_OR_NOT_READY")
         value = decode(self.channel.recv_bytes(MAX_STARTUP, deadline=self.config.context.cutoff), MAX_STARTUP)
         from probe_a_session import identity_from
-        if type(value) is not dict or set(value) != {"v", "context", "role", "seq", "command", "controller"}:
+        fields={"v", "context", "role", "seq", "command", "controller"}
+        if type(value) is not dict or set(value) not in (fields,fields|{'actors'}):
             raise CoordinationDenied("FORGED_WORK_RELEASE")
         self.controller = identity_from(value["controller"])
         self.controller.require_controller()
-        if (value != {"v": 1, "context": self.config.context.identifier,
+        expected={"v": 1, "context": self.config.context.identifier,
                      "role": self.config.role, "seq": 1, "command": "RUN",
                      "controller": identity_record(self.controller)}
+        self.actors={}
+        if 'actors' in value:
+            if type(value['actors']) is not dict or set(value['actors'])!=set(ACTORS):raise CoordinationDenied('INCOMPLETE_ACTOR_RELEASE')
+            self.actors={r:identity_from(i) for r,i in value['actors'].items()}
+            if (self.actors[self.config.role]!=self.config.identity or self.actors['controller']!=self.controller
+                    or any(self.actors[r]!=i for r,i in self.config.peers)):
+                raise CoordinationDenied('ACTOR_RELEASE_SUBSTITUTION')
+            expected['actors']=value['actors']
+        if 'guardian-audit' in dict(self.config.descriptors) and not self.actors:
+            raise CoordinationDenied('GUARDIAN_AUDIT_RELEASE_REQUIRED')
+        if (value != expected
                 or self.config.role == "controller" and self.controller != self.config.identity):
             raise CoordinationDenied("FORGED_WORK_RELEASE")
         self.released = True
-        self.announce("RUNNING")

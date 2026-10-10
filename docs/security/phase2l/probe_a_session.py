@@ -158,7 +158,7 @@ class RoleConfiguration:
             raise SessionDenied("ROOT_ACTOR_IDENTITY_REQUIRED")
         names, fds = set(), set()
         allowed = {"startup", "guardian", "observer", "controller", "audit",
-                   "guardian-pidfd", "observer-pidfd", "startup-pidfd"}
+                   "guardian-audit", "observer-audit", "guardian-pidfd", "observer-pidfd", "startup-pidfd"}
         for name, fd in self.descriptors:
             if (name not in allowed or name in names or type(fd) is not int or fd < 3 or fd in fds):
                 raise SessionDenied("DESCRIPTOR_SUBSTITUTION_OR_DUPLICATION")
@@ -166,6 +166,8 @@ class RoleConfiguration:
         required = {"startup", "guardian", "observer", "guardian-pidfd", "observer-pidfd", "startup-pidfd"} \
             if self.role == "controller" else ({"startup", "controller"} if self.role == "guardian"
                                                else {"startup", "controller", "audit"})
+        if self.role=='guardian' and 'observer-audit' in names:required.add('observer-audit')
+        if self.role=='observer' and 'guardian-audit' in names:required.add('guardian-audit')
         if names != required:
             raise SessionDenied("UNEXPECTED_ROLE_DESCRIPTORS")
         peer_roles = set()
@@ -175,6 +177,8 @@ class RoleConfiguration:
             identity_from(identity_record(identity)); peer_roles.add(role)
         if self.role == "controller" and peer_roles != {"guardian", "observer"}:
             raise SessionDenied("PRIVILEGED_PEER_HANDOFF_REQUIRED")
+        if self.role=='guardian' and 'observer-audit' in names and peer_roles!={'observer'}:
+            raise SessionDenied('INDEPENDENT_OBSERVER_HANDOFF_REQUIRED')
 
     def record(self):
         return {"v": 1, "context": self.context.record(), "role": self.role,

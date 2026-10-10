@@ -14,6 +14,7 @@
 static timer_t guard_timer;
 static int initialized;
 static double final_end;
+static pid_t owner_pid;
 
 static void fail_stop(int sig) {
     (void)sig;
@@ -36,6 +37,7 @@ int probe_a_guard_initialize(double end) {
     event.sigev_signo = SIGALRM;
     if (timer_create(CLOCK_MONOTONIC, &event, &guard_timer)) return -1;
     final_end = end;
+    owner_pid = getpid();
     initialized = 1;
     return 0;
 }
@@ -43,7 +45,7 @@ int probe_a_guard_initialize(double end) {
 int probe_a_guard_arm(double deadline) {
     struct timespec now;
     struct itimerspec timer = {0};
-    if (!initialized || !isfinite(deadline) || deadline > final_end || clock_gettime(CLOCK_MONOTONIC, &now)) return -1;
+    if (!initialized || owner_pid != getpid() || !isfinite(deadline) || deadline > final_end || clock_gettime(CLOCK_MONOTONIC, &now)) return -1;
     double current = (double)now.tv_sec + (double)now.tv_nsec / 1e9;
     if (deadline <= current) fail_stop(SIGALRM);
     timer.it_value.tv_sec = (time_t)deadline;
@@ -55,4 +57,15 @@ int probe_a_guard_arm(double deadline) {
 int probe_a_guard_restore_final(void) {
     /* Never disarm privileged lifetime protection between operations. */
     return probe_a_guard_arm(final_end);
+}
+
+int probe_a_guard_reinitialize_child(double end) {
+    /* clone/fork does not copy POSIX timers. Never use its inherited timer ID
+     * or rely on Python at-fork hooks for the direct clone3 syscall. Exec also
+     * removes this timer: the immutable entry must initialize anew after exec.
+     */
+    if (!initialized || owner_pid == getpid() || end != final_end) return -1;
+    initialized = 0;
+    if (probe_a_guard_initialize(end)) return -1;
+    return probe_a_guard_restore_final();
 }

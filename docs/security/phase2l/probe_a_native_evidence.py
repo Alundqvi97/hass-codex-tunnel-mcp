@@ -152,8 +152,12 @@ def validate_network_measurement(case, value, context, worker, peer=None):
                                     "hello_hex":b"P2AHELLO".hex(),"reply_hex":b"P2AACK!!".hex()}):
             raise SessionDenied("ESTABLISHED_LOOPBACK_EXCHANGE_UNOBSERVED")
     else:
-        if (value["outcome"] != "firewall-rejected" or set(observations) != {"verdict","hook","errno","cookie","worker"}
-                or observations["verdict"] != "NF_REJECT" or observations["hook"] != "LOCAL_OUT"
+        # NF_REJECT is not a Linux netfilter verdict. The nft reject expression
+        # emits a rejection and returns NF_DROP (0). A bare NF_DROP, socket
+        # errno or timeout cannot establish that the owned reject rule ran.
+        if (value["outcome"] != "firewall-rejected" or set(observations) != {"verdict","verdict_code","expression","hook","errno","cookie","worker"}
+                or observations["verdict"] != "NF_DROP" or type(observations['verdict_code']) is not int
+                or observations['verdict_code']!=0 or observations['expression']!='reject' or observations["hook"] != "LOCAL_OUT"
                 or type(observations["errno"]) is not int or observations["errno"] not in (1,13,111)
                 or type(observations["cookie"]) is not int or observations["cookie"] != value["socket_cookie"] or observations["worker"] != [worker.pid,worker.starttime]):
             raise SessionDenied("DENIAL_NOT_ATTRIBUTED_TO_EXPECTED_FIREWALL_REJECTION")

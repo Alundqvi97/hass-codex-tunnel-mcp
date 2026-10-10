@@ -271,7 +271,9 @@ class PolicyStaticFixtures(unittest.TestCase):
             pc+=1
         self.fail('Missing BPF disposition')
     def test_root_direct_and_delegated_egress_denied_netfilter_only(self):
-        for role in ('guardian','observer','read-command','guardian-command','supervisor'):
+        for role in ('read-command','guardian-command','controller'):
+            # Leaf seccomp denies IP; parent roles now use stacked LSM denial
+            # so their legitimate worker descendants do not inherit IP denial.
             for domain,protocol in ((1,0),(2,0),(10,0),(17,0),(16,0),(16,16)):
                 self.assertEqual(self.run_filter(role,41,domain,protocol),DENY)
             self.assertEqual(self.run_filter(role,41,16,12),ALLOW)
@@ -315,7 +317,7 @@ class AdditionalNativeRegressions(unittest.TestCase):
             endpoints={c:[a,p] for c,a,p in targets(PLAN.dns,'1.1.1.1')}
             return {'v':1,'case':case,'context':CONTEXT.identifier,'worker':[900,901],'group':'worker',
                 'socket_cookie':5,'endpoint':endpoints[case],'interval':[1,2],'mechanism':'kernel-socket-and-netfilter-trace',
-                'outcome':'firewall-rejected','observations':{'verdict':'NF_REJECT','hook':'LOCAL_OUT','errno':111,'cookie':5,'worker':[900,901]},
+                'outcome':'firewall-rejected','observations':{'verdict':'NF_DROP','verdict_code':0,'expression':'reject','hook':'LOCAL_OUT','errno':111,'cookie':5,'worker':[900,901]},
                 'family':family,'rule_index':index,'rule_chain':PLAN.chain4}
         value=record('alternate-udp');self.assertTrue(validate_network_measurement('alternate-udp',value,CONTEXT,worker))
         for name,change in (('outcome','timeout'),('socket_cookie',True),('rule_index',True),('endpoint',['1.1.1.1',443])):

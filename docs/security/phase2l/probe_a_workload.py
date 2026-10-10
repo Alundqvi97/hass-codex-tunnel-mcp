@@ -31,7 +31,7 @@ def exact_argv(plan, case):
     return (
         "/usr/bin/setpriv",
         "--reuid", str(plan.uid), "--regid", str(plan.uid),
-        "--clear-groups", "--bounding-set=-all",
+        "--clear-groups", "--bounding-set=-all", "--inh-caps=-all", "--ambient-caps=-all",
         "/usr/bin/python3", "-I", "-B", WORKER,
         "--p2a-internal", case, plan.dns, str(plan.uid),
     )

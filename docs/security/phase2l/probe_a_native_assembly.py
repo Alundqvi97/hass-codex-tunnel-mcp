@@ -1,8 +1,8 @@
 """Disabled concrete allocation and existing GuardianCore service composition.
 
 No controller import, role execution, socket creation or allocation on import.
-This source still requires the reviewed post-exec package/grant handoff and
-independent guardian->observer UID audit channel, explicitly tracked as gaps.
+The guardian->observer audit handoff is sealed and server-purpose scoped.
+Package-descriptor/entry wiring remains incomplete; nothing runs on import.
 """
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import os
 import errno
 import fcntl
 import socket
+import time
 from probe_a_session import SessionDenied, PendingRoleConfiguration, RoleConfiguration
 from probe_a_integrated_bootstrap import ActorPreparation, ReviewedActorFactory
 from probe_a_native_ledger import NativeAttemptPermit, ExistingAttemptGrant
@@ -37,7 +38,7 @@ class NativeActorAllocator:
     def _pairs(self):
         created = {}
         try:
-            for name in ('observer-startup','guardian-startup','controller-startup','guardian-controller','observer-controller','observer-audit'):
+            for name in ('observer-startup','guardian-startup','controller-startup','guardian-controller','observer-controller','observer-audit','guardian-audit'):
                 left,right=socket.socketpair(socket.AF_UNIX,socket.SOCK_STREAM|socket.SOCK_CLOEXEC)
                 created[name]=(left,right)
             self.pairs=created
@@ -54,19 +55,23 @@ class NativeActorAllocator:
         self.used.add(role)
         self.inventory.verify_integration(self.context)
         if self.pairs is None:self._pairs()
-        descriptors={'startup':self.pairs[role+'-startup'][1].detach()}
+        from probe_a_native_package import DescriptorOwner
+        owner=DescriptorOwner()
+        descriptors={}
         extras=[];pending=None;executable=None
         try:
+            descriptors['startup']=owner.open(self.pairs[role+'-startup'][1].detach)
             if role=='controller':
                 for peer in ('guardian','observer'):
                     if peer not in bindings or bindings[peer].verify() is not True:
                         raise SessionDenied("PRIVILEGED_PEERS_NOT_READY_FOR_PIDFD_HANDOFF")
-                    descriptors[peer]=self.pairs[peer+'-controller'][1].detach()
-                    descriptors[peer+'-pidfd']=os.dup(bindings[peer].pidfd)
-                descriptors['startup-pidfd']=os.pidfd_open(self.bootstrap.pid,0)
+                    descriptors[peer]=owner.open(self.pairs[peer+'-controller'][1].detach)
+                    descriptors[peer+'-pidfd']=owner.open(os.dup,bindings[peer].pidfd)
+                descriptors['startup-pidfd']=owner.open(os.pidfd_open,self.bootstrap.pid,0)
             else:
-                descriptors['controller']=self.pairs[role+'-controller'][0].detach()
-                if role=='observer':descriptors['audit']=self.pairs['observer-audit'][1].detach()
+                descriptors['controller']=owner.open(self.pairs[role+'-controller'][0].detach)
+                if role=='observer':descriptors['audit']=owner.open(self.pairs['observer-audit'][1].detach)
+                descriptors['guardian-audit' if role=='observer' else 'observer-audit']=owner.open(self.pairs['guardian-audit'][0 if role=='observer' else 1].detach)
             rule=contract.policy['roles'][role]
             vectors=self.inventory.base.document['exec'][role]
             if (len(vectors)!=1 or vectors[0][-2]!='--sealed-config-fd'
@@ -77,18 +82,16 @@ class NativeActorAllocator:
             executable_path=vectors[0][0]
             alias=self.inventory.document['aliases'].get(executable_path)
             target=alias['target'] if alias else executable_path
-            self.reader.read_asset(target)
-            parent,_,name=self.reader._walk(target)
-            try:executable=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC,dir_fd=parent[-1])
-            finally:
-                for fd in reversed(parent):os.close(fd)
+            executable=owner.open(self.reader.open_verified_fd,target)
             st=os.fstat(executable)
             def build(kernel):
                 expected=replace(kernel,uids=tuple(rule['uids']),gids=tuple(rule['gids']),groups=(),
                     capabilities=tuple(rule['caps']),no_new_privs=1,executable=(st.st_dev,st.st_ino))
                 return RoleConfiguration(self.context,role,expected,self.bootstrap,tuple(descriptors.items()),
-                    tuple((peer,bindings[peer].identity) for peer in ('guardian','observer')) if role=='controller' else ())
+                    tuple((peer,bindings[peer].identity) for peer in ('guardian','observer')) if role=='controller'
+                    else (('observer',bindings['observer'].identity),) if role=='guardian' else ())
             pending=PendingRoleConfiguration.allocate(build=build,permit=permit,activated=True)
+            owner.acquire(pending.reader)
             # Move into a reviewed descriptor slot WITHOUT overwriting any
             # existing descriptor. F_DUPFD_CLOEXEC must return the exact slot.
             if pending.reader!=config_slot:
@@ -99,16 +102,19 @@ class NativeActorAllocator:
                 moved=fcntl.fcntl(pending.reader,fcntl.F_DUPFD_CLOEXEC,config_slot)
                 if moved!=config_slot:
                     os.close(moved);raise SessionDenied("CONFIGURATION_SLOT_ALLOCATION_UNCERTAIN")
-                os.close(pending.reader);pending.reader=moved
+                os.close(owner.release(pending.reader));pending.reader=None
+                pending.reader=owner.open(lambda:moved)
             argv=tuple(vectors[0])
             inherited=(('config',pending.reader),)+tuple(
                 ('pidfd' if name.endswith('-pidfd') else 'ipc',fd) for name,fd in descriptors.items())
             return ActorPreparation(ExecSpec(role,executable,argv,contract.scopes.groups[role],inherited),
-                pending,self.pairs[role+'-startup'][0])
+                pending,self.pairs[role+'-startup'][0],owner=owner)
         except BaseException:
-            if pending is not None:pending.close()
-            if executable is not None:os.close(executable)
-            for fd in descriptors.values():os.close(fd)
+            try:
+                if pending is not None:
+                    if pending.reader in owner.handles:pending.reader=None
+                    pending.close()
+            finally:owner.close()
             raise
 
     def factory(self):
@@ -121,13 +127,14 @@ class NativeRoleServiceAssembly(TrustedRoleServiceFactory):
     The native post-exec package loader must authenticate this assembly before
     constructing it. independent_uid_client must be an observer BrokerClient,
     never a guardian-local callable or caller-supplied boolean. The existing
-    configuration does not yet hand that channel to guardian; native use is
-    therefore BLOCKED, with the precise integration gap in the coverage index.
+    configuration now hands the independently authenticated channel to guardian.
+    Post-exec package/entry and complete native policy remain blockers.
     """
-    def __init__(self, *, contract, specs, grant, resources, independent_uid_client=None, activation_signature=None, activated=False):
+    def __init__(self, *, contract, specs, grant, resources, independent_uid_client=None, guard=None, activation_signature=None, activated=False):
         self.contract,self.specs,self.grant,self.resources=contract,dict(specs),grant,resources
         self.uid_client,self.activated=independent_uid_client,activated is True
         self.activation_signature=activation_signature
+        self.guard=guard
         super().__init__(self._build)
 
     def _build(self, configuration):
@@ -136,7 +143,7 @@ class NativeRoleServiceAssembly(TrustedRoleServiceFactory):
                 or configuration.context!=self.contract.context or type(self.activation_signature) is not bytes):
             raise SessionDenied("EXTERNALLY_VERIFIED_EXISTING_GRANT_REQUIRED_AFTER_EXEC")
         self.contract.permit=self.grant
-        spawner=NativeAtomicSpawner(inventory=self.contract.inventory,contract=self.contract)
+        spawner=NativeAtomicSpawner(inventory=self.contract.inventory,contract=self.contract,guard=self.guard)
         if configuration.role=='observer':
             from probe_a_readonly_broker import NativeReadCommands,ReadOnlyBroker
             capture=NativeBoundedCapture(self.specs['read-command'],spawner=spawner,
@@ -146,8 +153,20 @@ class NativeRoleServiceAssembly(TrustedRoleServiceFactory):
                 observer_identity=configuration.identity,inventory_id=configuration.context.inventory,end=configuration.context.end)
             return RoleServices(contract=self.contract,observer_broker=broker)
         from probe_a_readonly_broker import BrokerClient
-        if not isinstance(self.uid_client,BrokerClient):
-            raise SessionDenied("SOURCE_GAP_GUARDIAN_INDEPENDENT_OBSERVER_UID_CHANNEL")
+        if self.uid_client is None:
+            from probe_a_linux_identity import ProcessBinding
+            from probe_a_role_entrypoints import authenticated_channel
+            expected=dict(configuration.peers).get('observer')
+            if expected is None or 'observer-audit' not in dict(configuration.descriptors):
+                raise SessionDenied('INDEPENDENT_OBSERVER_HANDOFF_REQUIRED')
+            peer=ProcessBinding(expected.pid)
+            try:
+                if peer.identity!=expected or peer.verify() is not True:raise SessionDenied('OBSERVER_IDENTITY_SUBSTITUTION')
+                channel=authenticated_channel(dict(configuration.descriptors)['observer-audit'],peer,time.monotonic)
+                self.uid_client=BrokerClient(configuration.context.plan,channel=channel,
+                    observer_identity=expected,inventory_id=configuration.context.inventory)
+            except BaseException:peer.close();raise
+        if not isinstance(self.uid_client,BrokerClient):raise SessionDenied('INDEPENDENT_OBSERVER_CLIENT_REQUIRED')
         from probe_a_guardian import GuardianCore
         from probe_a_linux_containment import NativeContainmentAdapter
         from probe_a_containment import CgroupV2Containment

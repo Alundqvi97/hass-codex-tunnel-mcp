@@ -207,7 +207,7 @@ class ExecSpec:
             raise LaunchDenied("COMMAND_MUST_NOT_INHERIT_ACTOR_RESOURCES")
         if self.role in ACTORS:
             kinds = tuple(kind for kind, _ in self.inherited)
-            if kinds.count("config") != 1 or not 1 <= kinds.count("ipc") <= 3:
+            if kinds.count("config") != 1 or not 1 <= kinds.count("ipc") <= 4:
                 raise LaunchDenied("SEALED_ACTOR_CONFIG_AND_PRIVATE_CHANNELS_REQUIRED")
         return True
 
@@ -285,9 +285,10 @@ class NativeAtomicSpawner:
     owned group and complete dependency/config inventory. No default approval.
     All privileged-child exceptions terminate via _exit, never caller Python.
     """
-    def __init__(self, *, inventory=None, contract=None, syscalls=None, clock=time.monotonic):
+    def __init__(self, *, inventory=None, contract=None, syscalls=None, guard=None, clock=time.monotonic):
         self.inventory = inventory
         self.contract = contract
+        self.guard = guard
         self.syscalls = LinuxSyscalls() if syscalls is None else syscalls
         self.clock = clock
 
@@ -296,6 +297,11 @@ class NativeAtomicSpawner:
                 or type(deadline) not in (int, float) or not math.isfinite(deadline)
                 or not 0 < deadline - self.clock() <= 240):
             raise LaunchDenied("DISABLED_OR_UNAPPROVED_OS_EXECUTION")
+        if type(self.syscalls) is LinuxSyscalls:
+            from probe_a_native_deadline import NativeDeadlineGuard
+            if (type(self.guard) is not NativeDeadlineGuard or self.contract is None
+                or self.guard.context!=self.contract.context):
+                raise LaunchDenied('EXACT_NATIVE_CLONE_DEADLINE_GUARD_REQUIRED')
         if (len(os.listdir("/proc/self/task")) != 1
                 or self.inventory.authorize_exec(spec, approval) is not True):
             raise LaunchDenied("UNREVIEWED_OR_MULTITHREADED_ROOT_BOOTSTRAP")
@@ -322,6 +328,7 @@ class NativeAtomicSpawner:
             raise
         if pid == 0:
             try:
+                if self.guard is not None:self.guard.after_clone(deadline)
                 os.close(gate_write)
                 if pending is not None:
                     os.close(pending.writer)  # writer NEVER reaches actor code

@@ -50,8 +50,8 @@ class NativeScopeObserver:
             children = [n for n in os.listdir(fd) if stat.S_ISDIR(os.stat(n,dir_fd=fd,follow_symlinks=False).st_mode)]
             if len(children) > 128: raise SessionDenied("NATIVE_CGROUP_DESCENDANT_OVERFLOW")
             members = []
-            procs = read_at(fd,"cgroup.procs").decode("ascii")
-            events = read_at(fd,"cgroup.events").decode("ascii")
+            procs = read_at(fd,"cgroup.procs")
+            events = read_at(fd,"cgroup.events")
             population = not empty_group(events,procs)
             for item in procs.splitlines():
                 self._time()
@@ -59,7 +59,7 @@ class NativeScopeObserver:
                     raise SessionDenied("NATIVE_SCOPE_PROCESS_BOUNDS")
                 binding = ProcessBinding(int(item))
                 try:
-                    if read_at(binding.procfd,"cgroup").decode("ascii") != "0::/p2a-"+self.context.plan.scope+"/"+role+"\n":
+                    if read_at(binding.procfd,"cgroup") != "0::/p2a-"+self.context.plan.scope+"/"+role+"\n":
                         raise SessionDenied("NATIVE_SCOPE_PROCESS_MOVED_OR_ESCAPED")
                     if binding.verify() is not True: raise SessionDenied("NATIVE_SCOPE_STALE_INCARNATION")
                     members.append([binding.identity.pid,binding.identity.starttime])
@@ -67,12 +67,12 @@ class NativeScopeObserver:
                     binding.close()
             if members:
                 raise SessionDenied("SOURCE_GAP_INDEPENDENT_PREEXEC_ATTACHMENT_TRACE")
-            delegated = (read_at(fd,"cgroup.subtree_control").strip() != b""
-                         or read_at(fd,"cgroup.type").strip() != b"domain")
+            delegated = (read_at(fd,"cgroup.subtree_control").strip() != ""
+                         or read_at(fd,"cgroup.type").strip() != "domain")
             control = os.stat("cgroup.procs",dir_fd=fd,follow_symlinks=False)
             delegated |= control.st_uid != 0 or control.st_gid != 0 or bool(control.st_mode & 0o022)
             # Membership churn or detached descendants cannot become empty.
-            if read_at(fd,"cgroup.procs").decode("ascii") != procs or read_at(fd,"cgroup.events").decode("ascii") != events:
+            if read_at(fd,"cgroup.procs") != procs or read_at(fd,"cgroup.events") != events:
                 raise SessionDenied("NATIVE_SCOPE_CHANGED_DURING_OBSERVATION")
             group.verify(); self._time()
             return {"context":context,"role":role,"identity":list(identity),"version":2,

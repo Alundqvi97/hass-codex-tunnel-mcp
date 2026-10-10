@@ -31,15 +31,90 @@ def read_fd(fd, maximum=MAX_PROC):
     raise IdentityDenied("UNBOUNDED_KERNEL_RESOURCE")
 
 
-def read_at(directory_fd, name, maximum=MAX_PROC):
-    if name not in ("stat", "status", "cgroup.events", "cgroup.procs"):
+def _read_fixed(directory_fd, name, allowed, maximum):
+    if name not in allowed:
         raise IdentityDenied("RESOURCE_NOT_ALLOWLISTED")
-    fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC,
+    fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
                  dir_fd=directory_fd)
     try:
-        return read_fd(fd, maximum).decode("ascii")
+        before=os.fstat(fd)
+        text=read_fd(fd,maximum).decode('ascii')
+        after=os.stat(name,dir_fd=directory_fd,follow_symlinks=False)
+        if (before.st_dev,before.st_ino)!=(after.st_dev,after.st_ino):
+            raise IdentityDenied('KERNEL_RESOURCE_PATH_SUBSTITUTION')
+        return text
+    except UnicodeError:raise IdentityDenied('MALFORMED_KERNEL_RESOURCE') from None
     finally:
         os.close(fd)
+
+
+def read_at(directory_fd, name, maximum=MAX_PROC):
+    """Fixed process/cgroup text; no paths, symlinks or caller-selected files."""
+    return _read_fixed(directory_fd,name,
+        ("stat","status","cgroup","cgroup.events","cgroup.procs",
+         "cgroup.type","cgroup.subtree_control"),maximum)
+
+
+def read_process_attribute(binding, name="current", maximum=4096):
+    if name != "current" or not 0 < maximum <= 4096:
+        raise IdentityDenied("RESOURCE_NOT_ALLOWLISTED")
+    if binding.verify() is not True:
+        raise IdentityDenied("PROCESS_IDENTITY_DRIFT")
+    fd = os.open("attr",os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW|os.O_CLOEXEC,
+                 dir_fd=binding.procfd)
+    try:
+        before=os.fstat(fd)
+        text=_read_fixed(fd,name,("current",),maximum)
+        after=os.stat("attr",dir_fd=binding.procfd,follow_symlinks=False)
+        if ((before.st_dev,before.st_ino)!=(after.st_dev,after.st_ino)
+                or binding.verify() is not True):
+            raise IdentityDenied("PROCESS_ATTRIBUTE_PATH_OR_INCARNATION_DRIFT")
+        return text
+    finally:os.close(fd)
+
+
+def read_network_table(directory_fd, name):
+    return _read_fixed(directory_fd,name,("tcp","tcp6"),131072)
+
+
+def observe_numeric_uids(proc_root, name):
+    """Narrow enumeration identity, including PID1 and kernel threads.
+
+    No executable observation is needed for an unrelated UID. Do not weaken
+    actor ProcessBinding. Missing, exiting, inaccessible or substituted entries
+    remain uncertain; never skip them to claim numeric UID absence.
+    """
+    if type(name) is not str or not name.isascii() or not name.isdecimal() or str(int(name))!=name or int(name)<1:
+        raise IdentityDenied('INVALID_ENUMERATION_PID')
+    pid=int(name);pidfd=procfd=None
+    def snapshot():
+        raw=read_at(procfd,'stat');status=read_at(procfd,'status')
+        try:
+            left,separator,rest=raw.rpartition(') ')
+            start=int(rest.split()[19])
+            if not separator or int(left.split(' (',1)[0])!=pid or start<=0:raise ValueError()
+            values={}
+            for line in status.splitlines():
+                key,sep,value=line.partition(':')
+                if sep:
+                    if key in values:raise ValueError()
+                    values[key]=value.split()
+            uids=values['Uid']
+            if len(uids)!=4 or any(not n.isascii() or not n.isdecimal() for n in uids):raise ValueError()
+            return start,tuple(int(n) for n in uids)
+        except (ValueError,KeyError,IndexError):raise IdentityDenied('MALFORMED_ENUMERATION_IDENTITY') from None
+    try:
+        pidfd=os.pidfd_open(pid,0)
+        procfd=os.open(name,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW|os.O_CLOEXEC,dir_fd=proc_root)
+        before=os.fstat(procfd);first=snapshot();second=snapshot()
+        current=os.stat(name,dir_fd=proc_root,follow_symlinks=False)
+        if (first!=second or (before.st_dev,before.st_ino)!=(current.st_dev,current.st_ino)
+                or select.select([pidfd],[],[],0)[0]):
+            raise IdentityDenied('ENUMERATION_INCARNATION_OR_UID_CHANGED')
+        return pid,first[0],first[1]
+    finally:
+        if procfd is not None:os.close(procfd)
+        if pidfd is not None:os.close(pidfd)
 
 
 @dataclass(frozen=True)

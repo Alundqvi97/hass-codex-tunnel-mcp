@@ -55,7 +55,11 @@ class ReadOnlyBroker:
     serve() additionally enforces actual identity and explicit runtime review.
     """
     def __init__(self, plan, *, command, read_resource, observer_identity,
-                 inventory_id, end, clock=time.monotonic, expected_peer=None):
+                 inventory_id, end, clock=time.monotonic, expected_peer=None,
+                 purpose='controller'):
+        if purpose not in ('controller','supervisor-audit','guardian-uid-audit'):
+            raise BrokerDenied('UNAPPROVED_SERVER_PURPOSE')
+        self.purpose=purpose
         self.commands = catalog(plan)
         if (not callable(command) or not callable(read_resource)
                 or type(inventory_id) is not str or len(inventory_id) != 64
@@ -79,6 +83,8 @@ class ReadOnlyBroker:
                 or request["seq"] > 4096 or type(request["op"]) is not str):
             raise BrokerDenied("UNEXPECTED_COMMAND_IDENTITY_OR_REPLAY")
         op = request["op"]
+        if self.purpose=='guardian-uid-audit' and op!='resource:numeric_uid_process_absent':
+            raise BrokerDenied('GUARDIAN_RESOURCE_CATALOG_ONLY')
         deadline = min(self.end, self.clock() + 8)
         self.sequence = request["seq"]  # consumed before an uncertain observation
         if op in self.commands:

@@ -8,7 +8,7 @@ import os
 import stat
 import time
 from probe_a_session import SessionDenied
-from probe_a_linux_identity import ProcessBinding, read_at
+from probe_a_linux_identity import ProcessBinding, read_at, read_network_table, observe_numeric_uids
 from probe_a_resources import _listeners
 from probe_contract import CLEANUP_READBACKS
 
@@ -33,9 +33,10 @@ class NativeResourceCollector:
         binding=ProcessBinding(os.getpid());fd=None
         try:
             fd=os.open('net',os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW|os.O_CLOEXEC,dir_fd=binding.procfd)
-            raw=read_at(fd,path.rsplit('/',1)[1],131072)
+            raw=read_network_table(fd,path.rsplit('/',1)[1])
+            if binding.verify() is not True:raise SessionDenied('PROC_NETWORK_INCARNATION_CHANGED')
             self._gate(deadline)
-            return raw.decode('ascii')
+            return raw
         finally:
             if fd is not None:os.close(fd)
             binding.close()
@@ -51,13 +52,8 @@ class NativeResourceCollector:
             if len(names)>32768:raise SessionDenied('PROC_ENUMERATION_CAPACITY_EXCEEDED')
             for name in names:
                 self._gate(deadline)
-                binding=ProcessBinding(int(name))
-                try:
-                    identity=binding.identity
-                    if self.context.plan.uid in identity.uids:
-                        observed.append([identity.pid,identity.starttime])
-                    if binding.verify() is not True:raise SessionDenied('PROC_ENUMERATION_INCARNATION_CHANGED')
-                finally:binding.close()
+                pid,start,uids=observe_numeric_uids(root,name)
+                if self.context.plan.uid in uids:observed.append([pid,start])
             self._gate(deadline)
             return {'uid':self.context.plan.uid,'matches':observed,'enumerated':len(names),
                     'interval_end':self.clock(),'context':self.context.identifier}

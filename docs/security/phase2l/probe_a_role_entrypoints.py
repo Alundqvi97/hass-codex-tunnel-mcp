@@ -93,6 +93,7 @@ class RoleServices:
                     raise SessionDenied("CONTROLLER_INCARNATION_SUBSTITUTION")
                 controller = authenticated_channel(channels["controller"], peer, clock)
                 installed_signal_abort(lambda: self.guardian_core.cleanup(config.context.end))
+                startup.announce('RUNNING')
                 return GuardianChannel(self.guardian_core, clock=clock).serve(controller,
                     end=config.context.end, cleanup_cutoff=config.context.cutoff)
             finally:
@@ -119,6 +120,7 @@ class RoleServices:
             broker = BrokerClient(config.context.plan, channel=channels["observer"],
                 observer_identity=peers["observer"], inventory_id=config.context.inventory)
             io = IndependentControllerIO(remote, broker, config.context, clock=clock)
+            startup.announce('RUNNING')
             return control(config.context.plan, io, clock, absolute_deadline=config.context.end,
                            cleanup_cutoff=config.context.cutoff)
         finally:
@@ -127,6 +129,8 @@ class RoleServices:
     def _observe(self, config, startup, descriptors, clock):
         from probe_a_readonly_broker import ReadOnlyBroker, MAX_FRAME, MAX_REQUEST
         identities = {"controller": startup.controller, "audit": config.bootstrap}
+        if 'guardian-audit' in descriptors:
+            identities['guardian-audit']=startup.actors['guardian']
         from probe_a_ipc import IncrementalRequest
         owned, channels, brokers, frames = [], {}, {}, {}
         try:
@@ -138,15 +142,17 @@ class RoleServices:
                 b = self.observer_broker
                 command = b.command.for_audit(config, peer) if name == "audit" else b.command
                 frames[name] = IncrementalRequest(channels[name],
-                    end=config.context.end if name == "audit" else config.context.cutoff)
+                    end=config.context.end if name != "controller" else config.context.cutoff)
                 brokers[name] = ReadOnlyBroker(config.context.plan, command=command,
                     read_resource=b.read_resource, observer_identity=config.identity,
                     expected_peer=expected, inventory_id=config.context.inventory,
-                    end=config.context.end if name == "audit" else config.context.cutoff, clock=clock)
+                    end=config.context.end if name != "controller" else config.context.cutoff, clock=clock,
+                    purpose='supervisor-audit' if name=='audit' else 'guardian-uid-audit' if name=='guardian-audit' else 'controller')
+            startup.announce('RUNNING')
             while channels and clock() < config.context.end:
                 readable, _, _ = select.select([c.stream for c in channels.values()], [], [],
                                               min(0.05, config.context.end-clock()))
-                for name in ("audit", "controller"):
+                for name in ("audit", "guardian-audit", "controller"):
                     if name not in channels: continue
                     channel = channels[name]
                     if name == "controller" and clock() >= config.context.cutoff:
