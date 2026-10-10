@@ -11,6 +11,15 @@ from probe_a_session import canonical, decode, digest, SessionDenied
 from probe_a_os_inventory import ROLES
 
 
+# CAP_SETGID/SETUID/SETPCAP, NET_ADMIN and SYS_PTRACE are needed only
+# by the fixed trusted assembly/metadata interfaces. No role may receive
+# SYS_ADMIN, DAC_OVERRIDE, SYS_MODULE, NET_RAW or arbitrary bounding authority.
+ROLE_CAPABILITY_LIMITS = {"guardian":sum(1<<n for n in (6,7,8,12,21)),
+    "observer":sum(1<<n for n in (8,12,21)), "read-command":1<<12,
+    "guardian-command":1<<12, "controller":0, "peer":0, "worker":0}
+WORKER_BOOTSTRAP_LIMIT = sum(1<<n for n in (6,7,8))
+
+
 class ExecutionDenied(SessionDenied):
     pass
 
@@ -173,6 +182,11 @@ class ReviewedExecutionContract:
                     or role == "worker" and (rule["uids"] != [self.context.plan.uid]*4 or rule["gids"] != [self.context.plan.uid]*4 or any(rule["caps"]))
                     or role not in ("worker", "controller") and rule["uids"] != [0]*4):
                 raise ExecutionDenied("INCOMPLETE_OR_PERMISSIVE_ROOT_POLICY")
+            if (any(mask & ~ROLE_CAPABILITY_LIMITS[role] for mask in rule["caps"])
+                    or any(mask & ~(WORKER_BOOTSTRAP_LIMIT if role == "worker" else ROLE_CAPABILITY_LIMITS[role])
+                           for mask in rule["pre_exec_caps"])
+                    or role not in ("worker","controller") and rule["gids"] != [0]*4):
+                raise ExecutionDenied("EXCESSIVE_ROLE_CAPABILITY_OR_ROOT_GROUP_PROFILE")
         return True
 
     def before_spawn(self, spec, deadline, *, audit_authority=None):
@@ -224,7 +238,7 @@ class ReviewedExecutionContract:
             identity = own.identity
             if (list(identity.uids) != expected_uids or list(identity.gids) != expected_gids
                     or list(identity.capabilities) != rule["pre_exec_caps"] or identity.no_new_privs != 1
-                    or spec.role == "controller" and identity.groups or own.verify() is not True):
+                    or identity.groups or own.verify() is not True):
                 raise ExecutionDenied("UNEXPECTED_PRE_EXEC_EFFECTIVE_IDENTITY")
             return True
         finally:
@@ -235,7 +249,7 @@ class ReviewedExecutionContract:
         self.scopes.check(role, identity=identity)
         rule = self.policy["roles"][role]
         if (list(identity.uids) != rule["uids"] or list(identity.gids) != rule["gids"]
-                or list(identity.capabilities) != rule["caps"] or identity.no_new_privs != 1
+                or list(identity.capabilities) != rule["caps"] or identity.no_new_privs != 1 or identity.groups
                 or self.inspect_actor(role, identity, self.context.identifier, self.policy_bytes) is not True):
             raise ExecutionDenied("ACTOR_OS_POLICY_IDENTITY_UNVERIFIED")
         return True

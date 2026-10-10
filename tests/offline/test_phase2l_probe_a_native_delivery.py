@@ -388,4 +388,22 @@ class FinalBoundaryRegressions(unittest.TestCase):
                               capture_output=True,text=True,timeout=8,check=False)
         self.assertEqual(result.returncode,0,result.stderr)
 
+
+class ExcessivePrivilegeRegressions(unittest.TestCase):
+    def test_even_signed_roles_cannot_receive_sysadmin_or_unapproved_bounding_caps(self):
+        for role in ('guardian','observer','read-command','guardian-command','peer','worker'):
+            c,_=contract();c.policy['roles'][role]['caps']=[1<<21 if role=='worker' else 1<<24]*5
+            c.policy['roles'][role]['pre_exec_caps']=list(c.policy['roles'][role]['caps'])
+            # Re-authenticate the changed synthetic policy, so the restriction
+            # cannot rely merely on detection of a mutated canonical document.
+            c.policy_bytes=canonical(c.policy)
+            with self.assertRaises(ExecutionDenied):c.verify()
+    def test_root_actor_supplementary_groups_are_rejected(self):
+        c,records=contract();identity=replace(IDENTITIES['guardian'],groups=(0,))
+        records['guardian'].update(members=[[identity.pid,identity.starttime]],populated=True)
+        with self.assertRaises(ExecutionDenied):c.ready('guardian',identity)
+    def test_descriptor_acquisition_and_process_vm_routes_are_denied(self):
+        emulator=PolicyStaticFixtures()
+        for nr in (310,311,312,438):self.assertEqual(emulator.run_filter('guardian',nr),DENY)
+
 if __name__=='__main__':unittest.main()

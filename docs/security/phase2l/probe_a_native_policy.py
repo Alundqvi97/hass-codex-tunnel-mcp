@@ -17,7 +17,7 @@ from probe_a_linux_identity import read_at
 LD_ABS, JEQ, JSET, RET = 0x20, 0x15, 0x45, 0x06
 ALLOW, DENY, KILL = 0x7fff0000, 0x00050000 | errno.EPERM, 0x80000000
 ARCH_X86_64 = 0xc000003e
-DANGEROUS = (101,155,161,165,166,175,176,246,272,298,304,308,310,311,313,321,323,425,426,427)
+DANGEROUS = (101,155,161,165,166,175,176,246,272,298,304,308,310,311,312,313,321,323,425,426,427,438)
 # ptrace,pivot_root,chroot,mount,umount,module,kexec,unshare,perf,open_by_handle,
 # setns,process_vm_read/write,finit_module,bpf,userfaultfd,io_uring*.
 
