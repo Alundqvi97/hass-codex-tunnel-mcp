@@ -171,9 +171,14 @@ class LedgerFixtures(unittest.TestCase):
         import time
         db=sqlite3.connect(self.temp.name+'/attempts.sqlite',isolation_level=None);db.execute('BEGIN IMMEDIATE')
         try:
-            with self.assertRaises(sqlite3.OperationalError):self.store.claim_record(self.record,deadline=time.monotonic()+.05)
+            started=time.monotonic()
+            self.assertFalse(self.store.claim_record(self.record,deadline=started+.05))
+            self.assertLess(time.monotonic()-started,.5)
             self.assertTrue(self.store.poisoned)
         finally:db.execute('ROLLBACK');db.close()
+        with self.assertRaises(SessionDenied):self.store.claim_record(self.record,deadline=time.monotonic()+1)
+        self.store.close();self.store=DurableAttemptLedger(self.temp.name,synthetic=True)
+        self.assertTrue(self.store.claim_record(self.record,deadline=time.monotonic()+1))
     def test_cross_exec_substitution_and_synthetic_storage_rejected(self):
         import time
         r={'v':2,'session':CONTEXT.session,'context':CONTEXT.identifier,'inventory':CONTEXT.inventory,
@@ -288,12 +293,15 @@ class AdditionalNativeRegressions(unittest.TestCase):
     def test_real_simultaneous_fixture_claims_have_one_winner(self):
         from concurrent.futures import ThreadPoolExecutor
         import threading,time
-        with tempfile.TemporaryDirectory(prefix='probe-a-ledger-race-') as temp:
+        for round_number in range(8):
+          with self.subTest(round_number=round_number),tempfile.TemporaryDirectory(prefix='probe-a-ledger-race-') as temp:
             os.chmod(temp,0o700);one=DurableAttemptLedger(temp,synthetic=True);one.initialize_fixture()
             two=DurableAttemptLedger(temp,synthetic=True);barrier=threading.Barrier(2)
             record={'session':'f'*32,'boot':'synthetic','context':CONTEXT.identifier}
             def claim(store):
-                barrier.wait(timeout=1);return store.claim_record(record,deadline=time.monotonic()+1)
+                barrier.wait(timeout=1)
+                if (round_number%2 == 0) == (store is one):time.sleep(.001*round_number)
+                return store.claim_record(record,deadline=time.monotonic()+1)
             try:
                 with ThreadPoolExecutor(max_workers=2) as pool:
                     results=list(pool.map(claim,(one,two)))

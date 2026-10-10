@@ -119,9 +119,11 @@ class DurableAttemptLedger:
         if len(raw) > 65536 or not hexvalue(record.get("session"), 32) or type(record.get("boot")) is not str:
             raise SessionDenied("LEDGER_CLAIM_SCHEMA")
         db = None
+        begun = False
         try:
             db = self._connection(deadline)
             db.execute("BEGIN IMMEDIATE")
+            begun = True
             if db.execute("SELECT 1 FROM claims WHERE session=? OR binding=?",
                           (record["session"], binding)).fetchone() is not None:
                 db.execute("ROLLBACK")
@@ -134,6 +136,15 @@ class DurableAttemptLedger:
             if self.clock() >= deadline:
                 raise SessionDenied("LEDGER_COMMIT_ACKNOWLEDGEMENT_UNCERTAIN")
             return True
+        except sqlite3.OperationalError as exc:
+            self.poisoned = True
+            if getattr(exc, "sqlite_errorcode", None) in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
+                # Before acquiring the write transaction no mutation/authority
+                # happened. Bounded losing claim; this handle cannot retry.
+                if not begun:
+                    return False
+                raise SessionDenied("LEDGER_TRANSACTION_OUTCOME_UNCERTAIN") from None
+            raise
         except BaseException:
             self.poisoned = True
             raise

@@ -21,6 +21,7 @@ from .const import (
     TUNNEL_CLIENT_VERSION,
 )
 from .binary import is_clean_version
+from .mcp_url import validate_admin_auth_mode
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ def build_mcp_server_url(url: str) -> str:
 
 def build_tunnel_command(executable: Path, config: TunnelCommandConfig) -> list[str]:
     """Build the tunnel-client command line."""
+    validate_admin_auth_mode(config.mcp_server_url, config.use_ha_mcp_bearer_token)
     health_file = config.run_dir / "health.url"
     command = [
         str(executable),

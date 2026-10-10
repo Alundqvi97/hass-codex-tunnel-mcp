@@ -1,3 +1,34 @@
+# Administrator capability, security and reliability evidence
+
+Current target: Core2026.10.0/Python3.14.2, native `/api/mcp/hass_codex_admin`; source details in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). **CANDIDATE INCOMPLETE.** This table records development evidence, not HAOS, household or hosted acceptance. The historical HA-MCP matrix follows unchanged.
+
+| Blueprint outcome | Connected development evidence | Remaining limit/gate |
+|---|---|---|
+| UX-01 automation investigation | Actual synthetic native automation fault, definitions, trace list and exact trace with division-by-zero diagnosis; minimized health/state/log reads require no change prompt | Whole-HA log privacy, unloaded/include dependency visibility; no real household trace read |
+| UX-02 creation | Native automation/script and eight storage helper families, immutable plan → native owner WS approval → fixed API → fresh readback | Native helper ID allocation race; browser approval rendering untested |
+| UX-03 bounded repair | Native automation repair/rollback; same script changed twice with one approval and reverse restoration; helper partial edit becomes full approved replacement and restores added fields | No native CAS against concurrent local editors; observed definitions do not prove physical effects |
+| UX-04 exact deletion | Native helper/dashboard destructive decision, loaded definition/dashboard references, absence readback and exact captured restoration; renamed helper restores original ID | Unloaded YAML/other collections and uncaptured metadata incomplete; not full arbitrary-object deletion acceptance |
+| UX-05 dashboards | Native views/cards stored and read back with title/icon/sidebar/admin flags; deletion and restoration; panel JS serves and parses | Actual browser/card rendering and frontend user journey untested |
+| UX-06 integrations/maintenance | Actual calculated Sun integration reload and loaded readback, native Core config validation, fixed local backup job/archive metadata | Reconfigure/reauth/credential/Supervisor/add-on/restart/restore adapters explicitly blocked; backup is not restore proof |
+| UX-07 one task approval | Up to20 exact ordered operations, one approval, repeated-target reverse order and applied-prefix rollback, including dependency checks for inverse deletion; fixed TTL30–900sec | Every indirect/config/device effect is conservatively elevated; no dynamic risk classification claimed |
+| UX-08 wrong identity/injection | Actual native caller/session mismatch, token expiry/refresh/revocation, owner logout, hash/target alteration, literal-secret rejection, replay/expiry/revoke denial | Native auth-manager token refresh tested; actual hosted PKCE/consent/refresh flow, workspace/account isolation untested |
+| UX-09 alternate routes | Finite six-tool catalog, wrong route and unknown/generic tool/selector/argument denial; per-send grant check after WS handshake and intermediate reads; unrelated supported calls remain usable | Admin bearer remains valid on broader HA APIs; ingress/identity isolation is a release blocker, not proved by catalog tests |
+| UX-10 independent recovery | One durable intent, bounded SQLite held-lock denial/recovery, interrupted readback consumed/uncertain, read-only reconciliation, reverse restoration, late-thread completion rejected; two actual HA processes resume definitions/consumption | Graceful shutdown/start only; abrupt kill, host reboot, disk-full/power loss and production backup restore untested; boot revokes stored grants |
+| UX-11 latency/compatibility | Fixed official release/hash lock, bounded tool55sec/backend8sec/lock1sec; repeated four schedules of three actual concurrent executions with one dispatch; final suite duration in receipt | No captured pre-upgrade household inventory, multi-day soak, cross-version upgrade, supported patch series matrix or maintenance-time promise |
+| UX-12 useful closeout | Durable per-operation pending/dispatching/applied/uncertain/rolling_back/rolled_back states, exact snapshots and essential audit; replay freshly checks last object state; no blind uncertain retry | Reconciliation proves present definition, not mutation attribution; device feedback is HA state, not physical evidence |
+
+Ordinary device controls retain exact light/switch/cover/media verbs. Actual synthetic native Switch and Light entities exercise state, brightness and temperature once without replay. Unsupported attribute selectors are rejected before approval. Disjoint devices work in one task; overlapping device entity scopes are rejected before mutation. Cover/media asynchronous behavior remains untested. Devices can affect household security, so explicit elevated approval applies.
+
+## Final-dispatch boundary and provenance
+
+Actual native HTTP request + LLM user + refresh-token identity must agree; NORMAL active admin tokens from explicit caller lists only. Owner WS approval uses an independent NORMAL active owner frontend session, explicit enrollment, exact immutable hash and effects confirmation. All mutations check it again at the send boundary. MCP cannot approve itself. Definitions/traces/logs are untrusted data, not new rights. Static bearer injection into the native endpoint is rejected in both tunnel command construction and probing, including encoded paths.
+
+SQLite intent precedes the one write attempt. Before-state comparison, durable consumption, cancellation state, conditional terminal transitions, fresh readback and reconciliation compose recovery; they do not establish exactly-once kernel/device effects or native atomic CAS. Restoring DB/config at boot retires saved approvals. Trusted filesystem owners and HA owners remain trusted; this is not kernel confinement against a compromised admin process.
+
+Evidence labels: **actual application development** = native Core/MCP/WS/storage/SQLite under synthetic identities; **substituted boundary** = injected lost acknowledgment/delayed thread or loopback malformed/redirect server; **synthetic physical entity** = real HA entity/service with in-memory hardware; **unexecuted** = hosted identity, HAOS/Supervisor, physical devices, live access/firewall. None is a trusted Probe A PASS.
+
+## Historical upstream policy evidence — preserved
+
 # HA-MCP v8.6.0 administrative tool-policy matrix
 
 **VERIFIED SOURCE** against pinned `homeassistant-ai/ha-mcp@fc54437a804858732e4bc927add98e202d879a09`; **production effective rules NOT VERIFIED**.

@@ -1,3 +1,23 @@
+# Current native administrator threat model
+
+The active development path is `authenticated caller → native HA MCP/LLM API → exact task policy/owner approval → fixed native HA API → fresh readback/audit/recovery`. Only explicit YAML enables the optional component. Existing tunnel transport is retained; Probe A/ha-mcp8.6 candidates are disconnected research, not runtime fallback. The historical model below remains evidence of previous designs and unresolved hosted concerns.
+
+| Prior requirement/threat | Current control and representative test | Remaining boundary |
+|---|---|---|
+| Generic/root bypass and action substitution | No root helper, shell, arbitrary binary, URL, raw WS, bulk selector or service proxy. Six typed tools and finite native routes; reserved-ID/type/selector tests | Native admin token broad API scope still bypasses catalog if other routes are reachable; must solve/review ingress and identity isolation |
+| Caller/session impersonation and stale approval | Actual HA request/user/refresh token agreement, explicit client/user allowlists, independent owner decision, final per-send identity/hash/policy/TTL/revocation checks | Client ID is metadata, not human-presence attestation; actual hosted consent/account negatives untested |
+| Malicious script/template/log instruction | Treat returned data as untrusted; full definitions and indirect effects require exact elevated consent; literal secrets blocked and diagnostics redacted | Owner must inspect effects; arbitrary automation definitions can later call powerful services under HA's own authority. No complete semantic sandbox claimed |
+| Network/descriptor/process escape in old Probe A | Threat removed from product path by no privileged experimental actors, no cgroup/firewall operations and platform-owned ordinary HA lifecycle; source import review | HA itself has real integration networking. Fixture socket guards only enforce isolated tests, not production OS confinement; no CAP_NET_ADMIN or native confinement claim |
+| Inventory/signature/self-attested PASS | Fixed release provenance/hash-verified development lock; native version rejection; readback vs acknowledgment separated | Core mutable configuration is legitimate. No transient process/inventory pin or real Probe A trusted-PASS path is introduced; installed production artifact provenance needs review |
+| Replay, cancellation, ledger race and uncertain mutation | Durable SQLite claim before write; bounded contention, one attempt, conditional completion, drift check, read-only reconciliation, boot retires grants | Native APIs lack CAS and requested helper-ID reservation; external editor race remains a blocker; canceled SQL threads may finish but cannot overwrite newer terminal transitions |
+| Partial setup/cleanup/backup-restored authority | Optional HA setup tears down owned sessions/API/filter on errors/stop; temp fixtures own cleanup; boot revokes saved grants; local independent owner administration remains | Browser flow, abrupt-crash/disk durability, native UI recovery, actual backup restore and HAOS acceptance untested |
+| Credential/log/redirect leakage | Runtime native caller token never stored in task DB/Git; scoped diagnostic payload suppression, sanitized errors, minimized reads, no proxy environment/REST or WS redirects | Redaction is not whole-HA secret classification; installed logging/privacy and external tunnel behavior need independent acceptance |
+| Dependency/upgrade fragility | Native supported interfaces and one fixed Core target; hash lock separate from production deps; compatibility error and documented staged upgrade/rollback | Only2026.10.0 tested. Future patch/major releases, all native entity/service outcomes and filesystem backups need real staged checks |
+
+The finite MCP policy is an application boundary, not kernel-enforced least privilege. Privileged Probe A, VM/QEMU, production, household devices and real hosted identity remain unauthorized. Missing evidence remains blocked. No prior failed experiment is marked passed.
+
+## Historical threat model — preserved
+
 # Tunnel security threat model
 
 ## Assets and trust boundaries

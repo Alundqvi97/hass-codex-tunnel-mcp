@@ -1,3 +1,43 @@
+# Administrator operator runbook — candidate only
+
+**CANDIDATE INCOMPLETE: do not deploy this as production.** Use one normal package with the optional native administrator component plus the existing tunnel component; no Probe A actors, policy daemon or watchdog service. HA owns startup/shutdown and the local frontend. Supported tested target: Core2026.10.0/Python3.14.2; other2026.10 patches require the same staging checks, other series fail explicitly.
+
+## One installation/configuration path
+
+For separately authorized disposable staging, install the reviewed release's `custom_components/hass_codex_admin` directory into HA's `custom_components`; retain the existing tunnel integration only if its separately reviewed ingress/OAuth path passes acceptance. The development lock installs a test fixture, not production requirements. The administrator manifest uses Core/native MCP dependencies and no parallel package service. Preserve the known-good release archive/hash and a verified configuration backup before enabling anything.
+
+Central configuration is one `hass_codex_admin` YAML block: `backend_url` must be a literal loopback URL with this HA server's port; `caller_user_ids`, `caller_client_ids`, `approver_client_ids` must be explicit nonempty lists; caller and approver client IDs must be disjoint. `approval_panel` defaults true. Do not put passwords/tokens into that block. Account IDs and registered OAuth client IDs come from separately reviewed actual HA/connector configuration; synthetic `.invalid` fixture IDs are not production settings. Backend HTTPS retains normal verification. Only explicit configuration activates the component.
+
+Remote native endpoint: `/api/mcp/hass_codex_admin`. Static backend bearer injection is rejected. HA's supported OAuth discovery/authorization/PKCE/token/revoke paths also need a reviewed reachable route design; exposing only MCP cannot make login work. Native admin tokens grant broader HA APIs. A demonstrable route/identity isolation policy and wrong-account/alternate-route hosted acceptance are mandatory before remote use; no configuration here silently solves or accepts that blocker.
+
+After separately authorized HA startup, inspect local health/version first. Open the local **Administrator** panel as HA owner, enroll that frontend session and refresh pending tasks. Review the exact before/operation/indirect-effects/rollback definition and expiry; tick the effects confirmation and approve the exact hash once, or revoke. The assistant can inspect/propose/status, but cannot approve. Panel JavaScript serving/syntax is tested; actual browser interaction still needs acceptance. Configuration normalization makes helper full replacement fields visible before approval.
+
+## Health, faults and reconnect
+
+Use ordinary local HA UI/configuration/logs independently of ChatGPT. The MCP `admin_inspect` system health result distinguishes HA version/state from transport reachability; an open process/health file alone is not end-to-end readiness. Unsupported Core series gives a compatibility error; missing adapter gives a specific unsupported result without affecting unrelated commands. An authentication denial stops that request and does not restart HA or retry anonymously.
+
+Normal token refresh follows native HA OAuth, retaining the refresh-token session identity. Revocation requires genuine new consent and new task scope; refreshing login never renews an expired approval. Tests mint refreshed native access tokens and exercise HTTP reconnect, not actual hosted PKCE/consent. Retry safe reads once; never repeat a timed-out write blindly. Actual tool deadline55sec, backend8sec, executor acquisition1sec, task30–900sec and DB lock0.1sec are bounded, not promised household latency.
+
+Read `admin_status` after interruption. `dispatching`, `rolling_back` or `uncertain` means mutation may have occurred. `admin_reconcile` reads configurations only; it can verify the desired current definition without proving who caused it. Device/restart/backup uncertainties require local owner investigation. Ambiguous state remains blocked. Do not edit ledger status to manufacture completion. Review a new exact recovery task if needed. Reverse rollback uses captured before-definitions only while grant is valid and current state matches the recorded result; it restores an applied prefix and never overwrites intervening edits. Services and maintenance have no automatic inverse.
+
+HA startup retires every saved pending/approved grant and approver enrollment. After restart, inspect/reconcile results, reenroll and approve a fresh bounded recovery task if required. A saved receipt is history: replay checks live last-object state and reports drift without mutation. Graceful HA process stop/start and SQLite reopen were tested. Hard kill/power-loss/helper buffered-save durability, real host reboot and production reconnect remain unproved.
+
+## One update and rollback path
+
+Keep the target stable. For each reviewed upgrade, install the fixture from `requirements/admin-test.lock.txt` with `--require-hashes` in a disposable venv; run native connected tests, retained offline tests, compilation and panel syntax. Capture installed capability inventory and compare UX01–12 before changing the supported range. Stage the exact release/configuration with synthetic state, then independently verify local recovery, actual OAuth isolation and backup restore under separate authorization. Do not auto-adopt a breaking update or elevate an unsupported route.
+
+Back up through HA's native backup system and independently verify an authorized restore in disposable acceptance before relying on it. Core local backup creation is tested, Supervisor/HAOS restore is not. If copying the SQLite/configuration directly, cleanly stop the separately authorized HA instance and copy the complete task-owned configuration/store with private ownership/mode; do not copy only an active DB's main file or invent status changes. Task snapshots may contain private definitions; treat them as configuration secrets, not public diagnostics. Keep known-good package and backup outside Git.
+
+For rollback, use the independent local HA UI/console, stop only the authorized HA service through its existing lifecycle manager, restore the reviewed known-good component/package and verified matching backup, then start normally. Future DB schema versions are rejected without overwrite; do not downgrade against an unknown schema. Current store is v1, with no destructive automatic migration; restoring matching v1 backup requires fresh approvals after boot. This is the documented path; full release/backup rollback and HAOS acceptance remain unexecuted gates.
+
+## Costs and recurring work
+
+This adds no paid service, root component or daily maintenance helper. Existing HA host, ChatGPT and tunnel costs remain whatever the owner independently contracts; no price or maintenance-hour estimate is asserted. Recurring work: one release/update review with reproducible staging, verified backups/restore, owner session reenrollment after restart, and one task approval per bounded change. Existing tunnel unexpected-child-exit behavior needs independent local restart; automatic crash recovery remains the unimplemented historical design below. No healthy-service-killing watchdog is introduced.
+
+Before a live change provide one bounded proposal with exact artifacts/hash/configuration, identity/route permissions, verified backup and independent recovery, acceptance checks, time/resource budget and rollback triggers. Missing critical source adapters, native CAS/helper allocation gaps and dependency visibility must be closed or explicitly accepted first. No live access, VM, HAOS, merge or production authorization follows from this runbook.
+
+## Historical tunnel recovery proposal — preserved
+
 # Tunnel-client v0.0.15 crash resilience — isolated follow-up design
 
 **Status:** Architecture review only; no recovery source change in authentication PR #1. Implementation should be an independently reviewed follow-up draft PR because restart orchestration touches update, shutdown, process ownership and reliable administration. Distinct approval gates.
