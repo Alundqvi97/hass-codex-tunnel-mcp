@@ -169,7 +169,8 @@
       "Multiline selector lost line breaks",
       "Number selector rejected valid fraction",
       "Multi-select clearing rejected empty list",
-      "Reauth partial progress mistaken for initialized native form"
+      "Reauth partial progress mistaken for initialized native form",
+      "Native select accessible label included embedded option text"
     ],
     "final_confirmed_new_defects": [],
     "limits": [
@@ -198,7 +199,7 @@
   },
   "release_archive": {
     "path": "artifacts/native-admin-0.2.0.zip",
-    "sha256": "4b12c0baf23beaed3f8b3dda1026c1e0f3739e34b2a8ad79446df893a35a4b50",
+    "sha256": "8ca90cdaffcb8f9297c2fea02c41b492d058d87011db1b9cdff9d88be965e0b4",
     "manifest": "Embedded per-file SHA256/size; verified installed archive",
     "contents": "Two production components and release_manifest.json only",
     "excluded": "Probe A/tests/fixtures/credentials/databases/venvs/caches/toolchains",
@@ -763,6 +764,16 @@
       "kind": "Browser diagnosis",
       "failures": "Cloud sandbox unavailable; existing CI sandbox never disabled. Early login fixture caused Chrome local-network checks; owned Core static HTML fixes real network origin. UTF-8 document fixes JS emdash; revocation waits actual exact owner acknowledgment, not early UI click.",
       "logs": "Authenticated API works; private log redirects remain proxy403. Sanitized annotations used; no fabricated log access."
+    },
+    {
+      "sha": "7f8dbd8e61fb869c2b69cee5b8f0a016b2cdf3c1",
+      "native_local": {
+        "passed": 59,
+        "seconds": 134.331
+      },
+      "browser_push_run": 38066970514,
+      "browser_push": "failure",
+      "failure": "Menu/control labels included option text; exact field label unavailable. Explicit HTML label-for control IDs correct production accessibility; body35s, assertions and sandbox unchanged."
     }
   ],
   "multi_step_repair": {

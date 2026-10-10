@@ -1,5 +1,6 @@
 // Local HA-owned approval UI. Backend definitions are untrusted text.
 class AdministratorPanel extends HTMLElement {
+  static inputSerial = 0;
   set hass(value) { this._hass = value; if (!this.started) { this.started = true; this.render(); } }
   async call(action, fields = {}) {
     return this._hass.callWS({type: 'hass_codex_admin/approval', action, ...fields});
@@ -67,7 +68,9 @@ class AdministratorPanel extends HTMLElement {
               if (input.tagName === 'INPUT') input.type = field.kind === 'boolean' ? 'checkbox' : ['integer', 'number'].includes(field.kind) ? 'number' : field.password || /password|token|secret|key|credential|pin/i.test(field.name) ? 'password' : 'text';
               for (const key of ['min', 'max', 'step']) if (field[key] !== undefined) input[key] = field[key];
             }
-            input.autocomplete = 'off'; input.required = ['integer', 'number'].includes(field.kind) || field.kind === 'select' && !field.multiple; label.append(input); flow.append(label);
+            input.autocomplete = 'off'; input.required = ['integer', 'number'].includes(field.kind) || field.kind === 'select' && !field.multiple;
+            // Separate labels from option text and bind each control explicitly.
+            input.id = 'hca-native-'+(++AdministratorPanel.inputSerial); label.htmlFor = input.id; flow.append(label, input);
             let include;
             if (!field.required) { const optional = this.element('label', ` Set optional ${field.name}`); include = document.createElement('input'); include.type = 'checkbox'; optional.prepend(include); flow.append(optional); }
             inputs.push([field, input, include]);
