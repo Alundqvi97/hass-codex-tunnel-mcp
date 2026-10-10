@@ -45,8 +45,31 @@ jobs:
           PYTHONDONTWRITEBYTECODE: '1'
           PYTHONPYCACHEPREFIX: '${{ runner.temp }}/admin-pycache'
         run: |
-          python -B -m unittest discover -s tests/staging -p 'test_admin_product.py' -v
-          python -B -m unittest discover -s tests/staging -p 'test_admin_package.py' -v
+          run_native_suite() {
+            local pattern="$1" log="$RUNNER_TEMP/$1.log"
+            if python -B -m unittest discover -s tests/staging -p "$pattern" -v > "$log" 2>&1; then
+              cat "$log"
+              return 0
+            fi
+            # Publish only static test names and project traceback locations;
+            # exception values/credentials remain outside public annotations.
+            python -B - "$log" <<'PY_FAILURE'
+          from pathlib import Path
+          import re, sys
+          lines = Path(sys.argv[1]).read_text(errors="replace").splitlines()
+          for line in lines:
+              match = re.match(r"^(?:FAIL|ERROR): (test_[a-zA-Z0-9_]+)", line)
+              if match:
+                  print("::error title=Native acceptance::Failed " + match[1])
+              elif re.match(r'  File ".*(?:tests/staging|custom_components)/[^"\r\n]+", line \d+, in [a-zA-Z0-9_]+$', line):
+                  safe = line.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                  print("::notice title=Native failure location::" + safe)
+          PY_FAILURE
+            cat "$log"
+            return 1
+          }
+          run_native_suite 'test_admin_product.py'
+          run_native_suite 'test_admin_package.py'
           python -B -m py_compile custom_components/hass_codex_admin/*.py custom_components/hass_codex_tunnel_mcp/*.py tests/staging/*admin*.py
           node --check custom_components/hass_codex_admin/panel.js
           node --check tests/staging/admin_browser_fixture.cjs

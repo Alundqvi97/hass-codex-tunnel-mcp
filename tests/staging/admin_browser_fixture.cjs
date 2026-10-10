@@ -26,10 +26,16 @@ process.once('SIGTERM', () => {
   try {
     if (stopping) throw new Error('fixture startup interrupted');
     const context = await browser.newContext({serviceWorkers: 'block'});
-    await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
+    const ownedOrigin = url => {
+      const target = new URL(url);
+      if (target.protocol === 'ws:') target.protocol = 'http:';
+      else if (target.protocol === 'wss:') target.protocol = 'https:';
+      return target.origin === base;
+    };
+    await context.route('**/*', route => ownedOrigin(route.request().url()) ? route.continue() : route.abort());
     const page = await context.newPage();
     page.on('pageerror', error => console.error('BROWSER_PAGE_ERROR='+scrub(error.message)));
-    page.on('console', message => { if (/^FIXTURE_LOGIN_STAGE=[a-z-]+$/.test(message.text())) console.log(message.text()); });
+    page.on('console', message => { if (/^FIXTURE_(?:LOGIN_STAGE|OWNER_CODE)=[a-z_-]+$/.test(message.text())) console.log(message.text()); });
     checkpoint('panel-load');
     // A normal HTML document gives PKCE/auth a defined loopback origin; HA's
     // full frontend is intentionally not installed in this minimal Core fixture.
@@ -71,14 +77,16 @@ process.once('SIGTERM', () => {
         panel.hass = {callWS: command => new Promise((resolve, reject) => {
           const ws = new WebSocket(base.replace('http:', 'ws:')+'/api/websocket');
           const deadline = setTimeout(() => {ws.close(); reject(new Error('bounded WS timeout'));}, 8000);
+          ws.onopen = () => console.log('FIXTURE_LOGIN_STAGE=ws-open');
           ws.onmessage = event => {
             const value = JSON.parse(event.data);
             if (value.type === 'auth_required') ws.send(JSON.stringify({type:'auth', access_token:token}));
-            else if (value.type === 'auth_ok') ws.send(JSON.stringify({id:1, ...command}));
-            else if (value.type === 'result') {clearTimeout(deadline); ws.close(); value.success ? resolve(value.result) : reject(value.error);}
+            else if (value.type === 'auth_ok') {console.log('FIXTURE_LOGIN_STAGE=ws-authenticated'); ws.send(JSON.stringify({id:1, ...command}));}
+            else if (value.type === 'result') {console.log(value.success ? 'FIXTURE_LOGIN_STAGE=owner-command-approved' : 'FIXTURE_OWNER_CODE='+value.error.code); clearTimeout(deadline); ws.close(); value.success ? resolve(value.result) : reject(value.error);}
             else if (value.type === 'auth_invalid') {clearTimeout(deadline); ws.close(); reject(value);}
           };
-          ws.onerror = () => {clearTimeout(deadline); reject(new Error('fixture WS failed'));};
+          ws.onclose = event => {clearTimeout(deadline); reject(new Error('fixture WS closed: '+event.code));};
+          ws.onerror = () => {console.log('FIXTURE_LOGIN_STAGE=ws-failed'); clearTimeout(deadline); reject(new Error('fixture WS failed'));};
         })};
       };
     }, {base});
@@ -90,7 +98,9 @@ process.once('SIGTERM', () => {
     await page.getByRole('button', {name:'Issue a connection credential', exact:true}).waitFor();
     checkpoint('issue-connection');
     await page.getByRole('button', {name:'Issue a connection credential', exact:true}).click();
-    await page.getByText(/Save this credential privately now/).waitFor();
+    await page.waitForFunction(() => !!document.querySelector('hass-codex-admin > p:last-of-type')?.textContent, null, {timeout:10000});
+    const issueMessage = await page.locator('hass-codex-admin > p').last().textContent();
+    if (!issueMessage.includes('Save this credential privately now')) throw new Error('owner connection issuance failed: '+issueMessage);
     const credentials = (await page.locator('hass-codex-admin').textContent()).match(/hca_[A-Za-z0-9_-]{43}/g);
     if (!credentials || credentials.length !== 1) throw new Error('one-time scoped credential missing');
     checkpoint('revoke-connection');
