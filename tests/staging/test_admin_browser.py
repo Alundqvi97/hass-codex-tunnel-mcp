@@ -16,7 +16,7 @@ class OwnerPanelBrowser(unittest.IsolatedAsyncioTestCase):
         try:
             from homeassistant.components.http import StaticPathConfig
             document = fixture.root / "browser-fixture.html"
-            document.write_text("<!doctype html><html><body></body></html>")
+            document.write_text('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>')
             await fixture.hass.http.async_register_static_paths([
                 StaticPathConfig("/__admin_browser_fixture", str(document), False)
             ])

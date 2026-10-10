@@ -42,7 +42,7 @@ process.once('SIGTERM', () => {
     // A Playwright-fulfilled navigation has no real peer address and Chrome's
     // local-network check then rejects native WS. Do not disable that check.
     await page.goto(base+'/__admin_browser_fixture');
-    if (!(await page.evaluate(base => location.origin === base && isSecureContext && !!crypto.subtle, base))) throw new Error('owned loopback secure origin required for PKCE');
+    if (!(await page.evaluate(base => location.origin === base && document.characterSet === 'UTF-8' && isSecureContext && !!crypto.subtle, base))) throw new Error('owned UTF-8 loopback secure origin required for PKCE');
     await page.setContent('<form><label>Username<input name="username" autocomplete="off"></label><label>Password<input name="password" type="password" autocomplete="off"></label><button>Local fixture login</button></form><hass-codex-admin hidden></hass-codex-admin>');
     await page.addScriptTag({url: base+'/hass_codex_admin/panel.js'});
     await page.evaluate(({base}) => {
@@ -122,7 +122,13 @@ process.once('SIGTERM', () => {
     await page.getByText('Review the task and confirm its effects first.', {exact:true}).waitFor();
     for (const checkbox of await page.getByRole('checkbox').all()) await checkbox.check();
     await page.getByRole('button', {name:'Approve this exact task once', exact:true}).click();
-    await page.getByRole('heading', {name:/— approved/}).waitFor();
+    try {
+      await page.getByRole('heading', {name:/— approved/}).waitFor({timeout:10000});
+    } catch (error) {
+      const state = await page.locator('hass-codex-admin h3').allTextContents();
+      console.error('BROWSER_TASK_HEADINGS='+scrub(JSON.stringify(state)));
+      throw error;
+    }
     if (await page.locator('section script').count()) throw new Error('untrusted definition created a script element');
     const call = async (name, args) => page.evaluate(async ({base, credential, name, args}) => {
       const response = await fetch(base+'/api/hass_codex_admin/mcp', {method:'POST', headers:{Authorization:'Bearer '+credential, 'Content-Type':'application/json', Accept:'application/json'}, body:JSON.stringify({jsonrpc:'2.0', id:1, method:'tools/call', params:{name, arguments:args}})});
