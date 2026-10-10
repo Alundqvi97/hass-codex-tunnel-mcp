@@ -19,6 +19,7 @@ CONFIG_SCHEMA = vol.Schema({vol.Optional(DOMAIN): {
     vol.Required("backend_url"): cv.string,
     vol.Required("approver_client_ids"): [cv.string],
     vol.Optional("approval_panel", default=True): cv.boolean,
+    vol.Optional("edit_coordination", default="unaccepted"): vol.In(["unaccepted", "owner_window"]),
 }}, extra=vol.ALLOW_EXTRA)
 
 
@@ -51,6 +52,9 @@ async def async_setup(hass, config):
         identity = NativeIdentity(hass, policy, store, await hass.async_add_executor_job(store.activate_connectors))
         backend.credential = identity.backend_bearer
         engine = Administrator(store, backend, policy, identity.caller, identity.approved_session)
+        from .flows import NativeFlows, register as register_flows
+        backend.flows = NativeFlows(hass)
+        register_flows(hass, engine, identity, backend.flows)
         if policy["approval_panel"]:
             from .panel import register_panel
             await register_panel(hass)

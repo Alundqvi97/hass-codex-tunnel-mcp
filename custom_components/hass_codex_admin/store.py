@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 import sqlite3
 import stat
@@ -24,6 +25,16 @@ class TaskStore:
         info = self.directory.lstat()
         if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
             raise AdminError("private_storage_required")
+        self.intents = self.directory / "connector_revocations"
+        self.intents.mkdir(mode=0o700, exist_ok=True)
+        info = self.intents.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
+            raise AdminError("private_storage_required")
+        directory_fd = os.open(self.directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
         self.path = self.directory / "tasks.sqlite"
         if not self.path.exists():
             fd = os.open(self.path, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
@@ -31,7 +42,7 @@ class TaskStore:
         self._inspect()
         with self.transaction() as db:
             version = db.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, 1):
+            if version not in (0, 1, 2):
                 raise AdminError("unsupported_storage_version")
             schema = """
               CREATE TABLE IF NOT EXISTS tasks(id TEXT PRIMARY KEY, user TEXT, session TEXT, policy TEXT, plan TEXT, hash TEXT, status TEXT, expires REAL, approved_by TEXT);
@@ -40,7 +51,8 @@ class TaskStore:
               CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY, value REAL);
               CREATE TABLE IF NOT EXISTS audit(n INTEGER PRIMARY KEY, task TEXT, event TEXT, timestamp REAL);
               CREATE TABLE IF NOT EXISTS connectors(id TEXT PRIMARY KEY, digest TEXT UNIQUE, owner_session TEXT, expires REAL, label TEXT);
-              PRAGMA user_version=1;
+              CREATE TABLE IF NOT EXISTS pending_connectors(id TEXT PRIMARY KEY, digest TEXT UNIQUE, owner_session TEXT, expires REAL, label TEXT);
+              PRAGMA user_version=2;
             """
             for statement in schema.split(";"):
                 if statement.strip():
@@ -137,31 +149,93 @@ class TaskStore:
         with self.transaction() as db:
             return [dict(r) for r in db.execute("SELECT * FROM connectors")]
 
-    def activate_connectors(self):
-        """Boot/restore rotates credentials; no saved bearer can regain access.
+    def _intent_path(self, identifier):
+        if type(identifier) is not str or not re.fullmatch(r"[a-f0-9]{32}", identifier):
+            raise AdminError("invalid_connector_id")
+        return self.intents / identifier
 
-        Stable local connection IDs survive for the existing tunnel manager.
-        Only digests are written; the new capability exists in this Core's RAM.
+    def _revocation_ids(self):
+        # Corrupt/unexpected intent storage blocks renewal; it is not ignored.
+        identifiers = []
+        for path in self.intents.iterdir():
+            self._intent_path(path.name)
+            info = path.lstat()
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077 or info.st_nlink != 1 or info.st_size != 0:
+                raise AdminError("invalid_revocation_storage")
+            identifiers.append(path.name)
+            if len(identifiers) > 10000:
+                raise AdminError("revocation_storage_capacity")
+        return identifiers
+
+    def begin_connector_revoke(self, identifier):
+        path = self._intent_path(identifier)
+        revoked = self._revocation_ids()
+        if len(revoked) >= 10000 and identifier not in revoked:
+            raise AdminError("revocation_storage_capacity")
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077 or info.st_nlink != 1 or info.st_size:
+                raise AdminError("invalid_revocation_storage")
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        self._sync_intents()
+
+    def _sync_intents(self):
+        fd = os.open(self.intents, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+
+    def activate_connectors(self):
+        """At boot settle durable denies before rotating stable connection IDs.
+
+        Pending issuance never renews. Markers survive in-process cancellation
+        and late executor commits; only a later boot retires them after deletion.
         """
         import hashlib
         import secrets
+        revoked = self._revocation_ids()
         with self.transaction() as db:
+            db.execute("DELETE FROM pending_connectors")
+            for identifier in revoked:
+                db.execute("DELETE FROM connectors WHERE id=?", (identifier,))
             rows = [dict(r) for r in db.execute("SELECT * FROM connectors")]
             for row in rows:
                 row["credential"] = "hca_"+secrets.token_urlsafe(32)
                 row["digest"] = hashlib.sha256(row["credential"].encode()).hexdigest()
                 db.execute("UPDATE connectors SET digest=? WHERE id=?", (row["digest"], row["id"]))
-            return rows
+        for identifier in revoked:
+            self._intent_path(identifier).unlink()
+        self._sync_intents()
+        return rows
 
     def save_connector(self, identifier, digest, owner_session, expires, label):
+        self._intent_path(identifier)
         with self.transaction() as db:
-            if db.execute("SELECT count(*) FROM connectors").fetchone()[0] >= 32:
+            if self._intent_path(identifier).exists():
+                raise AdminError("connector_revoked_or_expired")
+            if db.execute("SELECT (SELECT count(*) FROM connectors)+(SELECT count(*) FROM pending_connectors)").fetchone()[0] >= 32:
                 raise AdminError("connector_capacity")
-            db.execute("INSERT INTO connectors VALUES(?,?,?,?,?)", (identifier, digest, owner_session, expires, label))
+            db.execute("INSERT INTO pending_connectors VALUES(?,?,?,?,?)", (identifier, digest, owner_session, expires, label))
+
+    def confirm_connector(self, identifier):
+        with self.transaction() as db:
+            if self._intent_path(identifier).exists():
+                raise AdminError("connector_revoked_or_expired")
+            if db.execute("INSERT INTO connectors SELECT * FROM pending_connectors WHERE id=?", (identifier,)).rowcount != 1:
+                raise AdminError("connector_issuance_incomplete")
+            db.execute("DELETE FROM pending_connectors WHERE id=?", (identifier,))
 
     def revoke_connector(self, identifier):
+        # Persist intent before SQL. Keep it until boot so a late issuance
+        # transaction cannot undo cancellation or revocation.
+        self.begin_connector_revoke(identifier)
         with self.transaction() as db:
             db.execute("DELETE FROM connectors WHERE id=?", (identifier,))
+            db.execute("DELETE FROM pending_connectors WHERE id=?", (identifier,))
 
     def retire_grants(self):
         """HA boot/restore never revives a saved approval or enrollment."""
@@ -206,6 +280,14 @@ class TaskStore:
             db.execute("UPDATE operations SET status=? WHERE task=? AND n=?", ("rolling_back" if rollback else "dispatching", task, n))
             db.execute("UPDATE operations SET result=? WHERE task=? AND n=?", (canonical({"rollback": rollback}), task, n))
             db.execute("INSERT INTO audit(task,event,timestamp) VALUES(?,?,?)", (task, "rollback_started" if rollback else "dispatch_started", now))
+
+    def acknowledge(self, task, n, result, *, expected):
+        # Capture a received mutation acknowledgement before independent
+        # readback. A missing response never creates an ownership receipt.
+        with self.transaction() as db:
+            changed = db.execute("UPDATE operations SET result=? WHERE task=? AND n=? AND status=?", (canonical(result), task, n, expected))
+            if changed.rowcount != 1:
+                raise AdminError("stale_operation_completion")
 
     def finish(self, task, n, status, after, result, *, expected):
         # A to_thread transaction may finish after caller cancellation. Its

@@ -41,11 +41,37 @@ class AdministratorPanel extends HTMLElement {
       detail.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere'; card.append(detail);
       const label = this.element('label', ' I reviewed the exact changes, indirect/security/destructive effects and rollback scope.');
       const check = document.createElement('input'); check.type = 'checkbox'; label.prepend(check); card.append(label);
+      const windowLabel = this.element('label', ' I will keep other editors away from the named objects until this task expires or is revoked; this is cooperation, not an HA lock.');
+      const windowCheck = document.createElement('input'); windowCheck.type = 'checkbox'; windowLabel.prepend(windowCheck);
+      if (task.plan.edit_window?.required) card.append(windowLabel);
       card.append(this.button('Approve this exact task once', async () => {
         if (!check.checked) { this.message.textContent = 'Review the task and confirm its effects first.'; return; }
-        await this.call('approve', {task: task.id, plan_hash: task.hash, confirm_effects: true}); await this.refresh();
+        await this.call('approve', {task: task.id, plan_hash: task.hash, confirm_effects: true, confirm_edit_window: windowCheck.checked}); await this.refresh();
       }));
       card.append(this.button('Revoke remaining operations', async () => { await this.call('revoke', {task: task.id, plan_hash: task.hash}); await this.refresh(); }));
+      for (const item of task.operations) {
+        if (item.status !== 'uncertain' || !item.result?.result?.owner_input_required) continue;
+        const flow = this.element('div'); card.append(flow);
+        const command = (action, fields = {}) => this._hass.callWS({type: 'hass_codex_admin/flow', action, task: task.id, plan_hash: task.hash, operation: item.n, ...fields});
+        const show = state => {
+          flow.replaceChildren(this.element('p', 'Native integration input stays here in HA. Starting a flow is not completion; an interrupted flow remains uncertain.'));
+          const inputs = [];
+          for (const field of state.fields) {
+            const label = this.element('label', field.name);
+            const input = document.createElement('input');
+            input.type = field.kind === 'boolean' ? 'checkbox' : field.kind === 'integer' ? 'number' : /password|token|secret|key|credential/i.test(field.name) ? 'password' : 'text';
+            input.autocomplete = 'off'; input.required = field.required; label.append(input); flow.append(label); inputs.push([field, input]);
+          }
+          flow.append(this.button('Continue in native HA', async () => {
+            const value = {};
+            for (const [field, input] of inputs) { value[field.name] = field.kind === 'boolean' ? input.checked : field.kind === 'integer' ? Number(input.value) : input.value; input.value = ''; }
+            const next = await command('submit', inputs.length ? {input: value} : {});
+            if (next.completed) await this.refresh(); else show(next);
+          }));
+          flow.append(this.button('Cancel native handoff', async () => { for (const [, input] of inputs) input.value = ''; await command('cancel'); await this.refresh(); }));
+        };
+        flow.append(this.button('Open secure native input', async () => show(await command('status'))));
+      }
       this.tasks.append(card);
     }
   }

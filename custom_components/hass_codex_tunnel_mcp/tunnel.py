@@ -139,7 +139,11 @@ class TunnelManager:
                 config = TunnelCommandConfig(str(entry_data[CONF_TUNNEL_ID]), str(entry_data[CONF_HA_MCP_URL]), self._run_dir,
                     str(entry_data.get(CONF_CONTROL_PLANE_BASE_URL) or ""), str(entry_data.get(CONF_CONTROL_PLANE_PATH) or ""), bool(token))
                 command = build_tunnel_command(executable, config)
-                env = os.environ.copy()
+                # HA host environment must not silently activate extra channels,
+                # bundled Cloudflare, raw logging, listeners or alternate MCP
+                # origins. Configure this one reviewed transport explicitly.
+                forbidden = ("CONTROL_PLANE_", "MCP_", "HARPOON_", "CLOUDFLARED_", "HEALTH_", "ADMIN_UI_", "LOG_", "EMBEDDED_MCP_")
+                env = {key: value for key, value in os.environ.items() if not key.startswith(forbidden) and key != "ALLOW_REMOTE_UI"}
                 env["CONTROL_PLANE_API_KEY"] = str(entry_data[CONF_API_KEY])
                 env.pop("HA_MCP_AUTH_HEADER", None)
                 if token:

@@ -96,9 +96,11 @@ async def run():
                 fixture.assertIsNotNone(observed)
                 fixture.assertEqual(result, {"error": "operation_consumed_or_uncertain"})
                 reconciled = await fixture.tool("admin_reconcile", args)
-                fixture.assertNotIn("error", reconciled, reconciled)
-                fixture.assertEqual(reconciled["operations"][0]["status"], "applied")
-                fixture.assertFalse(reconciled["operations"][0]["result"]["mutation_attribution_verified"])
+                fixture.assertEqual(reconciled, {"error": "creation_ownership_requires_owner_reconciliation"})
+                fixture.assertEqual(await fixture.tool("admin_rollback", args), {"error": "operation_consumed_or_uncertain"})
+                # Lost acknowledgement never conveys ownership after restart.
+                cleanup = await fixture.approved([{**op, "action": "delete", "value": None}])
+                fixture.assertNotIn("error", await fixture.tool("admin_execute", {"task": cleanup["id"], "plan_hash": cleanup["hash"]}))
             elif boundary == "crash-helper-receipt":
                 fixture.assertIsNone(observed)
                 fixture.assertEqual(result, {"error": "recorded_result_has_drift"})

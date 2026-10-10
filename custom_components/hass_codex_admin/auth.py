@@ -4,6 +4,7 @@ A connector is a provisioned connection, never proof of a human or OAuth client.
 Its opaque token is deliberately not a native HA access token. Native credentials
 are minted only for the fixed loopback backend and never leave that adapter.
 """
+import asyncio
 from contextvars import ContextVar
 import hashlib
 import secrets
@@ -63,8 +64,25 @@ class NativeIdentity:
         self.approved_session(owner.session)
         identifier, bearer = uuid.uuid4().hex, "hca_"+secrets.token_urlsafe(32)
         row = {"id": identifier, "digest": hashlib.sha256(bearer.encode()).hexdigest(), "owner_session": owner.session, "expires": time.time()+days*86400, "label": label}
-        await self.hass.async_add_executor_job(self.store.save_connector, identifier, row["digest"], owner.session, row["expires"], label)
-        self.approved_session(owner.session)
+        try:
+            await self.hass.async_add_executor_job(self.store.save_connector, identifier, row["digest"], owner.session, row["expires"], label)
+            self.approved_session(owner.session)
+            await self.hass.async_add_executor_job(self.store.confirm_connector, identifier)
+            self.approved_session(owner.session)
+        except BaseException:
+            # Shield durable deny from cancellation. The marker remains until
+            # boot and defeats executor jobs that commit after this coroutine.
+            cleanup = asyncio.ensure_future(self.hass.async_add_executor_job(self.store.revoke_connector, identifier))
+            while not cleanup.done():
+                try:
+                    await asyncio.shield(cleanup)
+                except asyncio.CancelledError:
+                    continue
+            try:
+                cleanup.result()
+            except (AdminError, OSError):
+                raise AdminError("connector_issuance_cleanup_incomplete") from None
+            raise
         row["credential"] = bearer
         self.connectors[row["digest"]] = row
         return {"id": identifier, "connector_credential": bearer, "expires": row["expires"], "path": CONNECTOR_PATH}
@@ -72,7 +90,10 @@ class NativeIdentity:
     async def revoke(self, identifier):
         # Revoke memory first: persistence failure must not keep active authority.
         self.connectors = {k:r for k,r in self.connectors.items() if r["id"] != identifier}
-        await self.hass.async_add_executor_job(self.store.revoke_connector, identifier)
+        try:
+            await self.hass.async_add_executor_job(self.store.revoke_connector, identifier)
+        except OSError:
+            raise AdminError("connector_revocation_incomplete") from None
 
     def approver(self, connection):
         return self.approved_session(connection.refresh_token_id)

@@ -8,3 +8,6 @@ home-assistant-frontend==20260930.2
 gazetteer-matcher==1.1.0
 hassil==3.12.1
 home-assistant-intents==2026.10.6
+
+# Official Core Supervisor manifest dependency for isolated native-handler tests.
+aiohasupervisor==0.6.0

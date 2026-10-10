@@ -7,7 +7,7 @@ set -euo pipefail
 # No application/security/workflow/lockfile/production edits during setup.
 repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 setup_dir=${ADMIN_DEV_STATE:-/workspace/.development/hass-codex-tunnel-mcp}
-approved=14fca17f54f364019b6bfa9074d1e016ccb6f92b
+approved=a7ad7a6a3362262e0a5f3b8d8a04998106d42acc
 upstream=fc54437a804858732e4bc927add98e202d879a09
 fixture_cache="$setup_dir/fixtures/ha-mcp.git"
 security_python="$setup_dir/security-venv/bin/python"

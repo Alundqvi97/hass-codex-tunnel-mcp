@@ -1,41 +1,82 @@
-// Actual panel DOM and native owner WebSocket against disposable loopback Core.
+// Actual panel DOM + real native login/WS + scoped MCP in disposable Core.
 const {chromium} = require('playwright');
 (async () => {
   const base = process.env.ADMIN_BROWSER_BASE;
   const browser = await chromium.launch({executablePath: process.env.ADMIN_BROWSER_EXECUTABLE, chromiumSandbox: true, headless: true});
   try {
     const context = await browser.newContext({serviceWorkers: 'block'});
-    await context.route('**/*', route => {
-      const url = new URL(route.request().url());
-      return url.origin === base ? route.continue() : route.abort();
-    });
+    await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
     const page = await context.newPage();
     await page.goto(base+'/hass_codex_admin/panel.js');
-    await page.setContent('<hass-codex-admin></hass-codex-admin>');
+    await page.setContent('<form><label>Username<input name="username" autocomplete="off"></label><label>Password<input name="password" type="password" autocomplete="off"></label><button>Local fixture login</button></form><hass-codex-admin hidden></hass-codex-admin>');
     await page.addScriptTag({url: base+'/hass_codex_admin/panel.js'});
-    await page.evaluate(({base, token}) => {
-      document.querySelector('hass-codex-admin').hass = {callWS: command => new Promise((resolve, reject) => {
-        const ws = new WebSocket(base.replace('http:', 'ws:')+'/api/websocket');
-        ws.onmessage = event => {
-          const value = JSON.parse(event.data);
-          if (value.type === 'auth_required') ws.send(JSON.stringify({type:'auth', access_token:token}));
-          else if (value.type === 'auth_ok') ws.send(JSON.stringify({id:1, ...command}));
-          else if (value.type === 'result') {ws.close(); value.success ? resolve(value.result) : reject(value.error);}
-          else if (value.type === 'auth_invalid') {ws.close(); reject(value);}
-        };
-        ws.onerror = () => reject(new Error('fixture websocket failed'));
-      })};
-    }, {base, token:process.env.ADMIN_BROWSER_OWNER_TOKEN});
+    await page.evaluate(({base}) => {
+      const form = document.querySelector('form');
+      form.onsubmit = async event => {
+        event.preventDefault();
+        const bytes = crypto.getRandomValues(new Uint8Array(48));
+        const verifier = btoa(String.fromCharCode(...bytes)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+        const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+        const challenge = btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+        const post = async (path, value) => (await fetch(base+path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(value)})).json();
+        const flow = await post('/auth/login_flow', {client_id:base, handler:['homeassistant', null], redirect_uri:base+'/auth/callback', code_challenge:challenge, code_challenge_method:'S256'});
+        const result = await post('/auth/login_flow/'+flow.flow_id, {client_id:base, username:form.username.value, password:form.password.value});
+        form.password.value = '';
+        if (result.type !== 'create_entry') throw new Error('native login failed');
+        const response = await fetch(base+'/auth/token', {method:'POST', body:new URLSearchParams({grant_type:'authorization_code', client_id:base, code:result.result, code_verifier:verifier})});
+        const tokens = await response.json();
+        if (!tokens.access_token) throw new Error('native token exchange failed');
+        const token = tokens.access_token; // closure only; never a remote connector credential
+        form.remove();
+        const panel = document.querySelector('hass-codex-admin'); panel.hidden = false;
+        panel.hass = {callWS: command => new Promise((resolve, reject) => {
+          const ws = new WebSocket(base.replace('http:', 'ws:')+'/api/websocket');
+          const deadline = setTimeout(() => {ws.close(); reject(new Error('bounded WS timeout'));}, 8000);
+          ws.onmessage = event => {
+            const value = JSON.parse(event.data);
+            if (value.type === 'auth_required') ws.send(JSON.stringify({type:'auth', access_token:token}));
+            else if (value.type === 'auth_ok') ws.send(JSON.stringify({id:1, ...command}));
+            else if (value.type === 'result') {clearTimeout(deadline); ws.close(); value.success ? resolve(value.result) : reject(value.error);}
+            else if (value.type === 'auth_invalid') {clearTimeout(deadline); ws.close(); reject(value);}
+          };
+          ws.onerror = () => {clearTimeout(deadline); reject(new Error('fixture WS failed'));};
+        })};
+      };
+    }, {base});
+    await page.getByLabel('Username', {exact:true}).fill(process.env.ADMIN_BROWSER_USERNAME);
+    await page.getByLabel('Password', {exact:true}).fill(process.env.ADMIN_BROWSER_PASSWORD);
+    await page.getByRole('button', {name:'Local fixture login', exact:true}).click();
+    await page.getByRole('button', {name:'Issue a connection credential', exact:true}).waitFor();
+    await page.getByRole('button', {name:'Issue a connection credential', exact:true}).click();
+    await page.getByText(/Save this credential privately now/).waitFor();
+    const credentials = (await page.locator('hass-codex-admin').textContent()).match(/hca_[A-Za-z0-9_-]{43}/g);
+    if (!credentials || credentials.length !== 1) throw new Error('one-time scoped credential missing');
+    await page.getByRole('button', {name:'Manage connections', exact:true}).click();
+    await page.getByRole('button', {name:'Revoke this connection', exact:true}).last().click();
+    if ((await page.locator('hass-codex-admin').textContent()).includes(credentials[0])) throw new Error('credential remained in panel');
+    const revokedStatus = await page.evaluate(async ({base, credential}) => (await fetch(base+'/api/hass_codex_admin/mcp', {method:'POST', headers:{Authorization:'Bearer '+credential}, body:'{}'})).status, {base, credential:credentials[0]});
+    if (revokedStatus !== 401) throw new Error('revoked credential accepted');
     await page.getByRole('button', {name:'Refresh tasks', exact:true}).click();
-    await page.getByRole('button', {name:'Approve this exact task once'}).waitFor();
-    await page.getByRole('button', {name:'Approve this exact task once'}).click();
+    await page.getByRole('button', {name:'Approve this exact task once', exact:true}).click();
     await page.getByText('Review the task and confirm its effects first.', {exact:true}).waitFor();
-    await page.getByRole('checkbox').check();
-    await page.getByRole('button', {name:'Approve this exact task once'}).click();
+    for (const checkbox of await page.getByRole('checkbox').all()) await checkbox.check();
+    await page.getByRole('button', {name:'Approve this exact task once', exact:true}).click();
     await page.getByRole('heading', {name:/— approved/}).waitFor();
-    if (await page.locator('section script').count()) throw new Error('untrusted definition created DOM script');
-    await page.getByRole('button', {name:'Revoke remaining operations'}).click();
+    if (await page.locator('section script').count()) throw new Error('untrusted definition created a script element');
+    const call = async (name, args) => page.evaluate(async ({base, credential, name, args}) => {
+      const response = await fetch(base+'/api/hass_codex_admin/mcp', {method:'POST', headers:{Authorization:'Bearer '+credential, 'Content-Type':'application/json', Accept:'application/json'}, body:JSON.stringify({jsonrpc:'2.0', id:1, method:'tools/call', params:{name, arguments:args}})});
+      const body = await response.json(); if (body.result.isError) throw new Error('scoped tool failed'); return JSON.parse(body.result.content[0].text).result;
+    }, {base, credential:process.env.ADMIN_BROWSER_CONNECTOR, name, args});
+    const args = {task:process.env.ADMIN_BROWSER_TASK, plan_hash:process.env.ADMIN_BROWSER_HASH};
+    const applied = await call('admin_execute', args);
+    if (applied.operations[0].status !== 'applied') throw new Error('approved mutation did not apply');
+    await page.getByRole('button', {name:'Refresh tasks', exact:true}).click();
+    await page.getByText(/stored_definition_or_ha_state_verified/).waitFor();
+    const rolled = await call('admin_rollback', args);
+    if (rolled.operations[0].status !== 'rolled_back') throw new Error('rollback not verified');
+    await page.getByRole('button', {name:'Refresh tasks', exact:true}).click();
+    await page.getByRole('button', {name:'Revoke remaining operations', exact:true}).click();
     await page.getByRole('heading', {name:/— revoked/}).waitFor();
-    console.log('ACTUAL_OWNER_PANEL_BROWSER=PASS');
+    console.log('ACTUAL_OWNER_PANEL_BROWSER=PASS login issue revoke plan consent execute outcome rollback reject');
   } finally {await browser.close();}
 })().catch(error => {console.error(error.message); process.exitCode=1;});

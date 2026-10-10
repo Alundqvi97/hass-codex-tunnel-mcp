@@ -3384,3 +3384,9 @@ zeroconf==0.151.5 \
     # via
     #   aiohttp-asyncmdnsresolver
     #   homeassistant
+
+# Official Core hassio fixture dependency; existing locked packages preserved.
+aiohasupervisor==0.6.0 \
+    --hash=sha256:6f78f474160e6f90fda1879f0fe7d341d8cfd5f69eec4cb0cb60483816f73d60 \
+    --hash=sha256:debee1dc3b99114f5b653959cb828a74a13181011cae3ac013ae9aefb0cda062
+    # via -r requirements/admin-test.in

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 import shutil
 import socket
@@ -36,7 +37,23 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         if not (self.root / "scripts.yaml").exists():
             (self.root / "scripts.yaml").write_text("{}\n")
         (self.root / "configuration.yaml").write_text("automation: !include automations.yaml\nscript: !include scripts.yaml\ninput_boolean: {}\nlovelace:\n  mode: storage\n")
-        shutil.copytree(REPO / "custom_components/hass_codex_admin", self.root / "custom_components/hass_codex_admin", ignore=shutil.ignore_patterns("__pycache__"), dirs_exist_ok=True)
+        archive = os.environ.get("ADMIN_RELEASE_ARCHIVE")
+        if archive:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("admin_release_package", REPO / "scripts/development/package.py")
+            package = importlib.util.module_from_spec(spec); spec.loader.exec_module(package)
+            if not (self.root / "custom_components").exists():
+                package.install_fresh(archive, self.root)
+            else:
+                # Persisted process fixtures must already have exactly the
+                # installed archive bytes, never source-checkout fallback.
+                import zipfile, hashlib
+                manifest = package.verify(archive)
+                for name, record in manifest["files"].items():
+                    self.assertEqual(hashlib.sha256((self.root/name).read_bytes()).hexdigest(), record["sha256"])
+        else:
+            shutil.copytree(REPO / "custom_components/hass_codex_admin", self.root / "custom_components/hass_codex_admin", ignore=shutil.ignore_patterns("__pycache__"), dirs_exist_ok=True)
+        self.legacy_package = json.loads((self.root / "custom_components/hass_codex_admin/manifest.json").read_text())["version"] == "0.1.0"
         port_file = self.root / "fixture.port"
         if self.persist_root and port_file.exists():
             self.port = int(port_file.read_text())
@@ -67,14 +84,21 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         self.native_remote_bearer = self.hass.auth.async_create_access_token(self.remote_refresh)
         self.owner_bearer = self.hass.auth.async_create_access_token(self.owner_refresh)
         config = {"http": {"server_host": "127.0.0.1", "server_port": self.port}, "automation": [], "script": {}, "input_boolean": {}, "lovelace": {"mode": "storage"},
-                  "hass_codex_admin": {"backend_url": self.base, "approver_client_ids": [self.base], "approval_panel": True}}
+                  "hass_codex_admin": {"backend_url": self.base, "approver_client_ids": [self.base], "approval_panel": True, "edit_coordination": "owner_window"}}
+        if self.legacy_package:
+            config["hass_codex_admin"].pop("edit_coordination")
         for domain in ("homeassistant", "persistent_notification", "http", "api", "websocket_api", "config", "automation", "script", "input_boolean", "lovelace", "hass_codex_admin"):
-            self.assertTrue(await async_setup_component(self.hass, domain, config), domain)
+            loaded = await async_setup_component(self.hass, domain, config)
+            if domain == "hass_codex_admin" and getattr(self, "expect_admin_failure", False):
+                self.assertFalse(loaded); break
+            self.assertTrue(loaded, domain)
         await self.hass.async_start()
         await self.hass.async_block_till_done()
         self.client = aiohttp.ClientSession(trust_env=False)
         self.addAsyncCleanup(self.client.close)
         self.counter = 0
+        if getattr(self, "expect_admin_failure", False):
+            return
         identity = self.hass.data["hass_codex_admin"]["identity"]
         connector_file = self.root / "fixture.connector"
         if self.persist_root and connector_file.exists():
@@ -111,6 +135,8 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         return content["result"]
 
     async def approval(self, action, *, bearer=None, **fields):
+        if action == "approve" and not self.legacy_package:
+            fields.setdefault("confirm_edit_window", True)  # synthetic owner accepts fixture-only edit policy
         async with self.client.ws_connect(self.base+"/api/websocket") as ws:
             self.assertEqual((await ws.receive_json())["type"], "auth_required")
             await ws.send_json({"type": "auth", "access_token": bearer or self.owner_bearer})
@@ -125,6 +151,121 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         result = await self.approval("approve", task=task["id"], plan_hash=task["hash"], confirm_effects=True)
         self.assertTrue(result["success"], result)
         return task
+
+    async def test_connector_revocation_sql_failure_cannot_renew_on_boot(self):
+        from unittest.mock import patch
+        from custom_components.hass_codex_admin.model import AdminError
+        identity = self.hass.data["hass_codex_admin"]["identity"]
+        identifier = identity.caller(self.bearer).session
+        store = identity.store
+        # Real durable intent succeeds, real SQLite deletion is the only fault.
+        original = store.transaction
+        with patch.object(store, "transaction", side_effect=AdminError("storage_unavailable")):
+            with self.assertRaises(AdminError):
+                await identity.revoke(identifier)
+        with self.assertRaises(AdminError):
+            identity.caller(self.bearer)
+        self.assertTrue((store.intents / identifier).is_file())
+        renewed = await asyncio.to_thread(store.activate_connectors)
+        self.assertNotIn(identifier, {row["id"] for row in renewed})
+        self.assertFalse((store.intents / identifier).exists())
+        self.assertNotIn(identifier, {row["id"] for row in await asyncio.to_thread(store.connectors)})
+
+    async def test_connector_cancelled_late_activation_cannot_return_authority(self):
+        import threading
+        from unittest.mock import patch
+        from custom_components.hass_codex_admin.model import AdminError
+        identity = self.hass.data["hass_codex_admin"]["identity"]
+        owner = identity.approved_session(self.owner_refresh.id)
+        entered, release = threading.Event(), threading.Event()
+        original = identity.store.confirm_connector
+        identifiers = []
+        def delayed(identifier):
+            identifiers.append(identifier); entered.set()
+            if not release.wait(3):
+                raise AssertionError("activation boundary stalled")
+            return original(identifier)
+        with patch.object(identity.store, "confirm_connector", delayed):
+            pending = asyncio.create_task(identity.issue(owner, "Cancelled issuance", 1))
+            self.assertTrue(await asyncio.to_thread(entered.wait, 2))
+            pending.cancel()
+            try:
+                with self.assertRaises(asyncio.CancelledError):
+                    await pending
+                self.assertTrue((identity.store.intents / identifiers[0]).exists())
+            finally:
+                release.set()
+            await self.hass.async_block_till_done()
+        renewed = await asyncio.to_thread(identity.store.activate_connectors)
+        self.assertNotIn(identifiers[0], {row["id"] for row in renewed})
+        # Invalid intent paths, symlinks and corrupt files never get ignored.
+        with self.assertRaises(AdminError):
+            await identity.revoke("../tasks.sqlite")
+        marker = identity.store.intents / ("a"*32)
+        marker.symlink_to(identity.store.path)
+        with self.assertRaises(AdminError):
+            await asyncio.to_thread(identity.store.activate_connectors)
+        marker.unlink()
+
+    async def test_failed_task_revoke_latches_before_dispatch(self):
+        from unittest.mock import patch
+        from custom_components.hass_codex_admin.model import AdminError
+        task = await self.approved([{"family": "script", "action": "create", "target": "failed_revoke", "value": {"sequence": [{"delay": "00:00:00"}]}}])
+        engine = self.hass.data["hass_codex_admin"]["engine"]
+        with patch.object(engine.store, "decide", side_effect=AdminError("storage_unavailable")):
+            response = await self.approval("revoke", task=task["id"], plan_hash=task["hash"])
+            self.assertFalse(response["success"])
+        self.assertEqual(await self.tool("admin_execute", {"task": task["id"], "plan_hash": task["hash"]}), {"error": "approval_revoked"})
+        self.assertIsNone(await self.tool("admin_inspect", {"family": "script", "target": "failed_revoke"}))
+        good = await self.approved([{"family": "script", "action": "create", "target": "after_failed_revoke", "value": {"sequence": [{"delay": "00:00:00"}]}}])
+        self.assertNotIn("error", await self.tool("admin_execute", {"task": good["id"], "plan_hash": good["hash"]}))
+
+    async def test_missing_create_ack_does_not_adopt_external_identical_object(self):
+        from unittest.mock import patch
+        from custom_components.hass_codex_admin.model import AdminError
+        op = {"family": "script", "action": "create", "target": "external_identical", "value": {"sequence": [{"delay": "00:00:00"}]}}
+        task = await self.approved([op]); args = {"task": task["id"], "plan_hash": task["hash"]}
+        engine = self.hass.data["hass_codex_admin"]["engine"]
+        with patch.object(engine.backend, "write", side_effect=AdminError("backend_unavailable_or_timeout")):
+            self.assertIn("error", await self.tool("admin_execute", args))
+        # An independently authenticated native editor creates identical bytes.
+        async with self.client.post(self.base+"/api/config/script/config/"+op["target"], json=op["value"], headers={"Authorization": "Bearer "+self.owner_bearer}) as response:
+            self.assertEqual(response.status, 200)
+        self.assertEqual(await self.tool("admin_reconcile", args), {"error": "creation_ownership_requires_owner_reconciliation"})
+        self.assertEqual(await self.tool("admin_rollback", args), {"error": "operation_consumed_or_uncertain"})
+        self.assertEqual(await self.tool("admin_inspect", {"family": "script", "target": op["target"]}), op["value"])
+
+    async def test_repeated_mixed_tasks_varied_schedule_and_duplicate_calls(self):
+        import time
+        from unittest.mock import patch
+        engine = self.hass.data["hass_codex_admin"]["engine"]
+        writes = []
+        original_write = engine.backend.write
+        async def counted(actor, operation):
+            writes.append((operation["target"], operation["action"]))
+            return await original_write(actor, operation)
+        started = time.perf_counter(); latencies = []
+        with patch.object(engine.backend, "write", counted):
+            for n, delay in enumerate((0, .001, .003, .002, 0)):
+                unknown = await self.rpc("tools/call", {"name": "not_a_tool", "arguments": {}})
+                self.assertTrue(unknown.get("error") or unknown.get("result", {}).get("isError"))
+                op = {"family": "script", "action": "create", "target": "mixed_"+str(n), "value": {"alias": "Create", "sequence": [{"delay": "00:00:00"}]}}
+                task = await self.approved([op, {**op, "action": "put", "value": {**op["value"], "alias": "Repair"}}])
+                args = {"task": task["id"], "plan_hash": task["hash"]}
+                async def call():
+                    await asyncio.sleep(delay); return await self.tool("admin_execute", args)
+                begin = time.perf_counter()
+                results = await asyncio.gather(call(), self.tool("admin_execute", args))
+                self.assertTrue(all("error" not in result for result in results), results)
+                self.assertEqual(writes.count((op["target"], "create")), 1)
+                self.assertEqual(writes.count((op["target"], "put")), 1)
+                self.assertEqual((await self.tool("admin_inspect", {"family": "script", "target": op["target"]}))["alias"], "Repair")
+                self.assertNotIn("error", await self.tool("admin_rollback", args))
+                self.assertIsNone(await self.tool("admin_inspect", {"family": "script", "target": op["target"]}))
+                latencies.append(round((time.perf_counter()-begin)*1000, 2))
+        self.assertFalse(engine.lock.locked())
+        self.assertEqual(len(writes), 20)  # two writes + two reverse writes each
+        print("NATIVE_RELIABILITY_METRICS="+json.dumps({"iterations": 5, "failed": 0, "duplicate_writes": 0, "duration_seconds": round(time.perf_counter()-started, 3), "task_and_rollback_ms": latencies, "scope": "bounded loopback scheduling variation; not a stability soak"}))
 
     async def test_native_bearer_bypass_reproduction_and_connector_global_denial(self):
         effects = []
@@ -222,7 +363,7 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("error", await self.tool("admin_rollback", {"task": repair["id"], "plan_hash": repair["hash"]}))
         self.assertEqual(await self.tool("admin_inspect", {"family": "script", "target": operation["target"]}), local)
 
-    async def test_native_helper_id_collision_after_final_check_remains_uncertain(self):
+    async def test_native_helper_id_collision_binds_assigned_identity_and_preserves_local_object(self):
         engine = self.hass.data["hass_codex_admin"]["engine"]
         task = await self.approved([{ "family": "input_boolean", "action": "create", "target": "allocation_race", "value": {"name": "Allocation race"}}])
         original = engine.backend.final_check
@@ -238,16 +379,18 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         engine.backend.final_check = boundary
         args = {"task": task["id"], "plan_hash": task["hash"]}
         try:
-            self.assertEqual(await self.tool("admin_execute", args), {"error": "helper_allocated_unexpected_identity"})
+            completed = await self.tool("admin_execute", args)
+            self.assertNotIn("error", completed, completed)
         finally:
             engine.backend.final_check = original
-        self.assertEqual((await self.tool("admin_status", {"task": task["id"]}))["operations"][0]["status"], "uncertain")
+        self.assertEqual(completed["operations"][0]["status"], "applied")
+        self.assertEqual(completed["operations"][0]["result"]["created_target"], "allocation_race_2")
         self.assertIsNotNone(await self.tool("admin_inspect", {"family": "input_boolean", "target": "allocation_race"}))
         self.assertIsNotNone(await self.tool("admin_inspect", {"family": "input_boolean", "target": "allocation_race_2"}))
-        self.assertEqual(await self.tool("admin_execute", args), {"error": "operation_consumed_or_uncertain"})
-        # Neither the unrelated local helper nor the uncertain allocation is
-        # automatically deleted or retried. A fresh explicit owner decision is
-        # required; this demonstrates the native allocation limitation.
+        self.assertNotIn("error", await self.tool("admin_execute", args))
+        self.assertNotIn("error", await self.tool("admin_rollback", args))
+        self.assertIsNone(await self.tool("admin_inspect", {"family": "input_boolean", "target": "allocation_race_2"}))
+        self.assertIsNotNone(await self.tool("admin_inspect", {"family": "input_boolean", "target": "allocation_race"}))
         fresh = await self.approved([{ "family": "script", "action": "create", "target": "after_collision", "value": {"sequence": [{"delay": "00:00:00"}]}}])
         self.assertNotIn("error", await self.tool("admin_execute", {"task": fresh["id"], "plan_hash": fresh["hash"]}))
 
@@ -266,6 +409,15 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         connector_id = identity.caller(self.bearer).session
         manager = TunnelManager(provider, self.root/"transport", retry_delays=(.03, .06), poll_interval=.05,
             credential_provider=lambda data: identity.transport_credential(data["admin_connection_id"]))
+        flags = patch.dict(os.environ, {"CLOUDFLARED_MANAGED": "true", "HARPOON_TARGETS": "http://synthetic.invalid", "LOG_HTTP_RAW_UNSAFE": "true"})
+        flags.start(); self.addCleanup(flags.stop)
+        spawn = manager._spawn
+        async def reviewed_spawn(command, environment):
+            self.assertNotIn("CLOUDFLARED_MANAGED", environment)
+            self.assertNotIn("HARPOON_TARGETS", environment)
+            self.assertNotIn("LOG_HTTP_RAW_UNSAFE", environment)
+            await spawn(command, environment)
+        manager._spawn = reviewed_spawn
         self.addAsyncCleanup(manager.close)
         data = {"tunnel_id": "synthetic-tunnel", "api_key": "synthetic-platform-key", "ha_mcp_url": self.base+"/api/hass_codex_admin/mcp", "admin_connection_id": connector_id, "auto_update_tunnel_client": False}
         transport_state = self.root/"transport.state";transport_state.write_text("ready")
@@ -348,8 +500,8 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         entry = SimpleNamespace(entry_id="synthetic-update", data=data, options={})
         updater = TunnelClientUpdater(self.hass, entry, self.root/"bin", lambda: None)
         await updater.async_load()
-        asset = TunnelClientAsset("linux", "amd64", "fixture.zip", "a"*64, "v0.0.11")
-        candidate = UpdateCheckResult("v0.0.11", "v0.0.11", asset, None)
+        asset = TunnelClientAsset("linux", "amd64", "fixture.zip", "a"*64, "v0.0.17")
+        candidate = UpdateCheckResult("v0.0.17", "v0.0.17", asset, None)
         await manager.start(data)
         self.assertTrue(await manager.wait_until_healthy(3))
         # Inject only the OS spawn failure; actual ownership/epoch, rollback
@@ -363,8 +515,8 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(FileNotFoundError):
                 await updater.async_update_tunnel_client(manager, data)
         self.assertTrue(await manager.wait_until_healthy(3))
-        self.assertEqual(updater.state.active_version, "v0.0.10")
-        self.assertIn("v0.0.11", updater.state.failed_versions)
+        self.assertEqual(updater.state.active_version, "v0.0.16")
+        self.assertIn("v0.0.17", updater.state.failed_versions)
         self.rpc_base = _read_health_url(self.root/"updater-run/health.url"); self.rpc_path = "/mcp"
         self.assertNotIn("error", await self.tool("admin_inspect", {"family": "system", "target": "core", "detail": "health"}))
         entered, release = asyncio.Event(), asyncio.Event()
@@ -670,7 +822,7 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.tool("admin_execute", {**args, "plan_hash": "0"*64}), {"error": "caller_scope_or_policy_changed"})
         self.assertFalse((await self.approval("approve", task=task["id"], plan_hash=task["hash"], confirm_effects=True))["success"])
         self.assertTrue((await self.approval("revoke", **args))["success"])
-        self.assertEqual(await self.tool("admin_execute", args), {"error": "approval_required_or_expired"})
+        self.assertEqual(await self.tool("admin_execute", args), {"error": "approval_revoked"})
         self.assertIsNone(await self.tool("admin_inspect", {"family": "script", "target": op["target"]}))
         expiring = await self.approved([{**op, "target": "expired_task"}])
         store = self.hass.data["hass_codex_admin"]["engine"].store
@@ -707,6 +859,45 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.tool("admin_execute", {"task": deletion["id"], "plan_hash": deletion["hash"]}), {"error": "referenced_object_requires_explicit_repair"})
         self.assertIsNotNone(await self.tool("admin_inspect", {"family": "input_boolean", "target": helper["target"]}))
 
+    async def test_native_supervisor_adapter_fixed_targets_and_verified_state(self):
+        from homeassistant.components.hassio.websocket_api import websocket_supervisor_api
+        from homeassistant.components import websocket_api
+        calls = []
+        states = {"synthetic_addon": {"slug": "synthetic_addon", "version": "1.0.0", "version_latest": "1.1.0", "state": "stopped"}}
+        class SyntheticSupervisor:
+            async def send_command(supervisor, endpoint, *, method, payload, **kwargs):
+                calls.append((endpoint, method, payload))
+                parts = endpoint.split("/")
+                slug = parts[3] if parts[1] == "store" else parts[2]
+                state = states[slug]
+                if method == "get":
+                    return {"data": {**state, "options": {"password": "never-export-this"}}}
+                action = endpoint.rsplit("/", 1)[1]
+                if action == "start": state["state"] = "started"
+                elif action == "stop": state["state"] = "stopped"
+                elif action == "update":
+                    self.assertEqual(endpoint, "/store/addons/synthetic_addon/update")
+                    self.assertEqual(payload, {"backup": True})
+                    state["version"] = state["version_latest"]
+                return {"data": {}}
+        # Only the upstream Supervisor network boundary is replaced. Actual
+        # native WS authentication/handler, engine, dispatch and SQLite execute.
+        self.hass.data["hassio"] = SyntheticSupervisor()
+        websocket_api.async_register_command(self.hass, websocket_supervisor_api)
+        for action in ("start", "update", "stop"):
+            value = {"addon": "synthetic_addon", **({"release": "latest"} if action == "update" else {})}
+            task = await self.approved([{"family": "maintenance", "action": "call", "target": "hassio.addon_"+action, "value": value}])
+            result = await self.tool("admin_execute", {"task": task["id"], "plan_hash": task["hash"]})
+            self.assertNotIn("error", result, result)
+            self.assertEqual(result["operations"][0]["status"], "applied")
+            self.assertNotIn("never-export-this", json.dumps(result))
+        self.assertIn(("/store/addons/synthetic_addon/update", "post", {"backup": True}), calls)
+        invalid = await self.tool("admin_propose", {"operations": [{"family": "maintenance", "action": "call", "target": "hassio.addon_update", "value": {"addon": "synthetic_addon", "version": "9.9.9"}}]})
+        self.assertEqual(invalid, {"error": "exact_addon_required"})
+        task = await self.approved([{"family": "maintenance", "action": "call", "target": "hassio.addon_restart", "value": {"addon": "synthetic_addon"}}])
+        self.assertEqual(await self.tool("admin_execute", {"task": task["id"], "plan_hash": task["hash"]}), {"error": "outcome_requires_reconciliation"})
+        self.assertEqual((await self.tool("admin_status", {"task": task["id"]}))["operations"][0]["status"], "uncertain")
+
     async def test_config_maintenance_supported_and_supervisor_gaps_explicit(self):
         task = await self.approved([{ "family": "maintenance", "action": "call", "target": "homeassistant.check_config", "value": {}}])
         result = await self.tool("admin_execute", {"task": task["id"], "plan_hash": task["hash"]})
@@ -737,7 +928,7 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         result = await self.tool("admin_reconcile", args)
         self.assertNotIn("error", result, result)
         self.assertEqual(result["operations"][0]["status"], "applied")
-        self.assertFalse(result["operations"][0]["result"]["mutation_attribution_verified"])
+        self.assertTrue(result["operations"][0]["result"]["mutation_attribution_verified"])
         self.assertNotIn("error", await self.tool("admin_rollback", args))
         self.assertIsNone(await self.tool("admin_inspect", {"family": "script", "target": op["target"]}))
 
@@ -832,6 +1023,217 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((device.changes, second.changes), (2, 1))
         # Device is a real HA entity/service fixture; no physical device tested.
 
+    async def test_native_reconfigure_and_reauth_owner_handoff_secret_isolation(self):
+        import probatio as vol
+        from unittest.mock import patch
+        from homeassistant.config_entries import ConfigFlow, ConfigEntry, ConfigEntryState, HANDLERS
+        self.assertTrue(await async_setup_component(self.hass, "sun", {}))
+        await self.hass.async_block_till_done()
+        entry = self.hass.config_entries.async_entries("sun")[0]
+        secret = "synthetic-private-input-not-for-chatgpt"
+        class SyntheticFlow(ConfigFlow):
+            VERSION = 1
+            async def async_step_reconfigure(flow, user_input=None):
+                if user_input is None or user_input.get("password") != secret:
+                    return flow.async_show_form(step_id="reconfigure", data_schema=vol.Schema({vol.Required("password"): str}), errors={} if user_input is None else {"base": "invalid_auth"})
+                return flow.async_update_reload_and_abort(flow._get_reconfigure_entry(), data_updates={"fixture_verified": True})
+            async def async_step_reauth(flow, entry_data):
+                return await flow.async_step_reauth_confirm()
+            async def async_step_reauth_confirm(flow, user_input=None):
+                if user_input is None or user_input.get("password") != secret:
+                    return flow.async_show_form(step_id="reauth_confirm", data_schema=vol.Schema({vol.Required("password"): str}), errors={} if user_input is None else {"base": "invalid_auth"})
+                return flow.async_update_reload_and_abort(flow._get_reauth_entry(), data_updates={"fixture_reauth": True})
+        for action in ("reconfigure", "reauth"):
+            with patch.dict(HANDLERS, {"sun": SyntheticFlow}):
+                task = await self.approved([{"family": "integration", "action": action, "target": entry.entry_id, "value": {}}])
+                args = {"task": task["id"], "plan_hash": task["hash"]}
+                self.assertEqual(await self.tool("admin_execute", args), {"error": "outcome_requires_reconciliation"})
+                pending = await self.tool("admin_status", {"task": task["id"]})
+                self.assertEqual(pending["operations"][0]["status"], "uncertain")
+                command = {"type": "hass_codex_admin/flow", "task": task["id"], "plan_hash": task["hash"], "operation": 0}
+                state = await self.native_ws({**command, "action": "status"})
+                self.assertTrue(state["success"], state)
+                if not state["result"]["fields"]:
+                    state = await self.native_ws({**command, "action": "submit"})
+                self.assertEqual(state["result"]["fields"][0]["name"], "password")
+                # Connector capabilities cannot authenticate this owner channel.
+                async with self.client.ws_connect(self.base+"/api/websocket") as ws:
+                    await ws.receive_json(); await ws.send_json({"type": "auth", "access_token": self.bearer})
+                    self.assertEqual((await ws.receive_json())["type"], "auth_invalid")
+                bad = await self.native_ws({**command, "action": "submit", "input": {"password": "incorrect"}})
+                self.assertTrue(bad["success"])
+                self.assertTrue(bad["result"]["owner_input_required"])
+                done = await self.native_ws({**command, "action": "submit", "input": {"password": secret}})
+                self.assertTrue(done["success"], done)
+                self.assertTrue(done["result"]["completed"])
+                self.assertFalse(done["result"]["external_authentication_verified"])
+                self.assertFalse((await self.native_ws({**command, "action": "submit", "input": {"password": secret}}))["success"])
+                history = await self.tool("admin_status", {"task": task["id"]})
+                self.assertEqual(history["operations"][0]["status"], "applied")
+                self.assertNotIn(secret, json.dumps(history))
+                await self.hass.async_block_till_done()
+
+    async def test_flow_lock_order_queued_revoke_and_cleanup_after_revocation(self):
+        import probatio as vol
+        from unittest.mock import patch
+        from homeassistant.config_entries import ConfigFlow, HANDLERS
+        from custom_components.hass_codex_admin.model import AdminError
+        self.assertTrue(await async_setup_component(self.hass, "sun", {})); await self.hass.async_block_till_done()
+        entry = self.hass.config_entries.async_entries("sun")[0]
+        starts = []
+        class SyntheticFlow(ConfigFlow):
+            VERSION = 1
+            async def async_step_reconfigure(flow, user_input=None):
+                starts.append(True)
+                return flow.async_show_form(step_id="reconfigure", data_schema=vol.Schema({vol.Required("password"): str}))
+        engine = self.hass.data["hass_codex_admin"]["engine"]
+        identity = self.hass.data["hass_codex_admin"]["identity"]
+        flows = engine.backend.flows
+        op = {"family": "integration", "action": "reconfigure", "target": entry.entry_id, "value": {}}
+        with patch.dict(HANDLERS, {"sun": SyntheticFlow}):
+            task = await self.approved([op]); args = {"task": task["id"], "plan_hash": task["hash"]}
+            await flows.lock.acquire()
+            actor = identity.caller(self.bearer)
+            work = asyncio.create_task(engine.execute(actor, **args))
+            try:
+                async with asyncio.timeout(2):
+                    while (await engine.db("get", task["id"]))["operations"][0]["status"] != "dispatching": await asyncio.sleep(.01)
+                self.assertTrue((await self.approval("revoke", **args))["success"])
+            finally: flows.lock.release()
+            with self.assertRaises(AdminError) as error: await work
+            self.assertEqual(error.exception.code, "approval_revoked")
+            self.assertEqual(starts, [])
+            good = await self.approved([op]); args = {"task": good["id"], "plan_hash": good["hash"]}
+            self.assertEqual(await self.tool("admin_execute", args), {"error": "outcome_requires_reconciliation"})
+            command = {"type": "hass_codex_admin/flow", "action": "status", "operation": 0, **args}
+            owner = identity.approved_session(self.owner_refresh.id)
+            await engine.lock.acquire()
+            waiting = asyncio.create_task(flows.command(engine, identity, owner, command))
+            await asyncio.sleep(.01)
+            self.assertFalse(flows.lock.locked())  # no ABBA lock inversion
+            engine.lock.release(); self.assertTrue((await waiting)["owner_input_required"])
+            self.assertTrue((await self.approval("revoke", **args))["success"])
+            cancelled = await self.native_ws({**command, "action": "cancel"})
+            self.assertTrue(cancelled["success"], cancelled)
+            self.assertEqual(flows.active, {})
+            replacement = await self.approved([op]); args = {"task": replacement["id"], "plan_hash": replacement["hash"]}
+            self.assertEqual(await self.tool("admin_execute", args), {"error": "outcome_requires_reconciliation"})
+            # Owner logout while waiting defeats cleanup too; a retired task
+            # grants no continuation and cleanup still requires a current owner.
+            await engine.lock.acquire()
+            waiting = asyncio.create_task(flows.command(engine, identity, owner, {**command, **args, "action": "cancel"}))
+            await asyncio.sleep(.01)
+            self.hass.auth.async_remove_refresh_token(self.owner_refresh)
+            engine.lock.release()
+            with self.assertRaises(AdminError) as error: await waiting
+            self.assertEqual(error.exception.code, "owner_frontend_session_required")
+
+    async def test_bound_helper_interrupted_rollback_reconciles_actual_id(self):
+        from custom_components.hass_codex_admin.model import AdminError
+        from unittest.mock import patch
+        task = await self.approved([
+            {"family": "input_boolean", "action": "allocate", "target": "hint", "value": {"name": "Actual binding"}},
+            {"family": "input_boolean", "action": "put", "target": "@0", "value": {"icon": "mdi:shield"}},
+        ])
+        args = {"task": task["id"], "plan_hash": task["hash"]}
+        self.assertNotIn("error", await self.tool("admin_execute", args))
+        engine = self.hass.data["hass_codex_admin"]["engine"]
+        with patch.object(engine.backend, "after", side_effect=AdminError("backend_unavailable_or_timeout")):
+            self.assertEqual(await self.tool("admin_rollback", args), {"error": "backend_unavailable_or_timeout"})
+        recovered = await self.tool("admin_reconcile", args)
+        self.assertNotIn("error", recovered, recovered)
+        self.assertEqual(recovered["operations"][1]["status"], "rolled_back")
+        self.assertNotIn("error", await self.tool("admin_rollback", args))
+        self.assertIsNone(await self.tool("admin_inspect", {"family": "input_boolean", "target": "actual_binding"}))
+
+    async def test_native_flow_success_without_completed_reload_stays_uncertain(self):
+        import probatio as vol
+        from unittest.mock import patch, AsyncMock
+        from homeassistant.config_entries import ConfigFlow, HANDLERS
+        self.assertTrue(await async_setup_component(self.hass, "sun", {})); await self.hass.async_block_till_done()
+        entry = self.hass.config_entries.async_entries("sun")[0]
+        class SyntheticFlow(ConfigFlow):
+            VERSION = 1
+            async def async_step_reconfigure(flow, user_input=None):
+                if user_input is None: return flow.async_show_form(step_id="reconfigure", data_schema=vol.Schema({vol.Required("name"): str}))
+                return flow.async_update_reload_and_abort(flow._get_reconfigure_entry(), data_updates={"name": user_input["name"]})
+        with patch.dict(HANDLERS, {"sun": SyntheticFlow}):
+            task = await self.approved([{"family": "integration", "action": "reconfigure", "target": entry.entry_id, "value": {}}])
+            args = {"task": task["id"], "plan_hash": task["hash"]}
+            self.assertEqual(await self.tool("admin_execute", args), {"error": "outcome_requires_reconciliation"})
+            with patch.object(self.hass.config_entries, "async_reload", AsyncMock(return_value=False)):
+                outcome = await self.native_ws({"type": "hass_codex_admin/flow", "action": "submit", "operation": 0, "input": {"name": "Owner change"}, **args})
+            self.assertFalse(outcome["success"])
+            self.assertEqual(outcome["error"]["code"], "native_flow_reload_not_verified")
+            self.assertEqual((await self.tool("admin_status", {"task": task["id"]}))["operations"][0]["status"], "uncertain")
+
+    async def test_allocated_helper_followup_binding_and_replay(self):
+        engine = self.hass.data["hass_codex_admin"]["engine"]
+        task = await self.approved([
+            {"family": "input_boolean", "action": "allocate", "target": "allocation_hint", "value": {"name": "Server assigned object"}},
+            {"family": "input_boolean", "action": "put", "target": "@0", "value": {"icon": "mdi:shield"}},
+        ])
+        args = {"task": task["id"], "plan_hash": task["hash"]}
+        completed = await self.tool("admin_execute", args)
+        self.assertNotIn("error", completed, completed)
+        self.assertEqual(completed["operations"][0]["result"]["created_target"], "server_assigned_object")
+        self.assertEqual((await self.tool("admin_inspect", {"family": "input_boolean", "target": "server_assigned_object"}))["icon"], "mdi:shield")
+        self.assertNotIn("error", await self.tool("admin_execute", args))
+        self.assertNotIn("error", await self.tool("admin_rollback", args))
+        self.assertIsNone(await self.tool("admin_inspect", {"family": "input_boolean", "target": "server_assigned_object"}))
+        self.assertEqual(await self.tool("admin_propose", {"operations": [{"family": "input_boolean", "action": "delete", "target": "@0", "value": None}]}), {"error": "invalid_allocation_reference"})
+
+    async def test_independent_editor_during_dispatch_exposes_platform_limit_and_after_detects_drift(self):
+        from unittest.mock import patch
+        engine = self.hass.data["hass_codex_admin"]["engine"]
+        original = {"alias": "Original", "sequence": [{"delay": "00:00:00"}]}
+        op = {"family": "script", "action": "create", "target": "editor_gap", "value": original}
+        seeded = await self.approved([op])
+        self.assertNotIn("error", await self.tool("admin_execute", {"task": seeded["id"], "plan_hash": seeded["hash"]}))
+        async def local_edit(alias):
+            async with self.client.post(self.base+"/api/config/script/config/editor_gap", json={**original, "alias": alias}, headers={"Authorization": "Bearer "+self.owner_bearer}) as response:
+                self.assertEqual(response.status, 200)
+        desired = {**original, "alias": "Project edit"}
+        task = await self.approved([{**op, "action": "put", "value": desired}]); args = {"task": task["id"], "plan_hash": task["hash"]}
+        check = engine.backend.final_check
+        raced = False
+        async def gap():
+            nonlocal raced
+            await check()
+            if not raced:
+                raced = True; await local_edit("Concurrent local edit")
+        with patch.object(engine.backend, "final_check", gap):
+            applied = await self.tool("admin_execute", args)
+        # This is evidence of HA's missing CAS, NOT a passing concurrent-edit
+        # guarantee: a local editor violating the proposed named-object window
+        # can be overwritten in the final-check/send gap. Production mode stays
+        # unaccepted until the owner explicitly accepts this cooperation policy.
+        self.assertEqual(applied["operations"][0]["status"], "applied")
+        self.assertEqual((await self.tool("admin_inspect", {"family": "script", "target": "editor_gap"}))["alias"], "Project edit")
+        followup = await self.approved([{**op, "action": "put", "value": {**original, "alias": "Second project edit"}}])
+        args = {"task": followup["id"], "plan_hash": followup["hash"]}
+        write = engine.backend.write
+        async def after_dispatch(actor, operation):
+            result = await write(actor, operation); await local_edit("Local edit after dispatch"); return result
+        with patch.object(engine.backend, "write", after_dispatch):
+            self.assertEqual(await self.tool("admin_execute", args), {"error": "outcome_requires_reconciliation"})
+        self.assertEqual(await self.tool("admin_rollback", args), {"error": "operation_consumed_or_uncertain"})
+        self.assertEqual((await self.tool("admin_inspect", {"family": "script", "target": "editor_gap"}))["alias"], "Local edit after dispatch")
+
+    async def test_edit_window_is_explicit_policy_and_owner_consent_not_cas(self):
+        engine = self.hass.data["hass_codex_admin"]["engine"]
+        op = {"family": "script", "action": "create", "target": "edit_window", "value": {"sequence": [{"delay": "00:00:00"}]}}
+        task = await self.tool("admin_propose", {"operations": [op]})
+        denied = await self.approval("approve", task=task["id"], plan_hash=task["hash"], confirm_effects=True, confirm_edit_window=False)
+        self.assertFalse(denied["success"])
+        self.assertEqual(denied["error"]["code"], "explicit_named_object_edit_window_required")
+        engine.policy["edit_coordination"] = "unaccepted"
+        denied = await self.approval("approve", task=task["id"], plan_hash=task["hash"], confirm_effects=True)
+        self.assertEqual(denied["error"]["code"], "owner_edit_policy_acceptance_required")
+        engine.policy["edit_coordination"] = "owner_window"
+        self.assertTrue((await self.approval("approve", task=task["id"], plan_hash=task["hash"], confirm_effects=True))["success"])
+        self.assertNotIn("error", await self.tool("admin_execute", {"task": task["id"], "plan_hash": task["hash"]}))
+
     async def test_actual_calculated_integration_reload_and_readback(self):
         self.assertTrue(await async_setup_component(self.hass, "sun", {}))
         await self.hass.async_block_till_done()
@@ -883,7 +1285,7 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
             resume.set()
             with self.assertRaises(AdminError) as error:
                 await work
-            self.assertEqual(error.exception.code, "approval_required_or_expired")
+            self.assertEqual(error.exception.code, "approval_revoked")
             self.assertIsNone(await self.tool("admin_inspect", {"family": "script", "target": op["target"]}))
         finally:
             resume.set()
@@ -917,9 +1319,12 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result["operations"][0]["status"], "uncertain")
         finally:
             release.set();engine.backend.write = original
-        self.assertNotIn("error", await self.tool("admin_reconcile", args))
-        self.assertNotIn("error", await self.tool("admin_rollback", args))
-        self.assertIsNone(await self.tool("admin_inspect", {"family": "script", "target": op["target"]}))
+        self.assertEqual(await self.tool("admin_reconcile", args), {"error": "creation_ownership_requires_owner_reconciliation"})
+        self.assertEqual(await self.tool("admin_rollback", args), {"error": "operation_consumed_or_uncertain"})
+        self.assertEqual(await self.tool("admin_inspect", {"family": "script", "target": op["target"]}), op["value"])
+        # Recovery is a new exact owner-approved deletion, not inferred ownership.
+        cleanup = await self.approved([{**op, "action": "delete", "value": None}])
+        self.assertNotIn("error", await self.tool("admin_execute", {"task": cleanup["id"], "plan_hash": cleanup["hash"]}))
 
     async def test_future_store_version_private_files_and_debug_secret_suppression(self):
         import io, logging, os, sqlite3

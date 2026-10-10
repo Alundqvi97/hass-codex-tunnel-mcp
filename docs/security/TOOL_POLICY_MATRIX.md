@@ -1,3 +1,28 @@
+# Release-candidate capability, security and reliability matrix
+
+Selected candidate: native administrator0.2.0, Core2026.10.0/Python3.14.2/MCP1.28.1, official tunnelv0.0.16. Optional explicit enablement, scoped `/api/hass_codex_admin/mcp`, native owner panel, SQLitev2; no production change. Full Blueprint scope is not declared complete.
+
+| Capability | Implemented evidence | Exact boundary / release status |
+|---|---|---|
+| Diagnose/repair automation and script; CRUD | Real native config/trace/fault, exact multi-step consent, readback, rollback; useful commands after denials | Owner must accept named-object edit window; arbitrary indirect/custom/YAML behavior not proven |
+| Helpers (eight storage families) | Native HA-assigned ID, exact approved definition; task receipt-bound follow-ups and inverse; local allocation collision preserves unrelated object | Exact pre-reserved ID is unsupported; final-check gap not CAS; no adoption after lost create acknowledgment |
+| Dashboards | Real storage config/metadata CRUD and restoration; untrusted text rendered as text | Named-object window, actual panel browser CI receipt; card/device visual effects not target-tested |
+| Device service control | Existing finite verified light/switch/cover/media paths, explicit physical-effects consent | Synthetic device observations, not household outcomes; other high-impact types are absent |
+| Integration repair/credentials | Native reload, bound reauth/reconfigure initiation/status/basic owner input/cancel; actual unload→loaded observation | Complex selectors/external OAuth/MFA native frontend and broad provider coverage pending; no secret in MCP |
+| Core configuration/backup | Native validation, local backup and actual process restoration; durable intents vs buffered config exercised | Core restart/host OS lifecycle outcome adapter absent; real Supervisor/HAOS/power loss not accepted |
+| Supervisor/add-ons | Fixed actual native Supervisor handler contract, start/stop state and update version readback; backup:true, explicit latest add-on release | Service backend replaced by synthetic Supervisor. Restart uncertain without incarnation evidence; no root fallback |
+| Remote authority | Distinct opaque connection capability fails native REST/WS/base/alternate MCP/Assist; local owner remains usable; wrong caller/plan/expiry/revoke/replay | Platform org/workspace sharing and production route reachability need isolated hosted staging |
+| Revocation/restore | Pending issuance, persistent private deny intent before SQL, task RAM deny, boot rotation/retirement; cancellation and SQL faults | All durable storage failure/unsupported copying needs independent local retirement; response loss cannot undo already-issued authority |
+| Recovery/update | One process owner, finite backoff, auth-denial stop, no per-crash download; actual official clientv10/v16 scoped tasks after crash; updater rollback | Loopback fake control plane; hosted provider behavior, long soak and target reboot pending |
+| Packaged lifecycle | Archive-only installed execution, old→new schema upgrade, unsafe old downgrade refusal, independent local HA and reinstall recovery | Reinstall current verified archive is tested; old0.1 is not a supported software rollback |
+| Repeated use | Five varied-schedule mixed task/rollback iterations, zero failed/duplicate writes; invalid then useful commands | Bounded local development run, not uptime or physical-performance guarantee |
+
+Annotations accurately distinguish writes/reads. A ChatGPT confirmation is additional to server consent, not a human identity attestation or replacement for task authorization. The native owner window is enforced as explicit policy/consent; other editors' cooperation is not enforceable by HA's APIs. Release acceptance has not accepted that limitation.
+
+See [NATIVE_ADMIN_EVIDENCE.json](NATIVE_ADMIN_EVIDENCE.json) for exact fresh counts, substituted boundaries and review limits; [RECOVERY_DESIGN.md](RECOVERY_DESIGN.md) for one finite approval sheet. Historical tables below describe earlier candidates, not new test counts.
+
+## Previous candidate matrix and historical evidence — preserved
+
 # Administrator capability, security and reliability evidence
 
 Current candidate: Core2026.10.0/Python3.14.2, scoped `/api/hass_codex_admin/mcp`, existing official tunnel clientv0.0.10, one custom administrator and SQLite. **CANDIDATE INCOMPLETE.** See the committed [evidence receipt](NATIVE_ADMIN_EVIDENCE.json) and [implementation plan](IMPLEMENTATION_PLAN.md). Historical evidence follows unchanged.

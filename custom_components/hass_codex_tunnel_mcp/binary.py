@@ -110,14 +110,14 @@ PINNED_ASSETS: dict[tuple[str, str], TunnelClientAsset] = {
     ("linux", "amd64"): TunnelClientAsset(
         os_name="linux",
         arch="amd64",
-        filename="tunnel-client-v0.0.10-linux-amd64.zip",
-        sha256="b9e0388a343f2d7adeff3992f411a0bd3d916a64bc56534aac5fd15ac1b20cd5",
+        filename="tunnel-client-v0.0.16-linux-amd64.zip",
+        sha256="d60cdba019bce451bcc3a15478cc5b9cb11270b049f5b56ea39a80b517f8b117",
     ),
     ("linux", "arm64"): TunnelClientAsset(
         os_name="linux",
         arch="arm64",
-        filename="tunnel-client-v0.0.10-linux-arm64.zip",
-        sha256="b842a9b2352eebd80514cf01a1fbb1c0d400a7d24a4015e85a7ea5f1aeaa5b30",
+        filename="tunnel-client-v0.0.16-linux-arm64.zip",
+        sha256="963d0384aaa7c798778479c45673f9051a4039dd891aef8f8978d2a1a628b74f",
     ),
 }
 
@@ -369,15 +369,8 @@ def _safe_extract_zip(data: bytes, destination: Path) -> None:
 
 def find_executable(root: Path) -> Path:
     """Find the tunnel-client executable in an extracted release archive."""
-    candidates = [
-        path
-        for path in root.rglob("tunnel-client*")
-        if path.is_file() and not path.name.endswith(".zip")
-    ]
-    for path in candidates:
-        if path.name == "tunnel-client":
-            return path
-    if candidates:
+    candidates = [path for path in root.rglob("tunnel-client") if path.is_file() and not path.is_symlink()]
+    if len(candidates) == 1:
         return candidates[0]
     raise TunnelClientError("tunnel-client executable not found in archive")
 

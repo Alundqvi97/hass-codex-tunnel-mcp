@@ -7,7 +7,7 @@ from homeassistant.helpers.http import current_request
 class PayloadFilter(logging.Filter):
     def filter(self, record):
         request = current_request.get()
-        sensitive = record.name == "homeassistant.components.websocket_api.http.connection" and any(key in record.getMessage() for key in ("access_token", "connector_credential", "hca_"))
+        sensitive = record.name == "homeassistant.components.websocket_api.http.connection" and any(key in record.getMessage() for key in ("access_token", "connector_credential", "hca_", "hass_codex_admin/flow"))
         if sensitive or request is not None and request.path in {"/api/mcp/hass_codex_admin", "/api/hass_codex_admin/mcp"}:
             record.msg = "Administrator protocol diagnostic; payload omitted"
             record.args = ()

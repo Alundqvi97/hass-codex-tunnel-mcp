@@ -43,6 +43,7 @@ class HABackend:
         await check()
 
     def __init__(self, base_url, session, *, timeout=8, credential=None):
+        self.flows = None
         parsed = urlsplit(base_url)
         try:
             loopback = ipaddress.ip_address(parsed.hostname).is_loopback
@@ -107,7 +108,8 @@ class HABackend:
                     authentication = await ws.receive_json()
                     if not isinstance(authentication, dict) or authentication.get("type") != "auth_ok":
                         raise AdminError("backend_authentication_or_permission")
-                    if command["type"] not in READ_COMMANDS:
+                    from .supervisor import read_command
+                    if command["type"] not in READ_COMMANDS and not read_command(command):
                         await self.final_check()
                     await ws.send_json({**command, "id": 1})
                     reply = await ws.receive_json()
@@ -163,6 +165,11 @@ class HABackend:
         raise AdminError("unsupported_read")
 
     async def snapshot(self, actor, op):
+        from .supervisor import ADDON_ACTIONS, snapshot
+        if op["family"] == "maintenance" and op["target"] in set(ADDON_ACTIONS) | {"hassio.core_update"}:
+            return await snapshot(self, actor, op)
+        if op["family"] in HELPERS and op["action"] == "allocate":
+            return {"existing_ids": sorted(item["id"] for item in await self.ws(actor, {"type": op["family"]+"/list"}))}
         if op["family"] == "service":
             return {e: await self.rest(actor, "GET", "/api/states/"+e) for e in op["value"]["entity_ids"]}
         return await self.read(actor, op["family"], op["target"])
@@ -201,21 +208,21 @@ class HABackend:
         if family in {"automation", "script"}:
             return await self.rest(actor, "DELETE" if action == "delete" else "POST", f"/api/config/{family}/config/{target}", value)
         if family in HELPERS:
-            verb = "delete" if action == "delete" else "create" if action == "create" else "update"
-            if verb == "create":
+            verb = "delete" if action == "delete" else "create" if action in {"create", "allocate"} else "update"
+            if verb == "create" and action != "allocate":
                 await self.helper_absent(actor, family, target)
             args = {} if verb == "create" else {family+"_id": target}
             if verb != "delete":
                 args.update(value)
             restore_name = None
-            if verb == "create" and re.sub(r"[^a-z0-9]+", "_", args["name"].lower()).strip("_") != target:
+            if verb == "create" and action != "allocate" and re.sub(r"[^a-z0-9]+", "_", args["name"].lower()).strip("_") != target:
                 # Restoring a renamed helper uses the approved target as its
                 # temporary allocation name, then restores the recorded name.
                 # Both mutations have their own final grant check.
                 restore_name = args["name"]
                 args["name"] = target
             result = await self.ws(actor, {**args, "type": family+"/"+verb})
-            if verb != "delete" and result.get("id") != target:
+            if verb != "delete" and action != "allocate" and result.get("id") != target:
                 raise AdminError("helper_allocated_unexpected_identity")
             if restore_name is not None:
                 result = await self.ws(actor, {"type": family+"/update", family+"_id": target, **{**value, "name": restore_name}})
@@ -240,8 +247,16 @@ class HABackend:
                 return await self.ws(actor, {"type": "lovelace/dashboards/delete", "dashboard_id": item["id"]})
             return await self.ws(actor, {"type": "lovelace/config/save", "url_path": None if target == "lovelace" else target, "config": value["config"]})
         if family == "integration":
+            if action in {"reauth", "reconfigure"}:
+                await self.final_check()
+                if self.flows is None:
+                    raise AdminError("native_flow_adapter_unavailable")
+                return await self.flows.begin(op, self.final_check)
             return await self.rest(actor, "POST", f"/api/config/config_entries/entry/{target}/reload", {})
         if family in {"service", "maintenance"}:
+            from .supervisor import ADDON_ACTIONS, write
+            if family == "maintenance" and target in set(ADDON_ACTIONS) | {"hassio.core_update"}:
+                return await write(self, actor, op)
             if target == "backup.create":
                 return await self.ws(actor, {"type": "backup/generate", "agent_ids": ["backup.local"], "include_all_addons": False, "include_database": True, "include_homeassistant": True})
             if target == "homeassistant.check_config":
@@ -273,8 +288,13 @@ class HABackend:
             data = op["value"]["data"]
             return all(state["state"] == desired and all(state["attributes"].get(key) == value for key, value in data.items()) for state in after.values())
         if op["family"] == "integration":
+            if op["action"] != "reload":
+                return False  # Flow initiation is not credential-change success.
             return after is not None and after.get("state") == "loaded"
         if op["family"] == "maintenance":
+            from .supervisor import ADDON_ACTIONS, verified
+            if op["target"] in set(ADDON_ACTIONS) | {"hassio.core_update"}:
+                return verified(op, before, after, result)
             if op["target"] == "backup.create":
                 old = {x["backup_id"] for x in before["backups"]}
                 new = [x for x in after["backups"] if x["backup_id"] not in old]

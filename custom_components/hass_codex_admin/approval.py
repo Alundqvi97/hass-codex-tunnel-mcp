@@ -6,7 +6,7 @@ from .model import AdminError, redact
 
 
 def register_approval_commands(hass, engine, identity):
-    @websocket_api.websocket_command({vol.Required("type"): "hass_codex_admin/approval", vol.Required("action"): vol.In(["enroll", "list", "get", "approve", "revoke"]), vol.Optional("task"): str, vol.Optional("plan_hash"): str, vol.Optional("confirm_effects"): bool})
+    @websocket_api.websocket_command({vol.Required("type"): "hass_codex_admin/approval", vol.Required("action"): vol.In(["enroll", "list", "get", "approve", "revoke"]), vol.Optional("task"): str, vol.Optional("plan_hash"): str, vol.Optional("confirm_effects"): bool, vol.Optional("confirm_edit_window"): bool})
     @websocket_api.async_response
     async def approval(hass, connection, message):
         try:
@@ -22,11 +22,21 @@ def register_approval_commands(hass, engine, identity):
             else:
                 if action == "approve" and message.get("confirm_effects") is not True:
                     raise AdminError("explicit_effect_review_required")
+                if action == "approve":
+                    row = await engine.db("get", message.get("task", ""))
+                    if row["plan"].get("edit_window", {}).get("required"):
+                        if engine.policy.get("edit_coordination") != "owner_window":
+                            raise AdminError("owner_edit_policy_acceptance_required")
+                        if message.get("confirm_edit_window") is not True:
+                            raise AdminError("explicit_named_object_edit_window_required")
                 actor = identity.approver(connection)
                 # Current native owner session validation replaces boot-time
                 # reenrollment. It never supplies the explicit approval itself.
                 await engine.db("enroll", actor)
-                await engine.db("decide", message.get("task", ""), actor, message.get("plan_hash", ""), "approved" if action == "approve" else "revoked")
+                if action == "revoke":
+                    await engine.revoke(message.get("task", ""), actor, message.get("plan_hash", ""))
+                else:
+                    await engine.db("decide", message.get("task", ""), actor, message.get("plan_hash", ""), "approved")
                 value = {"decision": action}
             connection.send_result(message["id"], value)
         except AdminError as exc:

@@ -53,6 +53,8 @@ class AdminTool(llm.Tool):
         except (AdminError, vol.Invalid, TimeoutError) as exc:
             code = exc.code if isinstance(exc, AdminError) else "invalid_arguments" if isinstance(exc, vol.Invalid) else "request_deadline"
             return llm.ToolResult(data={"error": code}, error=True)
+        except Exception:
+            return llm.ToolResult(data={"error": "administration_failed_outcome_may_be_uncertain"}, error=True)
 
 
 class AdminAPI(llm.API):

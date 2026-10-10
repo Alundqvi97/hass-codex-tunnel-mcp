@@ -10,7 +10,7 @@ DOMAIN = "hass_codex_admin"
 HELPERS = {"input_boolean", "input_number", "input_text", "input_select", "input_datetime", "input_button", "counter", "timer"}
 FAMILIES = {"automation", "script", "dashboard", "integration", "service", "maintenance"} | HELPERS
 SERVICES = {"light.turn_on", "light.turn_off", "switch.turn_on", "switch.turn_off", "cover.open_cover", "cover.close_cover", "media_player.media_play", "media_player.media_pause"}
-MAINTENANCE = {"homeassistant.check_config", "homeassistant.reload_core_config", "homeassistant.restart", "backup.create", "hassio.addon_restart", "hassio.addon_update", "hassio.backup_full"}
+MAINTENANCE = {"homeassistant.check_config", "homeassistant.reload_core_config", "homeassistant.restart", "backup.create", "hassio.addon_start", "hassio.addon_stop", "hassio.addon_restart", "hassio.addon_update", "hassio.core_update", "hassio.backup_full"}
 SECRET_KEYS = re.compile(r"password|token|secret|api_key|authorization|credential", re.I)
 
 
@@ -71,7 +71,7 @@ def operation(value):
         raise AdminError("operation_schema")
     op = decode(canonical(value))
     family, action, target, data = (op[k] for k in ("family", "action", "target", "value"))
-    if type(family) is not str or type(action) is not str or family not in FAMILIES or type(target) is not str or not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,100}", target):
+    if type(family) is not str or type(action) is not str or family not in FAMILIES or type(target) is not str or not re.fullmatch(r"(?:[A-Za-z0-9_][A-Za-z0-9_.-]{0,100}|@[0-9]{1,2})", target):
         raise AdminError("unsupported_operation")
     if family in {"service", "maintenance"}:
         catalog = SERVICES if family == "service" else MAINTENANCE
@@ -92,27 +92,37 @@ def operation(value):
                 if type(number) is not int or not low <= number <= high:
                     raise AdminError("device_argument_range")
         elif target.startswith("hassio.addon_"):
-            if set(data) != {"addon"} or not re.fullmatch(r"[a-z0-9_]+", str(data["addon"])):
+            if set(data) != ({"addon", "release"} if target.endswith("update") else {"addon"}) or not re.fullmatch(r"[a-z0-9_]+", str(data["addon"])):
                 raise AdminError("exact_addon_required")
+            if target.endswith("update") and data.get("release") != "latest":
+                raise AdminError("native_addon_update_requires_explicit_latest_contract")
+        elif target == "hassio.core_update":
+            if set(data) != {"version"}:
+                raise AdminError("exact_update_version_required")
         elif data:
             raise AdminError("maintenance_arguments")
+        if family == "maintenance" and target == "hassio.core_update" and (type(data.get("version")) is not str or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[a-z0-9.-]+)?", data["version"])):
+            raise AdminError("exact_update_version_required")
     elif family == "integration":
-        if action != "reload" or data != {} or not re.fullmatch(r"(?:[A-Z0-9]{26}|[a-f0-9]{32})", target):
+        if action not in {"reload", "reauth", "reconfigure"} or data != {} or not re.fullmatch(r"(?:[A-Z0-9]{26}|[a-f0-9]{32})", target):
             raise AdminError("integration_schema")
-    elif action not in {"create", "put", "delete"} or (action == "delete" and data is not None) or (action != "delete" and not isinstance(data, dict)):
+    elif action not in {"create", "allocate", "put", "delete"} or (action == "delete" and data is not None) or (action != "delete" and not isinstance(data, dict)):
         raise AdminError("configuration_schema")
+    if action == "allocate" and family not in HELPERS or target.startswith("@") and (family not in HELPERS or action not in {"put", "delete"}):
+        raise AdminError("invalid_allocation_reference")
     if family not in {"service", "maintenance"} and "." in target:
         raise AdminError("invalid_object_id")
     if action != "delete" and family in HELPERS and ({"type", "id", "entity_id", family+"_id"} & set(data)):
         raise AdminError("helper_reserved_argument")
     if family == "automation" and action != "delete" and "id" in data:
         raise AdminError("automation_id_is_target")
-    if family in HELPERS and action == "create":
-        # HA allocates the helper ID from its name. Approval includes the name
-        # and expected ID; collisions remain uncertain, never an alias fallback.
-        name = data.get("name")
-        if type(name) is not str or re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_") != target:
-            raise AdminError("helper_name_id_mismatch")
+    if family in HELPERS and action in {"create", "allocate"}:
+        # Approval is for one NEW resource and exact definition. Target is an
+        # allocation hint, never a promised reservation or authority over an
+        # existing resource. HA's returned identity is bound by the executor.
+        if type(data.get("name")) is not str or not data["name"].strip():
+            raise AdminError("helper_name_required")
+        op["action"] = "allocate"
     if family == "dashboard" and action != "delete":
         if not {"title", "config"} <= set(data) or set(data) - {"title", "config", "icon", "show_in_sidebar", "require_admin"} or type(data["title"]) is not str or not isinstance(data["config"], dict):
             raise AdminError("dashboard_schema")
@@ -131,7 +141,7 @@ def effects(op):
     if op["family"] in {"automation", "script", "dashboard"}:
         return "elevated", ["Configuration may invoke services, scripts, templates or dashboard actions later. Review the complete definition; no ordinary-device grant applies."]
     if op["family"] in HELPERS:
-        return "elevated", ["Helper changes can trigger existing automations; review references and stored definition."]
+        return "elevated", ["Helper changes can trigger existing automations; review references and stored definition.", "For allocate: HA assigns the final ID to one new resource. The target is a hint; later same-task steps use the verified creation receipt. No exact-ID reservation is promised."]
     if op["family"] in {"integration", "maintenance"}:
-        return "elevated", ["Administrative operation may interrupt service or alter the installed system."]
+        return "elevated", ["Administrative operation may interrupt service or alter the installed system; no automatic inverse. Add-on update explicitly selects Supervisor latest at execution, not an exact version reservation. Restart acknowledgement alone does not prove restart."]
     return "elevated", ["Exact named device service and arguments only; a device may affect household security. Owner must review the actual entities and effects."]

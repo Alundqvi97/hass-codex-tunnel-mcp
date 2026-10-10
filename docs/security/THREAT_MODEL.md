@@ -1,3 +1,21 @@
+# Current release-candidate threat boundary
+
+Keep scoped connection → native MCP/custom LLM → independent native owner task approval → fixed trusted loopback backend → durable acknowledgment/readback/recovery. An attacker holding the connector credential can inspect/propose but cannot approve, call general native APIs or widen the exact accepted task. Owner identities derive from current native sessions, not supplied headers, client_id or platform tunnel delegation.
+
+New durable deny intents prevent SQL revocation failure and cancelled late issuance from reviving a connection on ordinary restart. Pending issuance is retired at boot; task RAM deny blocks dispatch even if its SQL revocation fails. Failures of every durable medium still require independent local recovery. Supported native backup restoration retires authority; unsupported copying of old auth/SQLite files is not treated as preserving later revocation.
+
+HA-assigned creations bind returned canonical ID/definition to the original task/index and fresh prior inventory; same-task references cannot substitute arbitrary targets. Backend acknowledgment is persisted before readback; absent attribution cannot be recovered from merely identical configuration. Rollback never adopts or deletes an unexpected object's name match.
+
+Unconditional HA editing APIs are a platform constraint: real independent final-check-gap editing can still be overwritten. The proposed optional short named-object owner window is explicit, disabled by default and awaits owner acceptance; it is human cooperation, not atomicity. Loaded configuration/group/dashboard dependency coverage remains bounded; unknown dynamic/custom references are disclosed for destructive consent.
+
+Finite native flow/Supervisor adapters do not open arbitrary service/URL/shell routes. Native owner input stays outside MCP and diagnostics. Flow lock order is engine→flow; final authorization occurs inside the acquired flow lock; cleanup after grant retirement still requires fresh owner session. Terminal flow success requires observed reload, not already-loaded state. Unobserved external flow/restart outcomes stay uncertain. Actual Supervisor and hosted control plane remain external acceptance boundaries.
+
+The retained official client uses verifiedv0.0.16 binaries and filtered settings; no extra inherited transport channel is activated. Local synthetic control-plane protocol tests are not official hosted identity/access evidence. Organization/workspace tunnel-use delegation is not a human identity, and NoOAuth does not replace local capabilities or owner decisions.
+
+Production-only ZIP checksums establish candidate integrity, not vendor signature or independent certification. SQLitev2 intentionally refuses vulnerable old software downgrade; local HA remains independent and tested reinstall recovery restores the candidate. Two source reviewers found/corrected retained-path defects; the failed quota-blocked scanner is not a clean review. No privileged, production, Probe A or VM operation occurred.
+
+## Previous native model and historical analysis — preserved
+
 # Current native administrator threat model
 
 The active boundary is verified scoped connection → custom credential adapter to native MCP/LLM → exact native owner task decision → fixed own-loopback backend → readback/consumed intent/recovery. Only explicit configuration enables it. Official OpenAI transport is retained; the community manager and custom administrator are not vendor-certified. Retired Probe A has no runtime dependency or fallback.
