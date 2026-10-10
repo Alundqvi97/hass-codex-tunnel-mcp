@@ -969,6 +969,7 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
             command = {"type": "hass_codex_admin/flow", "operation": 0, **args}
             state = await self.native_ws({**command, "action": "status"})
             self.assertEqual(state["result"]["fields"][0]["choices"], ["settings"])
+            self.assertTrue(state["result"]["fields"][0]["required"], "A menu choice is required to navigate, even though native GET permits omission")
             state = await self.native_ws({**command, "action": "submit", "input": {"next_step_id": "settings"}})
             self.assertNotIn(secret, json.dumps(state))
             self.assertTrue(state["result"]["fields"][0]["password"])

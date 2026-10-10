@@ -170,7 +170,8 @@
       "Number selector rejected valid fraction",
       "Multi-select clearing rejected empty list",
       "Reauth partial progress mistaken for initialized native form",
-      "Native select accessible label included embedded option text"
+      "Native select accessible label included embedded option text",
+      "Native menu next_step_id incorrectly treated as optional setting instead of required navigation"
     ],
     "final_confirmed_new_defects": [],
     "limits": [
@@ -199,7 +200,7 @@
   },
   "release_archive": {
     "path": "artifacts/native-admin-0.2.0.zip",
-    "sha256": "8ca90cdaffcb8f9297c2fea02c41b492d058d87011db1b9cdff9d88be965e0b4",
+    "sha256": "deb0a0507f8a3105c4c5f14fcb7eabb3952a5dd5d48fabcdff180548df3981d8",
     "manifest": "Embedded per-file SHA256/size; verified installed archive",
     "contents": "Two production components and release_manifest.json only",
     "excluded": "Probe A/tests/fixtures/credentials/databases/venvs/caches/toolchains",
@@ -780,6 +781,13 @@
       "browser_pr_run": 38067182614,
       "browser_pr": "failure",
       "failure": "Menu selection progressed; subsequent password field absent. Added bounded sanitized actual DOM diagnostic. Also corrected fixture multiline literal to an actual line break; expected assertion unchanged."
+    },
+    {
+      "sha": "fbd9b2bd801199d5541cbb06743c09d3673dc270",
+      "browser_push_run": 38067474866,
+      "browser_pr_run": 38067479210,
+      "browser": "failure",
+      "failure": "Sanitized DOM exposed optional next_step_id checkbox. Core permits menu omission for GET; submit navigation needs an explicit choice. Source now marks only native MENU next_step_id required; targeted contract assertion strengthened. No assertion/deadline/sandbox weakened."
     }
   ],
   "multi_step_repair": {

@@ -97,7 +97,7 @@ class NativeFlows:
                 name = str(key.schema) if isinstance(key, vol.Marker) else str(key)
                 if len(name) > 80:
                     raise AdminError("native_flow_requires_native_frontend")
-                field = {"name": name, "required": isinstance(key, vol.Required)}
+                field = {"name": name, "required": isinstance(key, vol.Required) or result["type"] == data_entry_flow.FlowResultType.MENU and name == "next_step_id"}
                 if validator in (str, bool, int):
                     field["kind"] = "boolean" if validator is bool else "integer" if validator is int else "text"
                 elif isinstance(validator, selector.BooleanSelector):
