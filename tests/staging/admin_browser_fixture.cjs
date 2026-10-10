@@ -1,16 +1,41 @@
 // Actual panel DOM + real native login/WS + scoped MCP in disposable Core.
 const {chromium} = require('playwright');
 let stage = 'sandboxed-browser-launch';
+const scrub = value => {
+  let message = String(value);
+  for (const secret of [process.env.ADMIN_BROWSER_PASSWORD, process.env.ADMIN_BROWSER_CONNECTOR]) {
+    if (secret) message = message.split(secret).join('[redacted]');
+  }
+  return message.replace(/hca_[A-Za-z0-9_-]{43}/g, '[redacted]').replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[redacted]');
+};
 const checkpoint = value => { stage = value; console.log('BROWSER_STAGE='+value); };
+let ownedBrowser;
+let stopping = false;
+const closeOwnedBrowser = async () => {
+  if (ownedBrowser) await ownedBrowser.close();
+  console.log('BROWSER_CLEANUP=COMPLETE');
+};
+process.once('SIGTERM', () => {
+  stopping = true;
+  if (ownedBrowser) closeOwnedBrowser().then(() => process.exit(1)).catch(() => { process.exitCode = 1; });
+});
 (async () => {
   const base = process.env.ADMIN_BROWSER_BASE;
-  const browser = await chromium.launch({executablePath: process.env.ADMIN_BROWSER_EXECUTABLE, chromiumSandbox: true, headless: true});
+  const browser = await chromium.launch({executablePath: process.env.ADMIN_BROWSER_EXECUTABLE, chromiumSandbox: true, headless: true, timeout: 25000});
+  ownedBrowser = browser;
   try {
+    if (stopping) throw new Error('fixture startup interrupted');
     const context = await browser.newContext({serviceWorkers: 'block'});
     await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
     const page = await context.newPage();
+    page.on('pageerror', error => console.error('BROWSER_PAGE_ERROR='+scrub(error.message)));
+    page.on('console', message => { if (/^FIXTURE_LOGIN_STAGE=[a-z-]+$/.test(message.text())) console.log(message.text()); });
     checkpoint('panel-load');
-    await page.goto(base+'/hass_codex_admin/panel.js');
+    // A normal HTML document gives PKCE/auth a defined loopback origin; HA's
+    // full frontend is intentionally not installed in this minimal Core fixture.
+    await page.route(base+'/__admin_browser_fixture', route => route.fulfill({contentType:'text/html', body:'<!doctype html><html><body></body></html>'}));
+    await page.goto(base+'/__admin_browser_fixture');
+    if (!(await page.evaluate(base => location.origin === base && isSecureContext && !!crypto.subtle, base))) throw new Error('owned loopback secure origin required for PKCE');
     await page.setContent('<form><label>Username<input name="username" autocomplete="off"></label><label>Password<input name="password" type="password" autocomplete="off"></label><button>Local fixture login</button></form><hass-codex-admin hidden></hass-codex-admin>');
     await page.addScriptTag({url: base+'/hass_codex_admin/panel.js'});
     await page.evaluate(({base}) => {
@@ -21,17 +46,28 @@ const checkpoint = value => { stage = value; console.log('BROWSER_STAGE='+value)
         const verifier = btoa(String.fromCharCode(...bytes)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
         const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
         const challenge = btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-        const post = async (path, value) => (await fetch(base+path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(value)})).json();
+        console.log('FIXTURE_LOGIN_STAGE=pkce-created');
+        const post = async (path, value) => {
+          const response = await fetch(base+path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(value)});
+          if (response.status !== 200) throw new Error('native login request rejected: '+response.status);
+          return response.json();
+        };
         const flow = await post('/auth/login_flow', {client_id:base, handler:['homeassistant', null], redirect_uri:base+'/auth/callback', code_challenge:challenge, code_challenge_method:'S256'});
-        const result = await post('/auth/login_flow/'+flow.flow_id, {client_id:base, username:form.username.value, password:form.password.value});
-        form.password.value = '';
+        console.log('FIXTURE_LOGIN_STAGE=flow-created');
+        const username = form.elements.namedItem('username').value;
+        const password = form.elements.namedItem('password').value;
+        form.elements.namedItem('password').value = '';
+        const result = await post('/auth/login_flow/'+flow.flow_id, {client_id:base, username, password});
+        console.log('FIXTURE_LOGIN_STAGE=credentials-submitted');
         if (result.type !== 'create_entry') throw new Error('native login failed');
         const response = await fetch(base+'/auth/token', {method:'POST', body:new URLSearchParams({grant_type:'authorization_code', client_id:base, code:result.result, code_verifier:verifier})});
         const tokens = await response.json();
         if (!tokens.access_token) throw new Error('native token exchange failed');
+        console.log('FIXTURE_LOGIN_STAGE=token-created');
         const token = tokens.access_token; // closure only; never a remote connector credential
         form.remove();
         const panel = document.querySelector('hass-codex-admin'); panel.hidden = false;
+        console.log('FIXTURE_LOGIN_STAGE=panel-binding');
         panel.hass = {callWS: command => new Promise((resolve, reject) => {
           const ws = new WebSocket(base.replace('http:', 'ws:')+'/api/websocket');
           const deadline = setTimeout(() => {ws.close(); reject(new Error('bounded WS timeout'));}, 8000);
@@ -88,13 +124,5 @@ const checkpoint = value => { stage = value; console.log('BROWSER_STAGE='+value)
     await page.getByRole('button', {name:'Revoke remaining operations', exact:true}).click();
     await page.getByRole('heading', {name:/— revoked/}).waitFor();
     console.log('ACTUAL_OWNER_PANEL_BROWSER=PASS login issue revoke plan consent execute outcome rollback reject');
-  } finally {await browser.close();}
-})().catch(error => {
-  let message = String(error.message || error.code || 'browser fixture failed');
-  for (const value of [process.env.ADMIN_BROWSER_PASSWORD, process.env.ADMIN_BROWSER_CONNECTOR]) {
-    if (value) message = message.split(value).join('[redacted]');
-  }
-  message = message.replace(/hca_[A-Za-z0-9_-]{43}/g, '[redacted]').replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[redacted]');
-  console.error('BROWSER_FAILURE_STAGE='+stage+'\n'+message);
-  process.exitCode=1;
-});
+  } finally {await closeOwnedBrowser();}
+})().catch(error => { console.error('BROWSER_FAILURE_STAGE='+stage+'\n'+scrub(error.message || error.code || 'browser fixture failed')); process.exitCode=1; });
