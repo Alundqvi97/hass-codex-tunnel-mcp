@@ -1,6 +1,6 @@
 # Native administrator release checklist — 2026-10-10
 
-**Release candidate awaiting explicit scope/coordination acceptance and hosted/target acceptance.** The implemented candidate remains optional and disabled without explicit configuration. Full administration is still the Blueprint outcome; the finite supported scope below is not silently substituted for it. Production, Probe A and HAOS/VM execution were neither authorized nor performed.
+**Release candidate for owner-accepted isolated staging scope, awaiting separately authorized hosted/target acceptance.** The implemented candidate remains optional and disabled without explicit configuration. Full administration is still the Blueprint outcome; the finite supported scope below is not silently substituted for it. Production, Probe A and HAOS/VM execution were neither authorized nor performed.
 
 Starting revision `27a78774c792ab8dfcf8a9abaed57329032d6483` matched PR2's open/draft/unmerged remote head. Reviewed source `a7ad7a6a3362262e0a5f3b8d8a04998106d42acc` and owner amendment `b2dc4eb05f5bda4ec9b32d443a1abba505543a2b` are ancestors. The reviewed source-to-delivery difference was exactly eight added implementation-plan lines. Initial checkout was clean; legitimate history was preserved. Source/test and later documentation SHAs are recorded by the following immutable delivery receipt, avoiding a self-referential hash.
 
