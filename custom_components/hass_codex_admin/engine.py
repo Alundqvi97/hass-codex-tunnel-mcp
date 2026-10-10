@@ -267,6 +267,15 @@ class Administrator:
                     # by name or let an unverified ID supply ownership.
                     raise AdminError("allocation_outcome_requires_owner_reconciliation")
                 op = self.bound_operation(row, n)
+                if op["family"] == "maintenance" and op["target"] in {"homeassistant.restart", "hassio.host_reboot"}:
+                    receipt = item["result"] or {}
+                    if not receipt.get("backend_acknowledged") or receipt.get("rollback"):
+                        raise AdminError("external_outcome_requires_owner_reconciliation")
+                    after = await self.backend.snapshot(actor, op)
+                    if not self.backend.verified(op, item["before_state"], after, receipt.get("result") or {}):
+                        raise AdminError("external_outcome_requires_owner_reconciliation")
+                    await self.db("finish", task, n, "applied", after, {**receipt, "current_lifecycle_facts_verified": True, "physical_behavior_verified": False}, expected=item["status"])
+                    continue
                 if op["family"] in {"service", "integration", "maintenance"}:
                     raise AdminError("external_outcome_requires_owner_reconciliation")
                 after = await self.backend.snapshot(actor, op)

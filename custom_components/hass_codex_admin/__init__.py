@@ -51,6 +51,12 @@ async def async_setup(hass, config):
             raise AdminError("backend_must_be_this_home_assistant_server")
         identity = NativeIdentity(hass, policy, store, await hass.async_add_executor_job(store.activate_connectors))
         backend.credential = identity.backend_bearer
+        # Own process only, using the existing Core dependency. A component
+        # reload in the same process is not evidence that Core restarted.
+        import os
+        import psutil
+        created = await hass.async_add_executor_job(psutil.Process().create_time)
+        backend.runtime = lambda: {"pid": os.getpid(), "created": created, "version": __version__, "state": hass.state.value}
         engine = Administrator(store, backend, policy, identity.caller, identity.approved_session)
         from .flows import NativeFlows, register as register_flows
         backend.flows = NativeFlows(hass)

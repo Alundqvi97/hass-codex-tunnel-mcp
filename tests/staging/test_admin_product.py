@@ -898,6 +898,85 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.tool("admin_execute", {"task": task["id"], "plan_hash": task["hash"]}), {"error": "outcome_requires_reconciliation"})
         self.assertEqual((await self.tool("admin_status", {"task": task["id"]}))["operations"][0]["status"], "uncertain")
 
+    async def test_native_host_lifecycle_boot_facts_and_uncertain_shutdown(self):
+        from homeassistant.components.hassio.websocket_api import websocket_supervisor_api
+        from homeassistant.components import websocket_api
+        calls = []
+        state = {"hostname": "synthetic-host", "operating_system": "Synthetic OS", "boot_timestamp": 100, "startup_time": 2.5, "features": ["reboot", "shutdown"]}
+        class SyntheticSupervisor:
+            async def send_command(supervisor, endpoint, *, method, payload, **kwargs):
+                calls.append((endpoint, method, payload))
+                if method == "get":
+                    self.assertEqual(endpoint, "/host/info")
+                    return {"data": dict(state)}
+                self.assertIn(endpoint, ("/host/reboot", "/host/shutdown"))
+                self.assertEqual(payload, {})
+                if endpoint == "/host/reboot": state["boot_timestamp"] += 100
+                return {"data": {}}
+        self.hass.data["hassio"] = SyntheticSupervisor()
+        websocket_api.async_register_command(self.hass, websocket_supervisor_api)
+        op = {"family": "maintenance", "action": "call", "target": "hassio.host_reboot", "value": {}}
+        task = await self.tool("admin_propose", {"operations": [op]}); args = {"task": task["id"], "plan_hash": task["hash"]}
+        self.assertEqual(await self.tool("admin_execute", args), {"error": "approval_required_or_expired"})
+        self.assertFalse(any(method == "post" for _, method, _ in calls))
+        self.assertTrue((await self.approval("approve", confirm_effects=True, **args))["success"])
+        self.assertEqual((await self.tool("admin_execute", args))["operations"][0]["status"], "applied")
+        self.assertEqual(await self.tool("admin_propose", {"operations": [{**op, "value": {"force": True}}]}), {"error": "maintenance_arguments"})
+        state["boot_timestamp"] = None
+        self.assertEqual(await self.tool("admin_propose", {"operations": [op]}), {"error": "host_boot_identity_unavailable"})
+        state["boot_timestamp"] = 200
+        task = await self.approved([{**op, "target": "hassio.host_shutdown"}]); args = {"task": task["id"], "plan_hash": task["hash"]}
+        self.assertEqual(await self.tool("admin_execute", args), {"error": "outcome_requires_reconciliation"})
+        self.assertEqual(await self.tool("admin_reconcile", args), {"error": "external_outcome_requires_owner_reconciliation"})
+        before = len(calls)
+        self.assertEqual(await self.tool("admin_execute", args), {"error": "operation_consumed_or_uncertain"})
+        self.assertFalse(any(method == "post" for _, method, _ in calls[before:]))
+
+    async def test_native_core_restart_same_incarnation_never_verifies(self):
+        from homeassistant.components.homeassistant import async_set_stop_handler
+        calls = []
+        async def stopped(hass, restart): calls.append(restart)
+        async_set_stop_handler(self.hass, stopped)  # Only the owned shutdown boundary is injected.
+        task = await self.approved([{"family": "maintenance", "action": "call", "target": "homeassistant.restart", "value": {}}])
+        args = {"task": task["id"], "plan_hash": task["hash"]}
+        self.assertEqual(await self.tool("admin_execute", args), {"error": "outcome_requires_reconciliation"})
+        self.assertEqual(calls, [True])
+        self.assertEqual(await self.tool("admin_reconcile", args), {"error": "external_outcome_requires_owner_reconciliation"})
+        self.assertEqual(await self.tool("admin_execute", args), {"error": "operation_consumed_or_uncertain"})
+        self.assertEqual(calls, [True])
+        async_set_stop_handler(self.hass)
+
+    async def test_native_flow_menu_and_selectors_without_secret_defaults(self):
+        from unittest.mock import patch
+        from homeassistant.config_entries import ConfigFlow, HANDLERS
+        from homeassistant.helpers import selector
+        import probatio as vol
+        self.assertTrue(await async_setup_component(self.hass, "sun", {})); await self.hass.async_block_till_done()
+        entry = self.hass.config_entries.async_entries("sun")[0]
+        secret = "synthetic-native-selector-password"
+        class SyntheticFlow(ConfigFlow):
+            VERSION = 1
+            async def async_step_reconfigure(flow, user_input=None):
+                return flow.async_show_menu(step_id="reconfigure", menu_options=["settings"])
+            async def async_step_settings(flow, user_input=None):
+                if user_input is None:
+                    return flow.async_show_form(step_id="settings", data_schema=vol.Schema({vol.Required("pin", default=secret): selector.TextSelector({"type": "password"}), vol.Required("choices"): selector.SelectSelector({"options": ["a", "b"], "multiple": True}), vol.Required("limit"): selector.NumberSelector({"min": 1, "max": 9}), vol.Optional("enabled"): selector.BooleanSelector()}))
+                self.assertEqual(user_input, {"pin": secret, "choices": ["b"], "limit": 3.0})
+                return flow.async_update_reload_and_abort(flow._get_reconfigure_entry(), data_updates={"selectors_verified": True})
+        with patch.dict(HANDLERS, {"sun": SyntheticFlow}):
+            task = await self.approved([{"family": "integration", "action": "reconfigure", "target": entry.entry_id, "value": {}}]); args = {"task": task["id"], "plan_hash": task["hash"]}
+            self.assertEqual(await self.tool("admin_execute", args), {"error": "outcome_requires_reconciliation"})
+            command = {"type": "hass_codex_admin/flow", "operation": 0, **args}
+            state = await self.native_ws({**command, "action": "status"})
+            self.assertEqual(state["result"]["fields"][0]["choices"], ["settings"])
+            state = await self.native_ws({**command, "action": "submit", "input": {"next_step_id": "settings"}})
+            self.assertNotIn(secret, json.dumps(state))
+            self.assertTrue(state["result"]["fields"][0]["password"])
+            complete = await self.native_ws({**command, "action": "submit", "input": {"pin": secret, "choices": ["b"], "limit": 3}})
+            self.assertTrue(complete["success"], complete)
+            self.assertTrue(complete["result"]["completed"])
+            self.assertNotIn(secret, json.dumps(await self.tool("admin_status", {"task": task["id"]})))
+
     async def test_config_maintenance_supported_and_supervisor_gaps_explicit(self):
         task = await self.approved([{ "family": "maintenance", "action": "call", "target": "homeassistant.check_config", "value": {}}])
         result = await self.tool("admin_execute", {"task": task["id"], "plan_hash": task["hash"]})
@@ -1053,8 +1132,7 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
                 command = {"type": "hass_codex_admin/flow", "task": task["id"], "plan_hash": task["hash"], "operation": 0}
                 state = await self.native_ws({**command, "action": "status"})
                 self.assertTrue(state["success"], state)
-                if not state["result"]["fields"]:
-                    state = await self.native_ws({**command, "action": "submit"})
+                self.assertTrue(state["result"]["fields"], "Native reauth handoff must contain its real initialized form")
                 self.assertEqual(state["result"]["fields"][0]["name"], "password")
                 # Connector capabilities cannot authenticate this owner channel.
                 async with self.client.ws_connect(self.base+"/api/websocket") as ws:
@@ -1094,12 +1172,20 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
             task = await self.approved([op]); args = {"task": task["id"], "plan_hash": task["hash"]}
             await flows.lock.acquire()
             actor = identity.caller(self.bearer)
-            work = asyncio.create_task(engine.execute(actor, **args))
-            try:
-                async with asyncio.timeout(2):
-                    while (await engine.db("get", task["id"]))["operations"][0]["status"] != "dispatching": await asyncio.sleep(.01)
-                self.assertTrue((await self.approval("revoke", **args))["success"])
-            finally: flows.lock.release()
+            queued = asyncio.Event()
+            original_begin = flows.begin
+            async def observed_begin(operation, check):
+                queued.set()
+                return await original_begin(operation, check)
+            # A durable claim precedes several legitimate authorization
+            # boundaries. Observe the actual queued-flow boundary instead of
+            # racing those checks by polling its earlier SQLite status.
+            with patch.object(flows, "begin", observed_begin):
+                work = asyncio.create_task(engine.execute(actor, **args))
+                try:
+                    await asyncio.wait_for(queued.wait(), 2)
+                    self.assertTrue((await self.approval("revoke", **args))["success"])
+                finally: flows.lock.release()
             with self.assertRaises(AdminError) as error: await work
             self.assertEqual(error.exception.code, "approval_revoked")
             self.assertEqual(starts, [])
@@ -1548,6 +1634,15 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
 
 
 class WholeProcessRestart(unittest.TestCase):
+    def test_actual_core_restart_receipt_reconciles_new_process_without_replay(self):
+        import subprocess, sys
+        with tempfile.TemporaryDirectory(prefix="ha-admin-lifecycle-") as root:
+            environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": str(REPO)}
+            for stage in ("lifecycle-request", "lifecycle-resume"):
+                result = subprocess.run([sys.executable, "-B", str(REPO/"tests/staging/admin_process_fixture.py"), root, stage], env=environment, capture_output=True, text=True, timeout=35)
+                self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+                self.assertIn("NATIVE_PROCESS_"+stage.upper()+"=PASS", result.stdout)
+
     def test_native_ha_process_restart_retains_consumption_and_definitions(self):
         import os, subprocess, sys
         with tempfile.TemporaryDirectory(prefix="ha-admin-process-") as root:

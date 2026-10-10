@@ -44,6 +44,7 @@ class HABackend:
 
     def __init__(self, base_url, session, *, timeout=8, credential=None):
         self.flows = None
+        self.runtime = None
         parsed = urlsplit(base_url)
         try:
             loopback = ipaddress.ip_address(parsed.hostname).is_loopback
@@ -157,6 +158,10 @@ class HABackend:
                 if info["agent_errors"] or info["state"] != "idle":
                     raise AdminError("backup_agent_not_ready")
                 return {"backups": [{k: item[k] for k in ("backup_id", "agents", "failed_agent_ids", "name", "date") if k in item} for item in info["backups"]]}
+            if target == "homeassistant.restart":
+                if self.runtime is None:
+                    raise AdminError("core_runtime_identity_unavailable")
+                return self.runtime()
             if target != "homeassistant.check_config":
                 # No unverified restart/update/credential mutation. These
                 # require a supported outcome adapter and separate acceptance.
@@ -165,8 +170,8 @@ class HABackend:
         raise AdminError("unsupported_read")
 
     async def snapshot(self, actor, op):
-        from .supervisor import ADDON_ACTIONS, snapshot
-        if op["family"] == "maintenance" and op["target"] in set(ADDON_ACTIONS) | {"hassio.core_update"}:
+        from .supervisor import TARGETS, snapshot
+        if op["family"] == "maintenance" and op["target"] in TARGETS:
             return await snapshot(self, actor, op)
         if op["family"] in HELPERS and op["action"] == "allocate":
             return {"existing_ids": sorted(item["id"] for item in await self.ws(actor, {"type": op["family"]+"/list"}))}
@@ -254,8 +259,8 @@ class HABackend:
                 return await self.flows.begin(op, self.final_check)
             return await self.rest(actor, "POST", f"/api/config/config_entries/entry/{target}/reload", {})
         if family in {"service", "maintenance"}:
-            from .supervisor import ADDON_ACTIONS, write
-            if family == "maintenance" and target in set(ADDON_ACTIONS) | {"hassio.core_update"}:
+            from .supervisor import TARGETS, write
+            if family == "maintenance" and target in TARGETS:
                 return await write(self, actor, op)
             if target == "backup.create":
                 return await self.ws(actor, {"type": "backup/generate", "agent_ids": ["backup.local"], "include_all_addons": False, "include_database": True, "include_homeassistant": True})
@@ -292,9 +297,11 @@ class HABackend:
                 return False  # Flow initiation is not credential-change success.
             return after is not None and after.get("state") == "loaded"
         if op["family"] == "maintenance":
-            from .supervisor import ADDON_ACTIONS, verified
-            if op["target"] in set(ADDON_ACTIONS) | {"hassio.core_update"}:
+            from .supervisor import TARGETS, verified
+            if op["target"] in TARGETS:
                 return verified(op, before, after, result)
+            if op["target"] == "homeassistant.restart":
+                return after.get("state") == "RUNNING" and after.get("version") == before.get("version") and (after.get("pid"), after.get("created")) != (before.get("pid"), before.get("created"))
             if op["target"] == "backup.create":
                 old = {x["backup_id"] for x in before["backups"]}
                 new = [x for x in after["backups"] if x["backup_id"] not in old]

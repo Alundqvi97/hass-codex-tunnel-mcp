@@ -10,7 +10,7 @@ DOMAIN = "hass_codex_admin"
 HELPERS = {"input_boolean", "input_number", "input_text", "input_select", "input_datetime", "input_button", "counter", "timer"}
 FAMILIES = {"automation", "script", "dashboard", "integration", "service", "maintenance"} | HELPERS
 SERVICES = {"light.turn_on", "light.turn_off", "switch.turn_on", "switch.turn_off", "cover.open_cover", "cover.close_cover", "media_player.media_play", "media_player.media_pause"}
-MAINTENANCE = {"homeassistant.check_config", "homeassistant.reload_core_config", "homeassistant.restart", "backup.create", "hassio.addon_start", "hassio.addon_stop", "hassio.addon_restart", "hassio.addon_update", "hassio.core_update", "hassio.backup_full"}
+MAINTENANCE = {"homeassistant.check_config", "homeassistant.reload_core_config", "homeassistant.restart", "backup.create", "hassio.addon_start", "hassio.addon_stop", "hassio.addon_restart", "hassio.addon_update", "hassio.core_update", "hassio.host_reboot", "hassio.host_shutdown", "hassio.backup_full"}
 SECRET_KEYS = re.compile(r"password|token|secret|api_key|authorization|credential", re.I)
 
 

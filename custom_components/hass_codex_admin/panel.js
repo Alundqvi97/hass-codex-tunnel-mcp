@@ -58,13 +58,35 @@ class AdministratorPanel extends HTMLElement {
           const inputs = [];
           for (const field of state.fields) {
             const label = this.element('label', field.name);
-            const input = document.createElement('input');
-            input.type = field.kind === 'boolean' ? 'checkbox' : field.kind === 'integer' ? 'number' : /password|token|secret|key|credential/i.test(field.name) ? 'password' : 'text';
-            input.autocomplete = 'off'; input.required = field.required; label.append(input); flow.append(label); inputs.push([field, input]);
+            const input = document.createElement(field.kind === 'select' ? 'select' : field.multiline ? 'textarea' : 'input');
+            if (field.kind === 'select') {
+              input.multiple = field.multiple;
+              if (!field.multiple) { const empty = this.element('option', 'Choose a value'); empty.value = ''; input.append(empty); }
+              for (const [index, choice] of field.choices.entries()) { const option = this.element('option', String(choice)); option.value = String(index); input.append(option); }
+            } else {
+              if (input.tagName === 'INPUT') input.type = field.kind === 'boolean' ? 'checkbox' : ['integer', 'number'].includes(field.kind) ? 'number' : field.password || /password|token|secret|key|credential|pin/i.test(field.name) ? 'password' : 'text';
+              for (const key of ['min', 'max', 'step']) if (field[key] !== undefined) input[key] = field[key];
+            }
+            input.autocomplete = 'off'; input.required = ['integer', 'number'].includes(field.kind) || field.kind === 'select' && !field.multiple; label.append(input); flow.append(label);
+            let include;
+            if (!field.required) { const optional = this.element('label', ` Set optional ${field.name}`); include = document.createElement('input'); include.type = 'checkbox'; optional.prepend(include); flow.append(optional); }
+            inputs.push([field, input, include]);
           }
           flow.append(this.button('Continue in native HA', async () => {
             const value = {};
-            for (const [field, input] of inputs) { value[field.name] = field.kind === 'boolean' ? input.checked : field.kind === 'integer' ? Number(input.value) : input.value; input.value = ''; }
+            // Validate all included controls before clearing any secret or
+            // dispatching. Included optional numbers/selections need a value.
+            for (const [field, input, include] of inputs) {
+              if (include && !include.checked) continue;
+              if (!input.checkValidity() || ['integer', 'number'].includes(field.kind) && !input.value || field.kind === 'select' && !field.multiple && !input.value) {
+                this.message.textContent = 'Complete the required native inputs using valid values.'; return;
+              }
+            }
+            for (const [field, input, include] of inputs) {
+              if (include && !include.checked) { input.value = ''; continue; }
+              value[field.name] = field.kind === 'select' ? field.multiple ? [...input.selectedOptions].map(option => field.choices[Number(option.value)]) : field.choices[Number(input.value)] : field.kind === 'boolean' ? input.checked : ['integer', 'number'].includes(field.kind) ? Number(input.value) : input.value;
+              input.value = '';
+            }
             const next = await command('submit', inputs.length ? {input: value} : {});
             if (next.completed) await this.refresh(); else show(next);
           }));

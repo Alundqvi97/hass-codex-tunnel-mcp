@@ -58,6 +58,36 @@ async def run():
                 fixture.assertEqual(await fixture.tool("admin_rollback", original), {"error": "caller_scope_or_policy_changed"})
                 history = await fixture.hass.data["hass_codex_admin"]["engine"].db("get", original["task"])
                 fixture.assertEqual(history["operations"][0]["status"], "applied")
+        elif stage == "lifecycle-request":
+            from homeassistant.components.homeassistant import async_set_stop_handler
+            from homeassistant.const import RESTART_EXIT_CODE
+            requested = asyncio.Event()
+            async def hold_shutdown(hass, restart):
+                fixture.assertTrue(restart)
+                requested.set()
+            # Public injected stop boundary lets the real HTTP acknowledgment
+            # commit before actual owned Core shutdown. No fake incarnation.
+            async_set_stop_handler(fixture.hass, hold_shutdown)
+            task = await fixture.approved([{"family": "maintenance", "action": "call", "target": "homeassistant.restart", "value": {}}])
+            args = {"task": task["id"], "plan_hash": task["hash"]}
+            receipt.write_text(json.dumps(args))
+            result = await fixture.tool("admin_execute", args)
+            fixture.assertEqual(result, {"error": "outcome_requires_reconciliation"})
+            await asyncio.wait_for(requested.wait(), 2)
+            row = await fixture.hass.data["hass_codex_admin"]["engine"].db("get", task["id"])
+            fixture.assertTrue(row["operations"][0]["result"]["backend_acknowledged"])
+            await fixture.hass.async_stop(RESTART_EXIT_CODE)
+            fixture.assertEqual(fixture.hass.state.value, "STOPPED")
+        elif stage == "lifecycle-resume":
+            args = json.loads(receipt.read_text())
+            fixture.assertEqual(await fixture.tool("admin_execute", args), {"error": "operation_consumed_or_uncertain"})
+            result = await fixture.tool("admin_reconcile", args)
+            fixture.assertNotIn("error", result, result)
+            item = result["operations"][0]
+            fixture.assertEqual(item["status"], "applied")
+            fixture.assertTrue(item["result"]["current_lifecycle_facts_verified"])
+            fixture.assertNotEqual((item["before_state"]["pid"], item["before_state"]["created"]), (item["after_state"]["pid"], item["after_state"]["created"]))
+            fixture.assertEqual(result["status"], "revoked")  # boot never renews task authority
         elif stage == "seed":
             pass
         elif stage.startswith("crash-"):

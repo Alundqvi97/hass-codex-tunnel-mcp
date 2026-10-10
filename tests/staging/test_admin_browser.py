@@ -25,8 +25,28 @@ class OwnerPanelBrowser(unittest.IsolatedAsyncioTestCase):
             await provider.async_add_auth("browser_owner", password)
             credential = await provider.async_get_or_create_credentials({"username": "browser_owner"})
             await fixture.hass.auth.async_link_user(fixture.owner, credential)
+            from unittest.mock import patch
+            from homeassistant.config_entries import ConfigFlow, HANDLERS
+            from homeassistant.helpers import selector
+            from homeassistant.setup import async_setup_component
+            import probatio as vol
+            self.assertTrue(await async_setup_component(fixture.hass, "sun", {}))
+            await fixture.hass.async_block_till_done()
+            entry = fixture.hass.config_entries.async_entries("sun")[0]
+            class BrowserFlow(ConfigFlow):
+                VERSION = 1
+                async def async_step_reconfigure(flow, user_input=None):
+                    return flow.async_show_menu(step_id="reconfigure", menu_options=["settings"])
+                async def async_step_settings(flow, user_input=None):
+                    if user_input is None:
+                        return flow.async_show_form(step_id="settings", data_schema=vol.Schema({vol.Required("pin", default=password): selector.TextSelector({"type": "password"}), vol.Required("choices"): selector.SelectSelector({"options": ["a", "b"], "multiple": True}), vol.Required("limit"): selector.NumberSelector({"min": 1, "max": 9}), vol.Optional("clear_choices"): selector.SelectSelector({"options": ["a", "b"], "multiple": True}), vol.Optional("extra_limit"): selector.NumberSelector({"min": 0, "max": 9}), vol.Optional("extra_choice"): selector.SelectSelector({"options": ["a", "b"]}), vol.Required("notes"): selector.TextSelector({"multiline": True}), vol.Optional("enabled"): selector.BooleanSelector()}))
+                    self.assertEqual(user_input, {"pin": password, "choices": ["b"], "clear_choices": [], "limit": 3.5, "notes": "first\nsecond"})
+                    return flow.async_update_reload_and_abort(flow._get_reconfigure_entry(), data_updates={"browser_selectors_verified": True})
+            handler_patch = patch.dict(HANDLERS, {"sun": BrowserFlow})
+            handler_patch.start()
+            self.addCleanup(handler_patch.stop)
             task = await fixture.tool("admin_propose", {"operations": [{"family": "script", "action": "create", "target": "browser_review", "value": {"alias": "<script>untrusted text</script>", "sequence": [{"delay": "00:00:00"}]}}]})
-            child = await asyncio.create_subprocess_exec("node", str(REPO/"tests/staging/admin_browser_fixture.cjs"), env={**os.environ, "ADMIN_BROWSER_BASE": fixture.base, "ADMIN_BROWSER_USERNAME": "browser_owner", "ADMIN_BROWSER_PASSWORD": password, "ADMIN_BROWSER_CONNECTOR": fixture.bearer, "ADMIN_BROWSER_TASK": task["id"], "ADMIN_BROWSER_HASH": task["hash"]}, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            child = await asyncio.create_subprocess_exec("node", str(REPO/"tests/staging/admin_browser_fixture.cjs"), env={**os.environ, "ADMIN_BROWSER_BASE": fixture.base, "ADMIN_BROWSER_USERNAME": "browser_owner", "ADMIN_BROWSER_PASSWORD": password, "ADMIN_BROWSER_CONNECTOR": fixture.bearer, "ADMIN_BROWSER_TASK": task["id"], "ADMIN_BROWSER_HASH": task["hash"], "ADMIN_BROWSER_FLOW_ENTRY": entry.entry_id}, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
             def signal_owned(method):
                 try:
                     method()

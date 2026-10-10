@@ -130,10 +130,11 @@ process.once('SIGTERM', () => {
       throw error;
     }
     if (await page.locator('section script').count()) throw new Error('untrusted definition created a script element');
-    const call = async (name, args) => page.evaluate(async ({base, credential, name, args}) => {
+    const call = async (name, args, expectedError) => page.evaluate(async ({base, credential, name, args, expectedError}) => {
       const response = await fetch(base+'/api/hass_codex_admin/mcp', {method:'POST', headers:{Authorization:'Bearer '+credential, 'Content-Type':'application/json', Accept:'application/json'}, body:JSON.stringify({jsonrpc:'2.0', id:1, method:'tools/call', params:{name, arguments:args}})});
-      const body = await response.json(); if (body.result.isError) throw new Error('scoped tool failed'); return JSON.parse(body.result.content[0].text).result;
-    }, {base, credential:process.env.ADMIN_BROWSER_CONNECTOR, name, args});
+      const body = await response.json(); const content = JSON.parse(body.result.content[0].text);
+      if (body.result.isError) {if (content.error === expectedError) return {error:content.error}; throw new Error('scoped tool failed');} return content.result;
+    }, {base, credential:process.env.ADMIN_BROWSER_CONNECTOR, name, args, expectedError});
     const args = {task:process.env.ADMIN_BROWSER_TASK, plan_hash:process.env.ADMIN_BROWSER_HASH};
     checkpoint('approved-mcp-execute');
     const applied = await call('admin_execute', args);
@@ -146,6 +147,41 @@ process.once('SIGTERM', () => {
     await page.getByRole('button', {name:'Refresh tasks', exact:true}).click();
     await page.getByRole('button', {name:'Revoke remaining operations', exact:true}).click();
     await page.getByRole('heading', {name:/— revoked/}).waitFor();
-    console.log('ACTUAL_OWNER_PANEL_BROWSER=PASS login issue revoke plan consent execute outcome rollback reject');
+    checkpoint('native-selector-handoff');
+    const flowTask = await call('admin_propose', {operations:[{family:'integration', action:'reconfigure', target:process.env.ADMIN_BROWSER_FLOW_ENTRY, value:{}}]});
+    await page.getByRole('button', {name:'Refresh tasks', exact:true}).click();
+    const flowCard = page.locator('hass-codex-admin section').filter({hasText:flowTask.id});
+    await flowCard.getByRole('checkbox').check();
+    await flowCard.getByRole('button', {name:'Approve this exact task once', exact:true}).click();
+    await flowCard.getByRole('heading', {name:/— approved/}).waitFor({timeout:5000});
+    const flowArgs = {task:flowTask.id, plan_hash:flowTask.hash};
+    const pending = await call('admin_execute', flowArgs, 'outcome_requires_reconciliation');
+    if (pending.error !== 'outcome_requires_reconciliation') throw new Error('native handoff prematurely completed');
+    await page.getByRole('button', {name:'Refresh tasks', exact:true}).click();
+    await flowCard.getByRole('button', {name:'Open secure native input', exact:true}).click();
+    await flowCard.getByLabel('next_step_id', {exact:true}).selectOption('0');
+    await flowCard.getByRole('button', {name:'Continue in native HA', exact:true}).click();
+    const pin = flowCard.getByLabel('pin', {exact:true});
+    if (await pin.getAttribute('type') !== 'password') throw new Error('native secret selector was visible input');
+    await pin.fill(process.env.ADMIN_BROWSER_PASSWORD);
+    const continueNative = flowCard.getByRole('button', {name:'Continue in native HA', exact:true});
+    await continueNative.click(); // Required numeric input is still empty.
+    if (await pin.inputValue() !== process.env.ADMIN_BROWSER_PASSWORD) throw new Error('local validation discarded native password');
+    await flowCard.getByLabel('choices', {exact:true}).selectOption(['1']);
+    await flowCard.getByLabel('limit', {exact:true}).fill('3.5');
+    await flowCard.getByLabel('notes', {exact:true}).fill('first\nsecond');
+    for (const optional of ['extra_limit', 'extra_choice']) {
+      const include = flowCard.getByLabel('Set optional '+optional, {exact:true});
+      await include.check();
+      await continueNative.click();
+      if (await pin.inputValue() !== process.env.ADMIN_BROWSER_PASSWORD) throw new Error('blank optional value dispatched or discarded native password');
+      await include.uncheck();
+    }
+    await flowCard.getByLabel('Set optional clear_choices', {exact:true}).check();
+    await continueNative.click();
+    await flowCard.getByText(/native_terminal_result_verified/).waitFor({timeout:5000});
+    const flowOutcome = await call('admin_status', {task:flowTask.id});
+    if (flowOutcome.operations[0].status !== 'applied' || JSON.stringify(flowOutcome).includes(process.env.ADMIN_BROWSER_PASSWORD)) throw new Error('native selector result or secret suppression failed');
+    console.log('ACTUAL_OWNER_PANEL_BROWSER=PASS login issue revoke plan consent execute outcome rollback reject native-menu-selectors-password');
   } finally {await closeOwnedBrowser();}
 })().catch(error => { console.error('BROWSER_FAILURE_STAGE='+stage+'\n'+scrub(error.message || error.code || 'browser fixture failed')); process.exitCode=1; });

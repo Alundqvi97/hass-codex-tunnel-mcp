@@ -7,6 +7,7 @@ import time
 from homeassistant import config_entries, data_entry_flow
 import probatio as vol
 from homeassistant.components import websocket_api
+from homeassistant.helpers import selector
 
 from .model import AdminError, canonical, fingerprint
 
@@ -51,9 +52,13 @@ class NativeFlows:
                 if op["action"] == "reauth":
                     entry.async_start_reauth(self.hass)
                     async with asyncio.timeout(4):
-                        while not (flows := list(entry.async_get_active_flows(self.hass, {config_entries.SOURCE_REAUTH}))):
+                        while not (flows := list(entry.async_get_active_flows(self.hass, {config_entries.SOURCE_REAUTH}))) or "step_id" not in flows[0]:
                             await asyncio.sleep(.01)
-                    result = flows[0]
+                        # Core exposes partial progress here, not a form. Its
+                        # native flow GET obtains the reviewable form through
+                        # this same public API without submitting input.
+                        await check()
+                        result = await self.hass.config_entries.flow.async_configure(flows[0]["flow_id"])
                 else:
                     result = await self.hass.config_entries.flow.async_init(entry.domain, context={"source": config_entries.SOURCE_RECONFIGURE, "entry_id": entry.entry_id})
             except (data_entry_flow.UnknownHandler, data_entry_flow.UnknownStep, TimeoutError):
@@ -79,6 +84,10 @@ class NativeFlows:
 
     def describe(self, context):
         result = context["result"]
+        if result.get("type") not in {data_entry_flow.FlowResultType.FORM, data_entry_flow.FlowResultType.MENU}:
+            # External/provider/progress steps must not masquerade as an empty
+            # supported form or turn repeated Continue clicks into success.
+            raise AdminError("native_flow_requires_native_frontend")
         schema = result.get("data_schema")
         fields = []
         if schema is not None:
@@ -86,9 +95,27 @@ class NativeFlows:
             # credentials or options. Unsupported selectors stay in native UI.
             for key, validator in schema.schema.items():
                 name = str(key.schema) if isinstance(key, vol.Marker) else str(key)
-                if validator not in (str, bool, int) or len(name) > 80:
+                if len(name) > 80:
                     raise AdminError("native_flow_requires_native_frontend")
-                fields.append({"name": name, "kind": "boolean" if validator is bool else "integer" if validator is int else "text", "required": isinstance(key, vol.Required)})
+                field = {"name": name, "required": isinstance(key, vol.Required)}
+                if validator in (str, bool, int):
+                    field["kind"] = "boolean" if validator is bool else "integer" if validator is int else "text"
+                elif isinstance(validator, selector.BooleanSelector):
+                    field["kind"] = "boolean"
+                elif isinstance(validator, selector.TextSelector) and not validator.config.get("multiple") and not (validator.config.get("multiline") and validator.config.get("type") == "password"):
+                    field.update(kind="text", password=validator.config.get("type") == "password", multiline=validator.config.get("multiline", False))
+                elif isinstance(validator, selector.NumberSelector):
+                    # Native step is a UI increment, not an input constraint.
+                    field.update(kind="number", step="any", **{k: validator.config[k] for k in ("min", "max") if k in validator.config})
+                elif isinstance(validator, (vol.In, selector.SelectSelector)):
+                    options = list(validator.container) if isinstance(validator, vol.In) else validator.config["options"]
+                    choices = [option.get("value") if isinstance(option, dict) else option for option in options]
+                    if not 1 <= len(choices) <= 100 or len(canonical(choices)) > 8192 or any(type(choice) not in (str, int, bool) for choice in choices) or isinstance(validator, selector.SelectSelector) and validator.config.get("custom_value"):
+                        raise AdminError("native_flow_requires_native_frontend")
+                    field.update(kind="select", choices=choices, multiple=isinstance(validator, selector.SelectSelector) and validator.config.get("multiple", False))
+                else:
+                    raise AdminError("native_flow_requires_native_frontend")
+                fields.append(field)
         return {"owner_input_required": True, "step": result.get("step_id"), "fields": fields, "errors": {str(k): "invalid_input" for k in (result.get("errors") or {})}}
 
     async def command(self, engine, identity, owner, message):
