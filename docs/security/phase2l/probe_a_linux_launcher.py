@@ -576,6 +576,12 @@ class IndependentSupervisor:
             raise LaunchDenied("INDEPENDENT_ACTORS_REQUIRED")
         self.actors, self.end, self.cutoff, self.clock = dict(actors), end, cutoff, clock
 
+    def _note_work(self, outcome):
+        audit = getattr(self, "evidence_audit", None)
+        composer = getattr(audit, "composer", None)
+        if composer is not None:
+            composer.note_work(outcome)
+
     def _finish(self, result, *, expired=False):
         # Observer cannot attest its own disappearance. The bootstrap owns
         # pidfd shutdown/reaping and exact actor-group readback after auditing.
@@ -626,6 +632,7 @@ class IndependentSupervisor:
             return self._run(close_controller_channel=close_controller_channel,
                              observe_after=observe_after, cancelled=cancelled, activated=True)
         except BaseException:
+            self._note_work("failed")
             # An interrupted trusted supervisor cannot skip controller shutdown
             # or independently certify cleanup. Guardian owns its same cutoff.
             coordinator = getattr(self, "coordinator", None)
@@ -663,10 +670,15 @@ class IndependentSupervisor:
             guardian = self.actors["guardian"]
             controller = self.actors["controller"]
             observer = self.actors["observer"]
-            if not stopped and (cancelled() or self.clock() >= self.cutoff
+            cancelled_now = cancelled() if not stopped else False
+            if not stopped and (cancelled_now or self.clock() >= self.cutoff
                                 or controller.exited() or guardian.exited() or observer.exited()):
                 stopped = True
                 reason = "UNVERIFIED_ABORT_OR_DEADLINE"
+                if cancelled_now:
+                    self._note_work("cancelled")
+                elif self.clock() >= self.cutoff or observer.exited():
+                    self._note_work("failed")
                 close_controller_channel()  # EOF triggers the existing guardian journal.
                 if self.clock() < self.end: controller.group.kill_all()
                 if not controller.exited():
@@ -679,6 +691,8 @@ class IndependentSupervisor:
                 guardian.reap()
                 controller.reap()
                 # Only the independent broker may observe AFTER guardian reaping.
+                if guardian.exitcode != 0 or controller.exitcode != 0:
+                    self._note_work("failed")
                 observed = False
                 try:
                     observed = observe_after() is True

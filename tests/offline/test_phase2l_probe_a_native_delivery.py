@@ -406,4 +406,21 @@ class ExcessivePrivilegeRegressions(unittest.TestCase):
         emulator=PolicyStaticFixtures()
         for nr in (310,311,312,438):self.assertEqual(emulator.run_filter('guardian',nr),DENY)
 
+
+class WorkLifecycleComposition(unittest.TestCase):
+    def test_controller_cancellation_is_recorded_separately_from_cleanup(self):
+        from probe_a_linux_launcher import IndependentSupervisor
+        import test_phase2l_probe_a_linux_foundation as foundation
+        actors=foundation.ContainmentAndSupervisionTests().actors()
+        supervisor=IndependentSupervisor(actors,end=240,cutoff=180,clock=lambda:0)
+        composer=EvidenceComposer(CONTEXT,IDENTITIES,groups=GROUPS)
+        audit=IndependentEvidenceAudit(composer)
+        # Lifecycle evidence collection is an unavailable kernel boundary; no
+        # success-returning audit is installed. Work status still persists.
+        supervisor.evidence_audit=audit
+        with patch('probe_a_linux_launcher.os.geteuid',return_value=0):
+            result=supervisor.run(close_controller_channel=Mock(),observe_after=Mock(),cancelled=lambda:True,activated=True)
+        self.assertEqual(supervisor.evidence_package.work,'cancelled')
+        self.assertIn('BLOCKED',result);self.assertEqual(supervisor.evidence_package.cleanup,'not-observed')
+
 if __name__=='__main__':unittest.main()
