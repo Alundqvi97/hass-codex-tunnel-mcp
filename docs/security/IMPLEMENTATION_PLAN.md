@@ -37,6 +37,14 @@ receipt and its HEAD/status are reported externally without a self-hash. Final p
 final effect authorization and full HAOS/recovery observers remain SOURCE
 blockers; a read-only permanent replacement is not accepted.
 
+Delivery-CI correction: docs-only `d22bb09357066c718ad856840c1c78dea5f0d664`
+has D/I/J/K/E/F SUCCESS, Phase2L PR SUCCESS but Phase2L push FAILURE
+(run38043156777, step4 exit1), and scanner FAILURE. Detailed job logs are blocked
+at the storage download host; API metadata works. Cause remains unresolved;
+source counts above are local evidence, not inferred CI counts. No test/workflow
+change or manual rerun. Exact outcomes remain in the closeout/index, and final
+receipt CI is reported externally without an indefinite publication loop.
+
 ## Historical implementation records — preserved
 
 Updated 2026-10-10. Repository: Alundqvi97/hass-codex-tunnel-mcp. This work is independent of home-infra-control-plane.

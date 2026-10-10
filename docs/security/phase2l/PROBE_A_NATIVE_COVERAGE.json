@@ -748,8 +748,130 @@
         ]
       },
       "manual_dispatch_or_rerun": false,
-      "scanner": "FAILURE; current detailed logs unavailable without authenticated API. Historical monthly-quota/HTTP402 reported by user; no clean vulnerability assessment. No rerun/billing change.",
+      "scanner": "FAILURE; authenticated API metadata now accessible, detailed log download blocked at storage host. Historical user-reported monthly-quota/HTTP402 is not a confirmed reason for this current run. No clean independent assessment; no rerun/billing change.",
       "publication_gate": "Public repository visibility verified; existing ordinary ubuntu-24.04 engineering CI authorized; workflows unchanged and VM path filters do not match."
+    },
+    "delivery_ci_d22bb09": {
+      "revision": "d22bb09357066c718ad856840c1c78dea5f0d664",
+      "source": "ce7fd5025c94974bb4c800351759342fff560abe",
+      "verified_pr_merge": "81168c1c30eb888150b7a76313d0e914d8f2dad7",
+      "verified_merge_parents": [
+        "9203fa88c77877a6d7eaba99909489949061f7da",
+        "d22bb09357066c718ad856840c1c78dea5f0d664"
+      ],
+      "source_delta": "DOCS_ONLY_FIVE_PATHS",
+      "runs": [
+        {
+          "id": 38043161254,
+          "name": "Code scanning AI findings on PR #2",
+          "status": "completed",
+          "conclusion": "failure",
+          "event": "dynamic",
+          "head_sha": "d22bb09357066c718ad856840c1c78dea5f0d664",
+          "html_url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043161254"
+        },
+        {
+          "id": 38043159372,
+          "name": "Phase 2J - Pure Offline Acceptance Model",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "pull_request",
+          "head_sha": "d22bb09357066c718ad856840c1c78dea5f0d664",
+          "html_url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043159372"
+        },
+        {
+          "id": 38043159362,
+          "name": "Phase 2I - Synthetic Offline Harness Only",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "pull_request",
+          "head_sha": "d22bb09357066c718ad856840c1c78dea5f0d664",
+          "html_url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043159362"
+        },
+        {
+          "id": 38043159376,
+          "name": "Phase 2K - Packaged Initial Policy Offline",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "pull_request",
+          "head_sha": "d22bb09357066c718ad856840c1c78dea5f0d664",
+          "html_url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043159376"
+        },
+        {
+          "id": 38043159375,
+          "name": "Phase 2D - HA-MCP Upstream Patch Candidates",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "pull_request",
+          "head_sha": "d22bb09357066c718ad856840c1c78dea5f0d664",
+          "html_url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043159375"
+        },
+        {
+          "id": 38043159318,
+          "name": "Phase 2L - DNS and Build Context Offline",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "pull_request",
+          "head_sha": "d22bb09357066c718ad856840c1c78dea5f0d664",
+          "html_url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043159318"
+        },
+        {
+          "id": 38043156756,
+          "name": "Phase 2H - Full Approval Semantics Regression",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "push",
+          "head_sha": "d22bb09357066c718ad856840c1c78dea5f0d664",
+          "html_url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043156756"
+        },
+        {
+          "id": 38043156759,
+          "name": "Phase 2D - HA-MCP Upstream Patch Candidates",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "push",
+          "head_sha": "d22bb09357066c718ad856840c1c78dea5f0d664",
+          "html_url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043156759"
+        },
+        {
+          "id": 38043156777,
+          "name": "Phase 2L - DNS and Build Context Offline",
+          "status": "completed",
+          "conclusion": "failure",
+          "event": "push",
+          "head_sha": "d22bb09357066c718ad856840c1c78dea5f0d664",
+          "html_url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043156777"
+        },
+        {
+          "id": 38043156665,
+          "name": "Phase 2E - Disposable Packaged Addon Test",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "push",
+          "head_sha": "d22bb09357066c718ad856840c1c78dea5f0d664",
+          "html_url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043156665"
+        },
+        {
+          "id": 38043156737,
+          "name": "Phase 2F - Supported Strict Addon Staging",
+          "status": "completed",
+          "conclusion": "success",
+          "event": "push",
+          "head_sha": "d22bb09357066c718ad856840c1c78dea5f0d664",
+          "html_url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043156737"
+        }
+      ],
+      "phase2l_failure": {
+        "run": 38043156777,
+        "job": 114187275287,
+        "step": 4,
+        "step_name": "Apply pinned candidate patches without building or launching anything",
+        "annotation": "Process completed with exit code 1.",
+        "cause": "UNKNOWN; neither runner incompatibility nor a test defect is established",
+        "diagnosis": "Authenticated API metadata works. Full job log redirects to storage host returning Forbidden; public step endpoint returns HTTP 404. Step combines candidate staging/tests/compilation/diff checks, so no failed command or test count is inferred.",
+        "manual_rerun": false
+      },
+      "scanner": "FAILURE at Processing Request (Linux); current reason not established; historical HTTP402/quota remains missing independent coverage; no rerun/billing change"
     }
   },
   "external_gates": [

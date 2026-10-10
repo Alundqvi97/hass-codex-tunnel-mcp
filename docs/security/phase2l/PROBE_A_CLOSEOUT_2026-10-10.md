@@ -125,9 +125,9 @@ requiring parent `b2dc4eb...`. `checksums.json` authenticates its individual fil
 against accidental drift; it is not a signature or runtime approval.
 
 The coverage index records commands/results, all critical hooks, exact source
-paths and historical CI. Final delivery CI is recorded after publication when
-accessible; API CONNECT remains blocked and no authentication/network setting was
-changed. Public GitHub metadata is read with normal TLS. Scanner monthly-quota/
+paths and historical CI. Authenticated GitHub API metadata is now accessible;
+full log downloads redirect to a storage host returning Forbidden. No authentication
+or network setting was changed. Metadata is read with normal TLS. Scanner monthly-quota/
 HTTP402 history is missing independent coverage, not a clean scan; no dispatch,
 rerun, billing change or quota workaround is authorized.
 
@@ -161,6 +161,43 @@ scan is FAILURE; its authenticated detail is unavailable. Historical402/quota
 failure remains missing independent coverage. It was not retried. A subsequent
 docs-only delivery cannot certify its own future CI; final delivery HEAD/status
 is verified and reported externally, with identical source/test tree.
+
+## Delivery CI discrepancy — preserved, not retried
+
+Documentation-only delivery `d22bb09357066c718ad856840c1c78dea5f0d664` has the
+identical source/test tree. Verified PR merge
+`81168c1c30eb888150b7a76313d0e914d8f2dad7` has parents
+`9203fa88c77877a6d7eaba99909489949061f7da` and that delivery.
+Authenticated API metadata binds each following result to its exact full head SHA.
+
+| Workflow/event | Outcome at d22bb09 | Immutable run |
+|---|---|---|
+| AI/dynamic | FAILURE | [38043161254](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043161254) |
+| J/pull_request | SUCCESS | [38043159372](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043159372) |
+| I/pull_request | SUCCESS | [38043159362](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043159362) |
+| K/pull_request | SUCCESS | [38043159376](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043159376) |
+| D/pull_request | SUCCESS | [38043159375](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043159375) |
+| L/pull_request | SUCCESS | [38043159318](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043159318) |
+| H/push | SUCCESS | [38043156756](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043156756) |
+| D/push | SUCCESS | [38043156759](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043156759) |
+| L/push | FAILURE | [38043156777](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043156777) |
+| E/push | SUCCESS | [38043156665](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043156665) |
+| F/push | SUCCESS | [38043156737](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38043156737) |
+
+Phase 2L push run38043156777, job114187275287, failed step4 with exit1. This
+step combines staging, unittest, compilation, shell parsing and Git checks.
+The annotation gives no failing command or individual test. Full authenticated
+job-log download redirects to storage returning Forbidden; the public step-log
+endpoint returns404. The same-source PR run succeeded, but that does not cancel
+this failure. Its cause is **unresolved validation**: neither a runner feature
+mismatch nor a specific source/test defect is proven. No test assertion was
+weakened, no workflow changed and no run retried. This adds no fabricated kernel
+or packaging evidence. Current scanner also failed at Processing Request; its
+reason cannot be equated to the historical quota error without the missing log.
+
+This receipt records already completed checks. Its own subsequent commit and CI
+are recorded in the external delivery artifact/final report rather than hashing
+itself or repeatedly publishing to chase a green result.
 
 ## Product and release matrix
 
