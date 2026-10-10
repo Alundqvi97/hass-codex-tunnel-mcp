@@ -304,6 +304,7 @@ class TunnelClientUpdater:
         """Install the latest eligible update and rollback on readiness failure."""
         if self._lock is None:
             raise RuntimeError("updater was not loaded")
+        requested_epoch = getattr(tunnel, "epoch", None)
         async with self._lock:
             result = await self.async_check_for_update(
                 now=now, skip_failed_versions=automatic
@@ -329,13 +330,19 @@ class TunnelClientUpdater:
                 await self._record_error("tunnel_client_update_failed", error)
                 raise
 
+            activation_epoch = None
             try:
-                await tunnel.start(entry_data, executable_override=candidate_executable)
+                await tunnel.start(entry_data, executable_override=candidate_executable, expected_epoch=requested_epoch)
+                activation_epoch = getattr(tunnel, "epoch", None)
                 if not await tunnel.wait_until_healthy(READINESS_TIMEOUT):
                     raise TunnelClientError(
                         f"tunnel-client {candidate.version} did not become ready"
                     )
             except Exception as err:
+                if activation_epoch is None:
+                    activation_epoch = getattr(err, "tunnel_activation_epoch", None)
+                if (activation_epoch if activation_epoch is not None else requested_epoch) is not None and (activation_epoch if activation_epoch is not None else requested_epoch) != tunnel.epoch:
+                    raise TunnelClientError("update superseded by lifecycle stop or restart") from None
                 await self._rollback_after_failed_update(
                     tunnel,
                     entry_data,
@@ -343,8 +350,12 @@ class TunnelClientUpdater:
                     old_asset=old_asset,
                     failed_version=candidate.version,
                     error=str(err),
+                    expected_epoch=activation_epoch,
                 )
                 raise
+
+            if activation_epoch is not None and activation_epoch != tunnel.epoch:
+                raise TunnelClientError("update superseded by lifecycle stop or restart")
 
             update_time = _utc_now(now)
             self.state.active_version = candidate.version
@@ -369,6 +380,13 @@ class TunnelClientUpdater:
         entry_data: Mapping[str, object],
     ) -> bool:
         """Rollback to the previous known-good tunnel-client version."""
+        if self._lock is None:
+            raise RuntimeError("updater was not loaded")
+        requested_epoch = getattr(tunnel, "epoch", None)
+        async with self._lock:
+            return await self._async_rollback_locked(tunnel, entry_data, requested_epoch)
+
+    async def _async_rollback_locked(self, tunnel, entry_data, requested_epoch):
         if not self.state.previous_version:
             self.state.last_error = "no previous tunnel-client version is available"
             await self.async_save()
@@ -379,6 +397,7 @@ class TunnelClientUpdater:
             target_version=self.state.previous_version,
             target_asset=self.state.previous_asset,
             issue_id="tunnel_client_rollback_failed",
+            expected_epoch=requested_epoch,
         )
 
     async def _switch_to_version(
@@ -389,7 +408,9 @@ class TunnelClientUpdater:
         target_version: str,
         target_asset: dict[str, str] | None,
         issue_id: str,
+        expected_epoch: int | None = None,
     ) -> bool:
+        requested_epoch = expected_epoch if expected_epoch is not None else getattr(tunnel, "epoch", None)
         current_version = self.state.active_version
         current_asset = self.state.active_asset
         asset = TunnelClientAsset.from_dict(target_asset)
@@ -404,7 +425,7 @@ class TunnelClientUpdater:
                 raise TunnelClientError(
                     f"no asset metadata is available for tunnel-client {target_version}"
                 )
-            await tunnel.start(entry_data, executable_override=executable)
+            await tunnel.start(entry_data, executable_override=executable, expected_epoch=requested_epoch)
             if not await tunnel.wait_until_healthy(READINESS_TIMEOUT):
                 raise TunnelClientError(
                     f"tunnel-client {target_version} did not become ready"
@@ -432,6 +453,7 @@ class TunnelClientUpdater:
         old_asset: dict[str, str] | None,
         failed_version: str,
         error: str,
+        expected_epoch: int | None = None,
     ) -> None:
         self.state.failed_versions[failed_version] = error
         self.state.active_version = old_version
@@ -445,7 +467,7 @@ class TunnelClientUpdater:
             {"error": error},
         )
         try:
-            await tunnel.start(entry_data)
+            await tunnel.start(entry_data, expected_epoch=expected_epoch)
             if not await tunnel.wait_until_healthy(READINESS_TIMEOUT):
                 raise TunnelClientError(
                     f"rollback tunnel-client {old_version} did not become ready"

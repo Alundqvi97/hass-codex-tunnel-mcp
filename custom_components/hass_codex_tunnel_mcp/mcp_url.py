@@ -102,6 +102,7 @@ async def async_probe_mcp_url(
 ) -> None:
     """Probe the configured HA-MCP URL for basic reachability."""
     validate_admin_auth_mode(value, bool(bearer_token))
+    validate_connector_credential(value, bearer_token)
     await asyncio.to_thread(_probe_mcp_url, value, timeout, bearer_token)
 
 
@@ -115,6 +116,12 @@ def validate_admin_auth_mode(value: str, injected_bearer: bool) -> None:
         path = decoded
     if path.rstrip("/") == "/api/mcp/hass_codex_admin" and injected_bearer:
         raise MCPUrlError("native_admin_requires_caller_oauth")
+
+
+def validate_connector_credential(value: str, bearer_token: str) -> None:
+    """The administrator accepts only its narrow connection capabilities."""
+    if urlsplit(value).path == "/api/hass_codex_admin/mcp" and bearer_token and (not bearer_token.startswith("hca_") or len(bearer_token) != 47):
+        raise MCPUrlError("scoped_connector_credential_required")
 
 
 class _NoRedirects(HTTPRedirectHandler):

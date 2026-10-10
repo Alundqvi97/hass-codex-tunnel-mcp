@@ -13,6 +13,10 @@ from .model import AdminError, canonical, decode, fingerprint
 
 
 class TaskStore:
+    def retire_connectors(self):
+        with self.transaction() as db:
+            db.execute("DELETE FROM connectors")
+
     def __init__(self, directory, *, clock=time.time):
         self.clock = clock
         self.directory = Path(directory)
@@ -35,6 +39,7 @@ class TaskStore:
               CREATE TABLE IF NOT EXISTS approvers(session TEXT PRIMARY KEY, user TEXT);
               CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY, value REAL);
               CREATE TABLE IF NOT EXISTS audit(n INTEGER PRIMARY KEY, task TEXT, event TEXT, timestamp REAL);
+              CREATE TABLE IF NOT EXISTS connectors(id TEXT PRIMARY KEY, digest TEXT UNIQUE, owner_session TEXT, expires REAL, label TEXT);
               PRAGMA user_version=1;
             """
             for statement in schema.split(";"):
@@ -127,6 +132,36 @@ class TaskStore:
     def enroll(self, actor):
         with self.transaction() as db:
             db.execute("INSERT OR REPLACE INTO approvers VALUES(?,?)", (actor.session, actor.user))
+
+    def connectors(self):
+        with self.transaction() as db:
+            return [dict(r) for r in db.execute("SELECT * FROM connectors")]
+
+    def activate_connectors(self):
+        """Boot/restore rotates credentials; no saved bearer can regain access.
+
+        Stable local connection IDs survive for the existing tunnel manager.
+        Only digests are written; the new capability exists in this Core's RAM.
+        """
+        import hashlib
+        import secrets
+        with self.transaction() as db:
+            rows = [dict(r) for r in db.execute("SELECT * FROM connectors")]
+            for row in rows:
+                row["credential"] = "hca_"+secrets.token_urlsafe(32)
+                row["digest"] = hashlib.sha256(row["credential"].encode()).hexdigest()
+                db.execute("UPDATE connectors SET digest=? WHERE id=?", (row["digest"], row["id"]))
+            return rows
+
+    def save_connector(self, identifier, digest, owner_session, expires, label):
+        with self.transaction() as db:
+            if db.execute("SELECT count(*) FROM connectors").fetchone()[0] >= 32:
+                raise AdminError("connector_capacity")
+            db.execute("INSERT INTO connectors VALUES(?,?,?,?,?)", (identifier, digest, owner_session, expires, label))
+
+    def revoke_connector(self, identifier):
+        with self.transaction() as db:
+            db.execute("DELETE FROM connectors WHERE id=?", (identifier,))
 
     def retire_grants(self):
         """HA boot/restore never revives a saved approval or enrollment."""

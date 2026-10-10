@@ -54,7 +54,7 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         loader.async_setup(self.hass)
         self.hass.config_entries = config_entries.ConfigEntries(self.hass, {})
         self.assertTrue(await bootstrap.async_load_base_functionality(self.hass))
-        self.hass.auth = await auth.auth_manager_from_config(self.hass, [], [])
+        self.hass.auth = await auth.auth_manager_from_config(self.hass, [{"type": "homeassistant"}], [])
         users = await self.hass.auth.async_get_users()
         if users:
             self.owner = next(user for user in users if user.name == "Synthetic owner")
@@ -64,10 +64,10 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
             self.owner = await self.hass.auth.async_create_user("Synthetic owner", group_ids=[GROUP_ID_ADMIN])
             self.remote_refresh = await self.hass.auth.async_create_refresh_token(self.owner, client_id="https://synthetic-mcp.invalid")
             self.owner_refresh = await self.hass.auth.async_create_refresh_token(self.owner, client_id=self.base)
-        self.bearer = self.hass.auth.async_create_access_token(self.remote_refresh)
+        self.native_remote_bearer = self.hass.auth.async_create_access_token(self.remote_refresh)
         self.owner_bearer = self.hass.auth.async_create_access_token(self.owner_refresh)
         config = {"http": {"server_host": "127.0.0.1", "server_port": self.port}, "automation": [], "script": {}, "input_boolean": {}, "lovelace": {"mode": "storage"},
-                  "hass_codex_admin": {"backend_url": self.base, "caller_user_ids": [self.owner.id], "caller_client_ids": ["https://synthetic-mcp.invalid"], "approver_client_ids": [self.base], "approval_panel": True}}
+                  "hass_codex_admin": {"backend_url": self.base, "approver_client_ids": [self.base], "approval_panel": True}}
         for domain in ("homeassistant", "persistent_notification", "http", "api", "websocket_api", "config", "automation", "script", "input_boolean", "lovelace", "hass_codex_admin"):
             self.assertTrue(await async_setup_component(self.hass, domain, config), domain)
         await self.hass.async_start()
@@ -75,10 +75,28 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         self.client = aiohttp.ClientSession(trust_env=False)
         self.addAsyncCleanup(self.client.close)
         self.counter = 0
+        identity = self.hass.data["hass_codex_admin"]["identity"]
+        connector_file = self.root / "fixture.connector"
+        if self.persist_root and connector_file.exists():
+            if getattr(self, "expect_restore", False):
+                from custom_components.hass_codex_admin.model import AdminError
+                with self.assertRaises(AdminError):
+                    identity.transport_credential(connector_file.read_text())
+                issued = await identity.issue(identity.approved_session(self.owner_refresh.id), "Fresh owner consent after restore", 1)
+                self.bearer = issued["connector_credential"]
+                connector_file.write_text(issued["id"])
+            else:
+                self.bearer = identity.transport_credential(connector_file.read_text())
+        else:
+            issued = await identity.issue(identity.approved_session(self.owner_refresh.id), "Synthetic connection", 1)
+            self.bearer = issued["connector_credential"]
+            if self.persist_root:
+                connector_file.write_text(issued["id"])
+                connector_file.chmod(0o600)
 
-    async def rpc(self, method, params=None, bearer=None, path="/api/mcp/hass_codex_admin"):
+    async def rpc(self, method, params=None, bearer=None, path=None):
         self.counter += 1
-        async with self.client.post(self.base+path, json={"jsonrpc": "2.0", "id": self.counter, "method": method, "params": params or {}},
+        async with self.client.post(getattr(self, "rpc_base", self.base)+(path or getattr(self, "rpc_path", "/api/hass_codex_admin/mcp")), json={"jsonrpc": "2.0", "id": self.counter, "method": method, "params": params or {}},
             headers={"Authorization": "Bearer "+(bearer or self.bearer), "Accept": "application/json"}) as response:
             self.assertEqual(response.status, 200)
             return await response.json()
@@ -108,6 +126,428 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["success"], result)
         return task
 
+    async def test_native_bearer_bypass_reproduction_and_connector_global_denial(self):
+        effects = []
+        async def effect(call):
+            effects.append(call.context.user_id)
+        self.hass.services.async_register("synthetic", "effect", effect)
+        # Red baseline: the former connector's ordinary admin bearer can bypass
+        # every task check. A read-only user also reaches non-entity services.
+        for token in (self.native_remote_bearer,):
+            async with self.client.post(self.base+"/api/services/synthetic/effect", json={}, headers={"Authorization": "Bearer "+token}) as response:
+                self.assertEqual(response.status, 200)
+        from homeassistant.auth.const import GROUP_ID_READ_ONLY
+        reader = await self.hass.auth.async_create_user("Synthetic reader", group_ids=[GROUP_ID_READ_ONLY])
+        reader_refresh = await self.hass.auth.async_create_refresh_token(reader, client_id=self.base)
+        async with self.client.post(self.base+"/api/services/synthetic/effect", json={}, headers={"Authorization": "Bearer "+self.hass.auth.async_create_access_token(reader_refresh)}) as response:
+            self.assertEqual(response.status, 200)
+        self.assertEqual(len(effects), 2)
+        for path in ("/api/services/synthetic/effect", "/api/services/automation/trigger", "/api/config/script/config/escaped", "/api/mcp", "/api/mcp/hass_codex_admin", "/api/mcp/assist", "/mcp_server/messages/forged"):
+            async with self.client.post(self.base+path, json={}, headers={"Authorization": "Bearer "+self.bearer}) as response:
+                self.assertEqual(response.status, 401, path)
+        async with self.client.ws_connect(self.base+"/api/websocket") as ws:
+            await ws.receive_json()
+            await ws.send_json({"type": "auth", "access_token": self.bearer})
+            self.assertEqual((await ws.receive_json())["type"], "auth_invalid")
+        self.assertEqual(len(effects), 2)
+        async with self.client.post(self.base+"/api/services/synthetic/effect", json={}, headers={"Authorization": "Bearer "+self.owner_bearer}) as response:
+            self.assertEqual(response.status, 200)
+        self.assertEqual(len(effects), 3)
+        for path in ("/api/hass_codex_admin/mcp?route=/api/services/synthetic/effect", "/api/hass_codex_admin/mcp/../mcp", "/api/hass_codex_admin/mcp/"):
+            async with self.client.post(self.base+path, json={}, headers={"Authorization": "Bearer "+self.bearer}, allow_redirects=False) as response:
+                self.assertIn(response.status, (400, 404, 405))
+        async with self.client.post(self.base+"/api/hass_codex_admin/mcp", json={}, headers={"Authorization": "Bearer "+self.owner_bearer}) as response:
+            self.assertEqual(response.status, 401)
+        self.assertEqual((await self.tool("admin_inspect", {"family": "system", "target": "core", "detail": "health"}))["version"], "2026.10.0")
+
+    async def test_owned_credential_issuance_revocation_and_debug_redaction(self):
+        import logging
+        ws_logger = logging.getLogger("homeassistant.components.websocket_api.http.connection")
+        old_level = ws_logger.level
+        ws_logger.setLevel(logging.DEBUG)
+        captured = []
+        class Capture(logging.Handler):
+            def emit(self, record):
+                captured.append(record.getMessage())
+        handler = Capture(); ws_logger.addHandler(handler)
+        self.addCleanup(ws_logger.removeHandler, handler)
+        self.addCleanup(ws_logger.setLevel, old_level)
+        async with self.client.ws_connect(self.base+"/api/websocket") as ws:
+            await ws.receive_json()
+            await ws.send_json({"type": "auth", "access_token": self.owner_bearer})
+            self.assertEqual((await ws.receive_json())["type"], "auth_ok")
+            await ws.send_json({"id": 1, "type": "hass_codex_admin/connection", "action": "issue", "label": "Owned synthetic connection"})
+            result = await ws.receive_json(); self.assertTrue(result["success"])
+            issued = result["result"]
+            self.assertIsNone(await self.tool("admin_inspect", {"family": "input_boolean", "target": "none"}, bearer=issued["connector_credential"]))
+            await ws.send_json({"id": 2, "type": "hass_codex_admin/connection", "action": "revoke", "connector_id": issued["id"]})
+            self.assertTrue((await ws.receive_json())["success"])
+        diagnostic = "\n".join(captured)
+        self.assertNotIn(self.owner_bearer, diagnostic)
+        self.assertNotIn(issued["connector_credential"], diagnostic)
+        private_db = (self.root/".storage/hass_codex_admin/tasks.sqlite").read_bytes()
+        self.assertNotIn(self.bearer.encode(), private_db)
+        self.assertNotIn(self.owner_bearer.encode(), private_db)
+        async with self.client.post(self.base+"/api/hass_codex_admin/mcp", json={}, headers={"Authorization": "Bearer "+issued["connector_credential"]}) as response:
+            self.assertEqual(response.status, 401)
+
+    async def native_ws(self, command, bearer=None):
+        async with self.client.ws_connect(self.base+"/api/websocket") as ws:
+            await ws.receive_json()
+            await ws.send_json({"type": "auth", "access_token": bearer or self.owner_bearer})
+            self.assertEqual((await ws.receive_json())["type"], "auth_ok")
+            await ws.send_json({"id": 1, **command})
+            return await ws.receive_json()
+
+    async def test_local_edit_after_intent_is_preserved_and_recovery_stays_useful(self):
+        engine = self.hass.data["hass_codex_admin"]["engine"]
+        operation = {"family": "script", "action": "create", "target": "conflict_window", "value": {"alias": "Remote plan", "sequence": [{"delay": "00:00:00"}]}}
+        task = await self.approved([operation])
+        original = engine.db
+        local = {**operation["value"], "alias": "Independent local edit"}
+        async def boundary(method, *args, **kwargs):
+            result = await original(method, *args, **kwargs)
+            if method == "claim":
+                async with self.client.post(self.base+"/api/config/script/config/conflict_window", json=local, headers={"Authorization": "Bearer "+self.owner_bearer}) as response:
+                    self.assertEqual(response.status, 200)
+            return result
+        engine.db = boundary
+        try:
+            self.assertEqual(await self.tool("admin_execute", {"task": task["id"], "plan_hash": task["hash"]}), {"error": "object_changed_requires_new_approval"})
+        finally:
+            engine.db = original
+        self.assertEqual(await self.tool("admin_inspect", {"family": "script", "target": operation["target"]}), local)
+        repair = await self.approved([{**operation, "action": "put", "value": {**local, "alias": "Explicit fresh repair"}}])
+        self.assertNotIn("error", await self.tool("admin_execute", {"task": repair["id"], "plan_hash": repair["hash"]}))
+        self.assertNotIn("error", await self.tool("admin_rollback", {"task": repair["id"], "plan_hash": repair["hash"]}))
+        self.assertEqual(await self.tool("admin_inspect", {"family": "script", "target": operation["target"]}), local)
+
+    async def test_native_helper_id_collision_after_final_check_remains_uncertain(self):
+        engine = self.hass.data["hass_codex_admin"]["engine"]
+        task = await self.approved([{ "family": "input_boolean", "action": "create", "target": "allocation_race", "value": {"name": "Allocation race"}}])
+        original = engine.backend.final_check
+        raced = False
+        async def boundary():
+            nonlocal raced
+            await original()
+            if not raced:
+                raced = True
+                local = await self.native_ws({"type": "input_boolean/create", "name": "Allocation race"})
+                self.assertTrue(local["success"], local)
+                self.assertEqual(local["result"]["id"], "allocation_race")
+        engine.backend.final_check = boundary
+        args = {"task": task["id"], "plan_hash": task["hash"]}
+        try:
+            self.assertEqual(await self.tool("admin_execute", args), {"error": "helper_allocated_unexpected_identity"})
+        finally:
+            engine.backend.final_check = original
+        self.assertEqual((await self.tool("admin_status", {"task": task["id"]}))["operations"][0]["status"], "uncertain")
+        self.assertIsNotNone(await self.tool("admin_inspect", {"family": "input_boolean", "target": "allocation_race"}))
+        self.assertIsNotNone(await self.tool("admin_inspect", {"family": "input_boolean", "target": "allocation_race_2"}))
+        self.assertEqual(await self.tool("admin_execute", args), {"error": "operation_consumed_or_uncertain"})
+        # Neither the unrelated local helper nor the uncertain allocation is
+        # automatically deleted or retried. A fresh explicit owner decision is
+        # required; this demonstrates the native allocation limitation.
+        fresh = await self.approved([{ "family": "script", "action": "create", "target": "after_collision", "value": {"sequence": [{"delay": "00:00:00"}]}}])
+        self.assertNotIn("error", await self.tool("admin_execute", {"task": fresh["id"], "plan_hash": fresh["hash"]}))
+
+    async def test_connection_crash_reconnect_and_revocation_have_actual_mcp_outcomes(self):
+        import sys, os
+        from unittest.mock import patch
+        from custom_components.hass_codex_tunnel_mcp.tunnel import TunnelManager, _read_health_url
+        from custom_components.hass_codex_tunnel_mcp.const import CONF_HA_MCP_BEARER_TOKEN
+        fixture = self.root / "tunnel-client"
+        fixture.write_text("#!"+sys.executable+"\nimport sys\nsys.path.insert(0, "+repr(str(REPO/"tests/staging"))+")\n"+(REPO/"tests/staging/admin_transport_fixture.py").read_text())
+        fixture.chmod(0o700)
+        calls = []
+        def provider(force):
+            calls.append(force); return fixture
+        identity = self.hass.data["hass_codex_admin"]["identity"]
+        connector_id = identity.caller(self.bearer).session
+        manager = TunnelManager(provider, self.root/"transport", retry_delays=(.03, .06), poll_interval=.05,
+            credential_provider=lambda data: identity.transport_credential(data["admin_connection_id"]))
+        self.addAsyncCleanup(manager.close)
+        data = {"tunnel_id": "synthetic-tunnel", "api_key": "synthetic-platform-key", "ha_mcp_url": self.base+"/api/hass_codex_admin/mcp", "admin_connection_id": connector_id, "auto_update_tunnel_client": False}
+        transport_state = self.root/"transport.state";transport_state.write_text("ready")
+        with patch.dict(os.environ, {"ADMIN_TRANSPORT_STATE_FILE": str(transport_state)}):
+            await manager.start(data)
+        self.assertTrue(await manager.wait_until_healthy(4))
+        self.rpc_base = _read_health_url(self.root/"transport/health.url");self.rpc_path = "/mcp"
+        self.assertEqual((await self.tool("admin_inspect", {"family": "system", "target": "core", "detail": "health"}))["version"], "2026.10.0")
+        await asyncio.gather(*(manager.start(data) for _ in range(5)))
+        self.assertEqual(calls, [False])
+        old = manager.process;old.kill()
+        for _ in range(100):
+            if manager.process is not old and manager.status.healthy:
+                break
+            await asyncio.sleep(.04)
+        self.assertIsNot(manager.process, old)
+        self.assertTrue(manager.status.healthy)
+        self.rpc_base = _read_health_url(self.root/"transport/health.url")
+        for turn in range(3):
+            self.assertIn("error", await self.tool("admin_propose", {"operations": [{"invalid": turn}]}))
+            task = await self.approved([{ "family": "script", "action": "create", "target": "transport_repair_"+str(turn), "value": {"sequence": [{"delay": "00:00:00"}]}}])
+            args = {"task": task["id"], "plan_hash": task["hash"]}
+            results = await asyncio.gather(*(self.tool("admin_execute", args) for _ in range(3)))
+            self.assertTrue(all("error" not in result for result in results), results)
+            self.assertNotIn("error", await self.tool("admin_rollback", args))
+        unchanged = manager.process
+        for mode, category in (("disconnected", "transport_not_ready"), ("provider-unavailable", "provider_unavailable")):
+            transport_state.write_text(mode)
+            for _ in range(60):
+                if manager.status.last_error == category:
+                    break
+                await asyncio.sleep(.03)
+            self.assertEqual(manager.status.last_error, category)
+            self.assertIs(manager.process, unchanged)
+            transport_state.write_text("ready")
+            self.assertTrue(await manager.wait_until_healthy(3))
+            self.assertNotIn("error", await self.tool("admin_inspect", {"family": "system", "target": "core", "detail": "health"}))
+        await self.hass.http.stop()
+        for _ in range(60):
+            if manager.status.last_error == "backend_unavailable":
+                break
+            await asyncio.sleep(.04)
+        self.assertEqual(manager.status.last_error, "backend_unavailable")
+        self.assertIs(manager.process, unchanged)
+        # Rebind the existing native app after an injected listener loss.
+        # Core normally reconstructs this server on restart; this fixture uses
+        # its supported setup/start methods without restarting the engine.
+        await self.hass.http.async_bind()
+        await self.hass.http.start()
+        self.assertTrue(await manager.wait_until_healthy(3))
+        self.assertNotIn("error", await self.tool("admin_inspect", {"family": "system", "target": "core", "detail": "health"}))
+        await identity.revoke(connector_id)
+        for _ in range(80):
+            if manager.status.state == "authentication_denied":
+                break
+            await asyncio.sleep(.04)
+        self.assertEqual(manager.status.state, "authentication_denied")
+        self.assertFalse(manager.status.healthy)
+        self.assertIsNotNone(manager.process.returncode)
+        self.assertEqual(calls, [False])
+        await manager.close()
+        with self.assertRaisesRegex(RuntimeError, "closed"):
+            await manager.start(data)
+
+    async def test_updater_failed_activation_rolls_back_and_late_stop_cannot_revive(self):
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import patch, AsyncMock
+        from custom_components.hass_codex_tunnel_mcp.tunnel import TunnelManager, _read_health_url
+        from custom_components.hass_codex_tunnel_mcp.updater import TunnelClientUpdater, UpdateCheckResult
+        from custom_components.hass_codex_tunnel_mcp.binary import TunnelClientAsset
+        good = self.root / "tunnel-client"
+        good.write_text("#!"+sys.executable+"\nimport sys\nsys.path.insert(0, "+repr(str(REPO/"tests/staging"))+")\n"+(REPO/"tests/staging/admin_transport_fixture.py").read_text())
+        good.chmod(0o700)
+        identity = self.hass.data["hass_codex_admin"]["identity"]
+        manager = TunnelManager(lambda force: good, self.root/"updater-run", poll_interval=.03,
+            credential_provider=lambda data: identity.transport_credential(data["admin_connection_id"]))
+        self.addAsyncCleanup(manager.close)
+        data = {"tunnel_id": "synthetic-tunnel", "api_key": "synthetic-platform-key", "ha_mcp_url": self.base+"/api/hass_codex_admin/mcp", "admin_connection_id": identity.caller(self.bearer).session}
+        entry = SimpleNamespace(entry_id="synthetic-update", data=data, options={})
+        updater = TunnelClientUpdater(self.hass, entry, self.root/"bin", lambda: None)
+        await updater.async_load()
+        asset = TunnelClientAsset("linux", "amd64", "fixture.zip", "a"*64, "v0.0.11")
+        candidate = UpdateCheckResult("v0.0.11", "v0.0.11", asset, None)
+        await manager.start(data)
+        self.assertTrue(await manager.wait_until_healthy(3))
+        # Inject only the OS spawn failure; actual ownership/epoch, rollback
+        # child and native MCP backend remain connected.
+        original_spawn = manager._spawn
+        async def spawn(command, env):
+            if command[0] == str(self.root/"absent-candidate"):
+                raise FileNotFoundError("synthetic_candidate_spawn_failure")
+            await original_spawn(command, env)
+        with patch.object(manager, "_spawn", spawn), patch.object(updater, "async_check_for_update", AsyncMock(return_value=candidate)), patch("custom_components.hass_codex_tunnel_mcp.updater.ensure_tunnel_client", AsyncMock(return_value=self.root/"absent-candidate")):
+            with self.assertRaises(FileNotFoundError):
+                await updater.async_update_tunnel_client(manager, data)
+        self.assertTrue(await manager.wait_until_healthy(3))
+        self.assertEqual(updater.state.active_version, "v0.0.10")
+        self.assertIn("v0.0.11", updater.state.failed_versions)
+        self.rpc_base = _read_health_url(self.root/"updater-run/health.url"); self.rpc_path = "/mcp"
+        self.assertNotIn("error", await self.tool("admin_inspect", {"family": "system", "target": "core", "detail": "health"}))
+        entered, release = asyncio.Event(), asyncio.Event()
+        async def delayed_install(*args, **kwargs):
+            entered.set(); await release.wait(); return good
+        with patch.object(updater, "async_check_for_update", AsyncMock(return_value=candidate)), patch("custom_components.hass_codex_tunnel_mcp.updater.ensure_tunnel_client", delayed_install):
+            updating = asyncio.create_task(updater.async_update_tunnel_client(manager, data))
+            await entered.wait()
+            await manager.stop()
+            release.set()
+            with self.assertRaisesRegex(Exception, "superseded"):
+                await updating
+        self.assertIsNone(manager.process)
+        self.assertEqual(manager.status.state, "stopped")
+
+    async def test_queued_update_and_rollback_cannot_reverse_later_stop(self):
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import patch, AsyncMock
+        from custom_components.hass_codex_tunnel_mcp.tunnel import TunnelManager
+        from custom_components.hass_codex_tunnel_mcp.updater import TunnelClientUpdater, UpdateCheckResult
+        from custom_components.hass_codex_tunnel_mcp.binary import TunnelClientAsset
+        good = self.root/"queued-client"
+        good.write_text("#!"+sys.executable+"\nimport sys\nsys.path.insert(0, "+repr(str(REPO/"tests/staging"))+")\n"+(REPO/"tests/staging/admin_transport_fixture.py").read_text());good.chmod(0o700)
+        identity = self.hass.data["hass_codex_admin"]["identity"]
+        data = {"tunnel_id": "synthetic-tunnel", "api_key": "synthetic-platform-key", "ha_mcp_url": self.base+"/api/hass_codex_admin/mcp", "admin_connection_id": identity.caller(self.bearer).session}
+        manager = TunnelManager(lambda force: good, self.root/"queued-run", poll_interval=.03,
+            credential_provider=lambda values: identity.transport_credential(values["admin_connection_id"]))
+        self.addAsyncCleanup(manager.close)
+        updater = TunnelClientUpdater(self.hass, SimpleNamespace(entry_id="queued-update",data=data,options={}), self.root/"bin", lambda: None)
+        await updater.async_load()
+        updater.state.previous_version = "v0.0.10"
+        candidate = UpdateCheckResult("v0.0.11", "v0.0.11", TunnelClientAsset("linux", "amd64", "fixture.zip", "a"*64, "v0.0.11"), None)
+        await manager.start(data)
+        self.assertTrue(await manager.wait_until_healthy(3))
+        with patch.object(updater, "async_check_for_update", AsyncMock(return_value=candidate)), patch("custom_components.hass_codex_tunnel_mcp.updater.ensure_tunnel_client", AsyncMock(return_value=good)):
+            await updater._lock.acquire()
+            updating = asyncio.create_task(updater.async_update_tunnel_client(manager,data))
+            rolling = asyncio.create_task(updater.async_rollback(manager,data))
+            await asyncio.sleep(.02)
+            await manager.stop()
+            updater._lock.release()
+            result = await asyncio.gather(updating,rolling,return_exceptions=True)
+        self.assertIsInstance(result[0], Exception)
+        self.assertIn("superseded", str(result[0]))
+        self.assertFalse(result[1])
+        self.assertIsNone(manager.process)
+        self.assertEqual(manager.status.state,"stopped")
+
+    async def test_wrapper_setup_failure_core_stop_and_native_nonadmin_denial(self):
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import patch, AsyncMock
+        from homeassistant.auth.const import GROUP_ID_READ_ONLY
+        import custom_components.hass_codex_tunnel_mcp as integration
+        from custom_components.hass_codex_tunnel_mcp.tunnel import TunnelManager
+        good = self.root / "lifecycle-client"
+        good.write_text("#!"+sys.executable+"\nimport sys\nsys.path.insert(0, "+repr(str(REPO/"tests/staging"))+")\n"+(REPO/"tests/staging/admin_transport_fixture.py").read_text())
+        good.chmod(0o700)
+        identity = self.hass.data["hass_codex_admin"]["identity"]
+        data = {"tunnel_id": "synthetic-tunnel", "api_key": "synthetic-platform-key", "ha_mcp_url": self.base+"/api/hass_codex_admin/mcp", "admin_connection_id": identity.caller(self.bearer).session, "auto_update_tunnel_client": False}
+        callbacks = []
+        entry = SimpleNamespace(entry_id="synthetic-lifecycle", data=data, options={}, async_on_unload=callbacks.append, add_update_listener=lambda listener: lambda: None)
+        managers = []
+        def manager_factory(*args, **kwargs):
+            manager = TunnelManager(*args, **kwargs, poll_interval=.03)
+            managers.append(manager); return manager
+        with patch("custom_components.hass_codex_tunnel_mcp.updater.ensure_tunnel_client", AsyncMock(return_value=good)), patch.object(integration, "TunnelManager", manager_factory):
+            with patch.object(self.hass.config_entries, "async_forward_entry_setups", AsyncMock(side_effect=RuntimeError("synthetic_platform_failure"))):
+                with self.assertRaisesRegex(RuntimeError, "platform_failure"):
+                    await integration.async_setup_entry(self.hass, entry)
+            self.assertIsNone(managers[0].process)
+            self.assertNotIn(entry.entry_id, self.hass.data[integration.DOMAIN])
+            with patch.object(self.hass.config_entries, "async_forward_entry_setups", AsyncMock()):
+                self.assertTrue(await integration.async_setup_entry(self.hass, entry))
+        manager = managers[-1]
+        self.addAsyncCleanup(manager.close)
+        self.assertTrue(await manager.wait_until_healthy(3))
+        child = manager.process
+        reader = await self.hass.auth.async_create_user("Synthetic local reader", group_ids=[GROUP_ID_READ_ONLY])
+        refresh = await self.hass.auth.async_create_refresh_token(reader, client_id=self.base)
+        for service in ("restart_tunnel", "redownload_tunnel_client", "check_tunnel_client_update", "update_tunnel_client", "rollback_tunnel_client"):
+            async with self.client.post(self.base+"/api/services/"+integration.DOMAIN+"/"+service, json={}, headers={"Authorization": "Bearer "+self.hass.auth.async_create_access_token(refresh)}) as response:
+                self.assertEqual(response.status, 401, service)
+        self.assertIs(manager.process, child)
+        await self.hass.async_stop()
+        self.assertIsNotNone(child.returncode)
+        self.assertIsNone(manager.process)
+        with self.assertRaisesRegex(RuntimeError, "closed"):
+            await manager.start(data)
+
+    async def test_native_owner_oauth_pkce_exchange_refresh_revoke_and_connector_separation(self):
+        import base64, hashlib, secrets
+        provider = self.hass.auth.get_auth_provider("homeassistant", None)
+        password = secrets.token_urlsafe(24)
+        await provider.async_add_auth("synthetic_owner", password)
+        credential = await provider.async_get_or_create_credentials({"username": "synthetic_owner"})
+        await self.hass.auth.async_link_user(self.owner, credential)
+        async with self.client.get(self.base+"/.well-known/oauth-authorization-server") as response:
+            self.assertEqual(response.status, 200)
+            metadata = await response.json()
+            self.assertEqual(metadata["token_endpoint"], self.base+"/auth/token")
+            self.assertIn("S256", metadata["code_challenge_methods_supported"])
+        verifier = secrets.token_urlsafe(48)
+        challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
+        async def login():
+            async with self.client.post(self.base+"/auth/login_flow", json={"client_id": self.base, "handler": ["homeassistant", None], "redirect_uri": self.base+"/auth/callback", "code_challenge": challenge, "code_challenge_method": "S256"}) as response:
+                self.assertEqual(response.status, 200)
+                flow = await response.json()
+            async with self.client.post(self.base+"/auth/login_flow/"+flow["flow_id"], json={"client_id": self.base, "username": "synthetic_owner", "password": password}) as response:
+                self.assertEqual(response.status, 200)
+                result = await response.json()
+                self.assertEqual(result["type"], "create_entry", result)
+                return result["result"]
+        code = await login()
+        async with self.client.post(self.base+"/auth/token", data={"grant_type": "authorization_code", "client_id": self.base, "code": code, "code_verifier": "wrong"}) as response:
+            self.assertEqual(response.status, 400)
+        code = await login()
+        exchange = {"grant_type": "authorization_code", "client_id": self.base, "code": code, "code_verifier": verifier}
+        async with self.client.post(self.base+"/auth/token", data=exchange) as response:
+            self.assertEqual(response.status, 200)
+            tokens = await response.json()
+        async with self.client.post(self.base+"/auth/token", data=exchange) as response:
+            self.assertEqual(response.status, 400)
+        refresh = {"grant_type": "refresh_token", "client_id": self.base, "refresh_token": tokens["refresh_token"]}
+        async with self.client.post(self.base+"/auth/token", data={**refresh, "client_id": self.base+"/wrong-client"}) as response:
+            self.assertEqual(response.status, 400)
+        async with self.client.post(self.base+"/auth/token", data=refresh) as response:
+            self.assertEqual(response.status, 200)
+            refreshed = await response.json()
+        async with self.client.get(self.base+"/api/config", headers={"Authorization": "Bearer "+refreshed["access_token"]}) as response:
+            self.assertEqual(response.status, 200)
+        async with self.client.post(self.base+"/api/hass_codex_admin/mcp", json={}, headers={"Authorization": "Bearer "+refreshed["access_token"]}) as response:
+            self.assertEqual(response.status, 401)
+        async with self.client.post(self.base+"/auth/token", data={"action": "revoke", "token": tokens["refresh_token"]}) as response:
+            self.assertEqual(response.status, 200)
+        async with self.client.post(self.base+"/auth/token", data=refresh) as response:
+            self.assertEqual(response.status, 400)
+        async with self.client.get(self.base+"/api/config", headers={"Authorization": "Bearer "+refreshed["access_token"]}) as response:
+            self.assertEqual(response.status, 401)
+        self.assertNotIn("error", await self.tool("admin_inspect", {"family": "system", "target": "core", "detail": "health"}))
+
+    async def test_native_cover_media_feedback_and_group_dependencies(self):
+        from homeassistant.components.cover import CoverEntity, CoverEntityFeature
+        from homeassistant.components.media_player import MediaPlayerEntity, MediaPlayerEntityFeature, MediaPlayerState
+        self.assertTrue(await async_setup_component(self.hass, "cover", {}))
+        self.assertTrue(await async_setup_component(self.hass, "media_player", {}))
+        class SyntheticCover(CoverEntity):
+            _attr_name = "Synthetic cover"
+            _attr_unique_id = "owned-cover"
+            _attr_should_poll = False
+            _attr_supported_features = CoverEntityFeature.OPEN | CoverEntityFeature.CLOSE
+            _attr_is_closed = True
+            async def async_open_cover(device, **kwargs):
+                device._attr_is_closed = False;device.async_write_ha_state()
+            async def async_close_cover(device, **kwargs):
+                device._attr_is_closed = True;device.async_write_ha_state()
+        class SyntheticMedia(MediaPlayerEntity):
+            _attr_name = "Synthetic media"
+            _attr_unique_id = "owned-media"
+            _attr_should_poll = False
+            _attr_supported_features = MediaPlayerEntityFeature.PLAY | MediaPlayerEntityFeature.PAUSE
+            _attr_state = MediaPlayerState.PAUSED
+            async def async_media_play(device):
+                device._attr_state = MediaPlayerState.PLAYING;device.async_write_ha_state()
+            async def async_media_pause(device):
+                device._attr_state = MediaPlayerState.PAUSED;device.async_write_ha_state()
+        cover, media = SyntheticCover(), SyntheticMedia()
+        await self.hass.data["cover"].async_add_entities([cover])
+        await self.hass.data["media_player"].async_add_entities([media])
+        for commands in (("cover.open_cover", "media_player.media_play"), ("cover.close_cover", "media_player.media_pause")):
+            task = await self.approved([{ "family": "service", "action": "call", "target": command, "value": {"entity_ids": [device.entity_id], "data": {}}} for command, device in zip(commands, (cover, media))])
+            result = await self.tool("admin_execute", {"task": task["id"], "plan_hash": task["hash"]})
+            self.assertNotIn("error", result, result)
+            self.assertEqual([item["status"] for item in result["operations"]], ["applied", "applied"])
+        helper = await self.approved([{ "family": "input_boolean", "action": "create", "target": "group_member", "value": {"name": "Group member"}}])
+        args = {"task": helper["id"], "plan_hash": helper["hash"]}
+        self.assertNotIn("error", await self.tool("admin_execute", args))
+        self.assertTrue(await async_setup_component(self.hass, "group", {"group": {"synthetic_dependents": {"entities": ["input_boolean.group_member"]}}}))
+        await self.hass.async_block_till_done()
+        self.assertEqual(await self.tool("admin_rollback", args), {"error": "referenced_object_requires_explicit_repair"})
+        self.assertIsNotNone(await self.tool("admin_inspect", {"family": "input_boolean", "target": "group_member"}))
+
     async def test_connected_native_script_create_readback_replay_and_rollback(self):
         initialized = await self.rpc("initialize", {"protocolVersion": "2025-03-26", "capabilities": {}, "clientInfo": {"name": "isolated-test", "version": "1"}})
         self.assertEqual(initialized["result"]["protocolVersion"], "2025-03-26")
@@ -134,7 +574,7 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         result = await self.tool("admin_execute", {"task": task["id"], "plan_hash": task["hash"]})
         self.assertNotIn("error", result, result)
         await self.hass.async_block_till_done()
-        async with self.client.post(self.base+"/api/services/automation/trigger", json={"entity_id": "automation.synthetic_fault"}, headers={"Authorization": "Bearer "+self.bearer}) as response:
+        async with self.client.post(self.base+"/api/services/automation/trigger", json={"entity_id": "automation.synthetic_fault"}, headers={"Authorization": "Bearer "+self.owner_bearer}) as response:
             self.assertEqual(response.status, 200)
         traces = await self.tool("admin_inspect", {"family": "automation", "target": "synthetic_fault", "detail": "traces"})
         self.assertTrue(traces, traces)
@@ -216,9 +656,10 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         for op in malformed:
             self.assertIn("error", await self.tool("admin_propose", {"operations": [op]}))
         self.assertTrue((await self.rpc("tools/call", {"name": "call_service", "arguments": {"domain": "script", "service": "turn_on"}}))["result"]["isError"])
-        refused = await self.approval("enroll", bearer=self.bearer)
-        self.assertFalse(refused["success"])
-        self.assertEqual(refused["error"]["code"], "owner_frontend_session_required")
+        async with self.client.ws_connect(self.base+"/api/websocket") as ws:
+            await ws.receive_json()
+            await ws.send_json({"type": "auth", "access_token": self.bearer})
+            self.assertEqual((await ws.receive_json())["type"], "auth_invalid")
         healthy = await self.tool("admin_inspect", {"family": "system", "target": "core", "detail": "health"})
         self.assertEqual(healthy["version"], "2026.10.0")
 
@@ -238,25 +679,23 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.tool("admin_execute", {"task": expiring["id"], "plan_hash": expiring["hash"]}), {"error": "approval_required_or_expired"})
         logout = await self.approved([{**op, "target": "owner_logout"}])
         self.hass.auth.async_remove_refresh_token(self.owner_refresh)
-        self.assertEqual(await self.tool("admin_execute", {"task": logout["id"], "plan_hash": logout["hash"]}), {"error": "owner_frontend_session_required"})
-        self.assertIsNone(await self.tool("admin_inspect", {"family": "script", "target": "owner_logout"}))
-
-    async def test_native_token_expiry_refresh_reconnect_and_wrong_session(self):
-        from datetime import timedelta
-        short = await self.hass.auth.async_create_refresh_token(self.owner, client_id="https://synthetic-mcp.invalid", access_token_expiration=timedelta(seconds=-60))
-        expired = self.hass.auth.async_create_access_token(short)
-        async with self.client.post(self.base+"/api/mcp/hass_codex_admin", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, headers={"Authorization": "Bearer "+expired, "Accept": "application/json"}) as response:
+        async with self.client.post(self.base+"/api/hass_codex_admin/mcp", json={}, headers={"Authorization": "Bearer "+self.bearer}) as response:
             self.assertEqual(response.status, 401)
-        # Same native refresh identity retains task binding across access refresh.
-        op = {"family": "script", "action": "create", "target": "refresh_test", "value": {"sequence": [{"delay": "00:00:00"}]}}
-        task = await self.approved([op])
-        self.bearer = self.hass.auth.async_create_access_token(self.remote_refresh)
-        self.assertNotIn("error", await self.tool("admin_execute", {"task": task["id"], "plan_hash": task["hash"]}))
-        different = await self.hass.auth.async_create_refresh_token(self.owner, client_id="https://synthetic-mcp.invalid")
-        token = self.hass.auth.async_create_access_token(different)
-        self.assertEqual(await self.tool("admin_status", {"task": task["id"]}, bearer=token), {"error": "wrong_caller"})
-        self.hass.auth.async_remove_refresh_token(self.remote_refresh)
-        async with self.client.post(self.base+"/api/mcp/hass_codex_admin", json={}, headers={"Authorization": "Bearer "+self.bearer}) as response:
+        self.assertFalse((self.root / "scripts.yaml").read_text().find("owner_logout:") >= 0)
+
+    async def test_connector_expiry_revocation_and_wrong_connection(self):
+        identity = self.hass.data["hass_codex_admin"]["identity"]
+        task = await self.approved([{ "family": "script", "action": "create", "target": "refresh_test", "value": {"sequence": [{"delay": "00:00:00"}]}}])
+        other = await identity.issue(identity.approved_session(self.owner_refresh.id), "Other connection", 1)
+        self.assertEqual(await self.tool("admin_status", {"task": task["id"]}, bearer=other["connector_credential"]), {"error": "wrong_caller"})
+        original = identity.caller(self.bearer)
+        await identity.revoke(original.session)
+        async with self.client.post(self.base+"/api/hass_codex_admin/mcp", json={}, headers={"Authorization": "Bearer "+self.bearer}) as response:
+            self.assertEqual(response.status, 401)
+        self.bearer = other["connector_credential"]
+        self.assertEqual((await self.tool("admin_inspect", {"family": "system", "target": "core", "detail": "health"}))["version"], "2026.10.0")
+        next(iter(identity.connectors.values()))["expires"] = 0
+        async with self.client.post(self.base+"/api/hass_codex_admin/mcp", json={}, headers={"Authorization": "Bearer "+self.bearer}) as response:
             self.assertEqual(response.status, 401)
 
     async def test_delete_checks_dashboard_references_and_preserves_object(self):
@@ -282,20 +721,16 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         # boundary. The mutation still goes through real HA HTTP/native storage.
         from custom_components.hass_codex_admin.model import AdminError
         engine = self.hass.data["hass_codex_admin"]["engine"]
-        original = engine.backend.snapshot
+        original = engine.backend.after
         op = {"family": "script", "action": "create", "target": "uncertain_write", "value": {"sequence": [{"delay": "00:00:00"}]}}
         task = await self.approved([op])
-        calls = 0
         async def lost_readback(actor, operation):
-            nonlocal calls
-            calls += 1
-            if calls == 2:
-                raise AdminError("backend_unavailable_or_timeout")
-            return await original(actor, operation)
-        engine.backend.snapshot = lost_readback
+            await original(actor, operation)
+            raise AdminError("backend_unavailable_or_timeout")
+        engine.backend.after = lost_readback
         args = {"task": task["id"], "plan_hash": task["hash"]}
         self.assertEqual(await self.tool("admin_execute", args), {"error": "backend_unavailable_or_timeout"})
-        engine.backend.snapshot = original
+        engine.backend.after = original
         status = await self.tool("admin_status", {"task": task["id"]})
         self.assertEqual(status["operations"][0]["status"], "uncertain")
         self.assertEqual(await self.tool("admin_execute", args), {"error": "operation_consumed_or_uncertain"})
@@ -666,7 +1101,7 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         site = web.TCPSite(runner, "127.0.0.1", 0);await site.start()
         port = site._server.sockets[0].getsockname()[1]
         async with create_session() as session:
-            backend = HABackend(f"http://127.0.0.1:{port}", session)
+            backend = HABackend(f"http://127.0.0.1:{port}", session, credential=lambda actor: actor.bearer)
             actor = Actor("fixture", "fixture", "synthetic-boundary-bearer")
             self.assertEqual(await backend.rest(actor, "GET", "/chunks"), {"value": "complete"})
             for path, code in (("/large", "backend_reply_too_large"), ("/malformed", "invalid_json")):
@@ -700,7 +1135,7 @@ class NativeAdministrator(unittest.IsolatedAsyncioTestCase):
         site = web.TCPSite(source, "127.0.0.1", 0);await site.start()
         source_port = site._server.sockets[0].getsockname()[1]
         async with create_session() as session:
-            backend = HABackend(f"http://127.0.0.1:{source_port}", session)
+            backend = HABackend(f"http://127.0.0.1:{source_port}", session, credential=lambda actor: actor.bearer)
             with self.assertRaises(AdminError) as error:
                 await backend.ws(Actor("fixture", "fixture", "synthetic-boundary-bearer"), {"type": "input_boolean/list"})
             self.assertEqual(error.exception.code, "backend_redirect_forbidden")
@@ -714,5 +1149,26 @@ class WholeProcessRestart(unittest.TestCase):
             environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": str(REPO)}
             for stage in ("create", "resume"):
                 result = subprocess.run([sys.executable, "-B", str(REPO/"tests/staging/admin_process_fixture.py"), root, stage], env=environment, capture_output=True, text=True, timeout=35)
+                self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+                self.assertIn("NATIVE_PROCESS_"+stage.upper()+"=PASS", result.stdout)
+
+    def test_abrupt_core_death_intent_mutation_and_buffered_helper_save(self):
+        import os, subprocess, sys
+        for boundary in ("crash-before-intent", "crash-after-intent", "crash-after-mutation", "crash-helper-receipt"):
+            with self.subTest(boundary=boundary), tempfile.TemporaryDirectory(prefix="ha-admin-death-") as root:
+                environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": str(REPO)}
+                for stage, code in (("seed", 0), (boundary, 73), ("recover-crash", 0)):
+                    result = subprocess.run([sys.executable, "-B", str(REPO/"tests/staging/admin_process_fixture.py"), root, stage], env=environment, capture_output=True, text=True, timeout=35)
+                    self.assertEqual(result.returncode, code, result.stdout+result.stderr)
+                    if code == 0:
+                        self.assertIn("NATIVE_PROCESS_"+stage.upper()+"=PASS", result.stdout)
+
+    def test_supported_core_backup_restore_rotates_old_credentials_and_retires_grants(self):
+        import os, subprocess, sys
+        with tempfile.TemporaryDirectory(prefix="ha-admin-backup-") as temporary:
+            root = Path(temporary)/"config";root.mkdir()
+            environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": str(REPO)}
+            for stage in ("create", "backup-create", "backup-mutate", "backup-resume"):
+                result = subprocess.run([sys.executable, "-B", str(REPO/"tests/staging/admin_process_fixture.py"), str(root), stage], env=environment, capture_output=True, text=True, timeout=35)
                 self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
                 self.assertIn("NATIVE_PROCESS_"+stage.upper()+"=PASS", result.stdout)

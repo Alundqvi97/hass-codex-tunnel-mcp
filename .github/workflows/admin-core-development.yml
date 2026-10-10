@@ -4,14 +4,20 @@ on:
     branches: [security/ha-mcp-phase2d-candidates]
     paths:
       - custom_components/hass_codex_admin/**
+      - custom_components/hass_codex_tunnel_mcp/**
       - tests/staging/*admin*.py
+      - tests/staging/admin_browser_fixture.cjs
+      - scripts/development/**
       - requirements/admin-test.*
       - .github/workflows/admin-core-development.yml
   pull_request:
     branches: [security/tunnel-auth-hardening]
     paths:
       - custom_components/hass_codex_admin/**
+      - custom_components/hass_codex_tunnel_mcp/**
       - tests/staging/*admin*.py
+      - tests/staging/admin_browser_fixture.cjs
+      - scripts/development/**
       - requirements/admin-test.*
       - .github/workflows/admin-core-development.yml
 permissions: {contents: read}
@@ -35,7 +41,9 @@ jobs:
           PYTHONPYCACHEPREFIX: '${{ runner.temp }}/admin-pycache'
         run: |
           python -B -m unittest discover -s tests/staging -p 'test_admin_product.py' -v
-          python -B -m py_compile custom_components/hass_codex_admin/*.py tests/staging/*admin*.py
+          python -B -m py_compile custom_components/hass_codex_admin/*.py custom_components/hass_codex_tunnel_mcp/*.py tests/staging/*admin*.py
           node --check custom_components/hass_codex_admin/panel.js
+          node --check tests/staging/admin_browser_fixture.cjs
+          bash -n scripts/development/install.sh
           git diff --check
           git diff --exit-code

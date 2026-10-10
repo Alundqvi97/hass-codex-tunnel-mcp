@@ -23,9 +23,29 @@ def register_approval_commands(hass, engine, identity):
                 if action == "approve" and message.get("confirm_effects") is not True:
                     raise AdminError("explicit_effect_review_required")
                 actor = identity.approver(connection)
+                # Current native owner session validation replaces boot-time
+                # reenrollment. It never supplies the explicit approval itself.
+                await engine.db("enroll", actor)
                 await engine.db("decide", message.get("task", ""), actor, message.get("plan_hash", ""), "approved" if action == "approve" else "revoked")
                 value = {"decision": action}
             connection.send_result(message["id"], value)
         except AdminError as exc:
             connection.send_error(message["id"], exc.code, exc.code)
     websocket_api.async_register_command(hass, approval)
+
+    @websocket_api.websocket_command({vol.Required("type"): "hass_codex_admin/connection", vol.Required("action"): vol.In(["issue", "list", "revoke"]), vol.Optional("label", default="ChatGPT connection"): vol.All(str, vol.Length(min=1, max=80)), vol.Optional("days", default=365): vol.All(int, vol.Range(min=1, max=365)), vol.Optional("connector_id"): str})
+    @websocket_api.async_response
+    async def connection_command(hass, connection, message):
+        try:
+            actor = identity.approver(connection)
+            if message["action"] == "issue":
+                value = await identity.issue(actor, message["label"], message["days"])
+            elif message["action"] == "revoke":
+                await identity.revoke(message.get("connector_id", ""))
+                value = {"revoked": True}
+            else:
+                value = [{k:r[k] for k in ("id", "label", "expires")} for r in identity.connectors.values()]
+            connection.send_result(message["id"], value)
+        except AdminError as exc:
+            connection.send_error(message["id"], exc.code, exc.code)
+    websocket_api.async_register_command(hass, connection_command)

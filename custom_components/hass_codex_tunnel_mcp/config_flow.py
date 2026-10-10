@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-import voluptuous as vol
+try:
+    import probatio as vol  # Core 2026.10
+except ImportError:
+    import voluptuous as vol  # Retained older compatibility environment
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_API_KEY
@@ -20,6 +23,7 @@ from .const import (
     CONF_CONTROL_PLANE_BASE_URL,
     CONF_CONTROL_PLANE_PATH,
     CONF_HA_MCP_BEARER_TOKEN,
+    CONF_ADMIN_CONNECTION_ID,
     CONF_HA_MCP_URL,
     CONF_TUNNEL_ID,
     DEFAULT_AUTO_UPDATE_TUNNEL_CLIENT,
@@ -43,6 +47,7 @@ def build_user_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
                 CONF_API_KEY, default=defaults.get(CONF_API_KEY, "")
             ): PASSWORD_SELECTOR,
             vol.Required(CONF_HA_MCP_URL, default=defaults.get(CONF_HA_MCP_URL, "")): str,
+            vol.Optional(CONF_ADMIN_CONNECTION_ID, default=defaults.get(CONF_ADMIN_CONNECTION_ID, "")): str,
             vol.Optional(
                 CONF_HA_MCP_BEARER_TOKEN,
                 default=defaults.get(CONF_HA_MCP_BEARER_TOKEN, ""),

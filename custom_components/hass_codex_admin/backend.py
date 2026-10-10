@@ -42,7 +42,7 @@ class HABackend:
             raise AdminError("dispatch_grant_required")
         await check()
 
-    def __init__(self, base_url, session, *, timeout=8):
+    def __init__(self, base_url, session, *, timeout=8, credential=None):
         parsed = urlsplit(base_url)
         try:
             loopback = ipaddress.ip_address(parsed.hostname).is_loopback
@@ -54,6 +54,12 @@ class HABackend:
         if session.trust_env:
             raise AdminError("backend_environment_proxies_forbidden")
         self.session, self.timeout = session, timeout
+        self.credential = credential
+
+    def bearer(self, actor):
+        if self.credential is None:
+            raise AdminError("backend_credential_custody_required")
+        return self.credential(actor)
 
     async def rest(self, actor, method, path, data=None, *, missing=False, text=False):
         # One bounded reconnect for safe reads. Mutations always get one attempt.
@@ -72,7 +78,7 @@ class HABackend:
                 if method != "GET":
                     await self.final_check()
                 async with self.session.request(method, self.base+path, json=data,
-                    headers={"Authorization": "Bearer "+actor.bearer}, allow_redirects=False) as response:
+                    headers={"Authorization": "Bearer "+self.bearer(actor)}, allow_redirects=False) as response:
                     if missing and response.status == 404:
                         return None
                     if response.status in (401, 403):
@@ -97,7 +103,7 @@ class HABackend:
                     first = await ws.receive_json()
                     if not isinstance(first, dict) or first.get("type") != "auth_required":
                         raise AdminError("backend_protocol")
-                    await ws.send_json({"type": "auth", "access_token": actor.bearer})
+                    await ws.send_json({"type": "auth", "access_token": self.bearer(actor)})
                     authentication = await ws.receive_json()
                     if not isinstance(authentication, dict) or authentication.get("type") != "auth_ok":
                         raise AdminError("backend_authentication_or_permission")
@@ -296,6 +302,9 @@ class HABackend:
         for state in states:
             entity = state["entity_id"]
             domain, name = entity.split(".", 1)
+            members = state.get("attributes", {}).get("entity_id", [])
+            if isinstance(members, list) and family+"."+target in members:
+                found.append(entity)
             if domain not in {"automation", "script"}:
                 continue
             key = state.get("attributes", {}).get("id", name)

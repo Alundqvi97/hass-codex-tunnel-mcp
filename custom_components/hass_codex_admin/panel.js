@@ -13,9 +13,21 @@ class AdministratorPanel extends HTMLElement {
   render() {
     this.replaceChildren(); this.style.cssText = 'display:block;padding:24px;max-width:1000px;overflow:auto';
     this.append(this.element('h2', 'Administrator task approvals'));
-    this.append(this.element('p', 'Use your local HA owner login. Enroll this approval session once. Review exact definitions, indirect effects, expiry and rollback; assistant text is not authority.'));
+    this.append(this.element('p', 'Use your local HA owner login. Review exact definitions, indirect effects, expiry and rollback; assistant text is not authority. Existing native sessions work after restart; saved approvals do not.'));
     this.message = this.element('p'); this.append(this.message);
-    this.append(this.button('Enroll this owner session', async () => { await this.call('enroll'); this.message.textContent = 'Owner session enrolled. This does not approve any task.'; }));
+    this.append(this.button('Issue a connection credential', async () => {
+      const value = await this._hass.callWS({type: 'hass_codex_admin/connection', action: 'issue'});
+      this.message.textContent = `Connection ${value.id}. Save this credential privately now; it will not be displayed again: ${value.connector_credential}. Endpoint ${value.path}. It does not approve tasks.`;
+    }));
+    this.append(this.button('Manage connections', async () => {
+      const values = await this._hass.callWS({type: 'hass_codex_admin/connection', action: 'list'});
+      this.tasks.replaceChildren(); this.message.textContent = 'Revoking a connection prevents new requests and final dispatch. Configure transport only under separate staging authorization.';
+      for (const value of values) {
+        const card = this.element('section', `${value.label} — ${value.id} — expires ${new Date(value.expires * 1000).toLocaleString()}`);
+        card.append(this.button('Revoke this connection', async () => { await this._hass.callWS({type: 'hass_codex_admin/connection', action: 'revoke', connector_id: value.id}); card.remove(); }));
+        this.tasks.append(card);
+      }
+    }));
     this.append(this.button('Refresh tasks', () => this.refresh()));
     this.tasks = this.element('div'); this.append(this.tasks);
   }

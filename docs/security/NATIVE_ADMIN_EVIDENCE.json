@@ -1,0 +1,147 @@
+{
+  "schema": 1,
+  "status": "CANDIDATE INCOMPLETE",
+  "repository": "Alundqvi97/hass-codex-tunnel-mcp",
+  "branch": "security/ha-mcp-phase2d-candidates",
+  "draft_pr": 2,
+  "baseline": {
+    "reviewed_source": "14fca17f54f364019b6bfa9074d1e016ccb6f92b",
+    "documentation_delivery": "7603213f386d802c9fd225dde015c10026d8aebd",
+    "owner_amendment": "b2dc4eb05f5bda4ec9b32d443a1abba505543a2b",
+    "initial_tree": "clean",
+    "source_to_delivery": "IMPLEMENTATION_PLAN.md receipt only (8 lines)",
+    "pr_verified": "open/draft/unmerged"
+  },
+  "source_revision": "The immutable source commit is recorded in IMPLEMENTATION_PLAN.md by the following documentation receipt; this checksum manifest binds the exact tested files.",
+  "target": {
+    "homeassistant": "2026.10.0",
+    "upstream_commit": "6a811d3359c7b2076dc9e1cf900843a129c044af",
+    "python": "3.14.2",
+    "mcp": "1.28.1",
+    "development_locked_packages": 124,
+    "official_tunnel_client": "v0.0.10",
+    "tunnel_tag_commit": "ab3b64ba1818d67ae625fb91c9b8ef850759579a",
+    "retained_phase2l_upstream": "fc54437a804858732e4bc927add98e202d879a09",
+    "browser_client": "Playwright1.62.1 optional separate npm integrity lock"
+  },
+  "baseline_reproduced": {
+    "native_passed": 30,
+    "phase2l_passed": 489,
+    "broader_passed": 626,
+    "broader_skipped": 1,
+    "skip": "Optional legacy HA selector module unavailable in the separate security venv"
+  },
+  "final_validation": {
+    "native": {
+      "command": "python -B -m unittest discover -s tests/staging -p 'test_admin_product.py' -v",
+      "passed": 42,
+      "failed": 0,
+      "skipped": 0,
+      "boundaries": "Actual Core/native HTTP/WebSocket/MCP/auth/entities/SQLite, task-owned processes and native backup/restore; local transport fixture substitutes official control plane",
+      "seconds": 110.188,
+      "representative_three_operation_task": {
+        "approvals": 1,
+        "execute_ms": 59.57,
+        "rollback_ms": 87.35,
+        "scope": "Single local synthetic run; no household latency guarantee"
+      }
+    },
+    "phase2l": {
+      "command": "python3 -B -m unittest discover -s tests/offline -p 'test_phase2l_*.py' -v",
+      "passed": 489,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 0.706
+    },
+    "broader": {
+      "command": "python -B -m pytest -q -rs -p no:cacheprovider tests --ignore=tests/staging (loopback-only temporary pytest guard)",
+      "passed": 633,
+      "failed": 0,
+      "skipped": 1,
+      "subtests": 296,
+      "skip": "Optional old HA selector dependency absent; native schema/lifecycle exercised in Core venv",
+      "seconds": 6.74
+    },
+    "compilation": "Python application/security/test compilation; both component paths and native fixtures; JS panel/browser fixture syntax; installer and historical VM runner parsed only; git diff --check and unchanged validation checkout snapshots passed"
+  },
+  "fresh_setup": {
+    "command": "ADMIN_DEV_STATE=<owned external state> ADMIN_NATIVE_PYTHON=<supplied Python3.14.2> bash scripts/development/install.sh --setup; --verify after final queued-updater correction",
+    "checkout": "Owned fresh clone of verified baseline plus exact candidate source/test/setup bytes",
+    "dependency_integrity": "New empty venvs, 124 existing hash-locked native packages, trusted TLS; separate existing pytest>=8,<10 range resolved pytest9.1.1; uv pip check passed",
+    "state": "External checkout caches/temp/fixtures/credentials; before/after worktree/index/status identical; no unpublished environment file dependency",
+    "environment_published": false
+  },
+  "proof_cases": [
+    "Old native admin and native read-only tokens actually reach nonentity service; distinct connector cannot use native REST/WS/base/alternate MCP/Assist/SSE/config routes; independent local owner can.",
+    "Owner WS issue/list/revoke, no secret redisplay or DB raw bearer, native DEBUG redaction; wrong caller/hash/expiry/revoke/replay denial followed by useful valid operations.",
+    "Three actual approved repair sequences through recovered local transport with concurrent duplicate executions and rollback; child crash/concurrent starts/disconnect/provider outage/backend listener loss/reconnect/permanent credential revoke.",
+    "Real manager known-good rollback after injected candidate spawn failure; actual later native MCP; stopped/closed and queued update/rollback cannot revive; failed setup tail and actual Core-stop reap child; native readonly lifecycle services denied.",
+    "Injected repeated cancellation before child acquisition, during TERM and while waiting on lifecycle lock; fake stalled post-KILL reap stays cleanup_incomplete and retains ownership.",
+    "Actual post-intent local edit detected and preserved, fresh repair/rollback useful; local helper allocated after final check yields wrong returned ID, uncertain result, no unrelated deletion and no replay.",
+    "Actual cover/media entity/service/readback plus retained light/switch; native group membership blocks inverse deletion; all eight helper families/dashboard/automation/script paths retained.",
+    "Twelve owned Core processes exercise four abrupt-death boundaries, including applied SQLite helper receipt before buffered HA save; no blind mutation retry and drift remains explicit.",
+    "Four actual Core processes exercise native local backup and startup restore; restored definition, grants retired, old bearer401 and old stable delegation cannot renew; fresh owner consent required.",
+    "Actual native owner OAuth discovery/login HTTP/PKCE, invalid verifier/code replay/wrong-client refresh, token refresh/revoke; native JWT cannot enter scoped MCP. Not hosted/browser consent evidence."
+  ],
+  "browser": {
+    "selected_tests": 1,
+    "passed": 0,
+    "failed": 1,
+    "status": "BLOCKED BEFORE PANEL EXECUTION",
+    "actual_failure": "Chromium SUID sandbox helper misconfigured; sandbox retained; alternate user-namespace sandbox launch also reported No usable sandbox",
+    "source": "Optional actual DOM/native WS test committed, separately locked client installed fresh outside checkout",
+    "not_performed": "No system sandbox change, no no-sandbox workaround, no iPhone/native frontend/hosted acceptance"
+  },
+  "official_references": {
+    "primary_urls": [
+      "https://developers.openai.com/api/docs/guides/custom-mcp-server",
+      "https://developers.openai.com/api/docs/guides/secure-mcp-tunnels",
+      "https://developers.openai.com/plugins/deploy/connect-chatgpt",
+      "https://www.home-assistant.io/integrations/mcp_server/",
+      "https://developers.home-assistant.io/docs/core/llm/",
+      "https://developers.home-assistant.io/docs/auth_api/"
+    ],
+    "outcome": "All six normal and approved read-only requests blocked by proxy CONNECT403; no permission-settings change",
+    "fallback": "Official GitHub tunnel-client README/connectors/permissions, v0.0.10 source/metrics and installed exact Core source",
+    "readme_blob": "ebbe7bc7b328fa1e214af26e56ae3b4b13428961"
+  },
+  "review": {
+    "kind": "Separate read-only adversarial source self-review; not independent certification",
+    "confirmed_corrections": [
+      "credential DEBUG leakage",
+      "supported-restore stable delegation revival",
+      "cancellation orphan risks including lock acquisition",
+      "unbounded post-KILL wait",
+      "candidate generation rollback failure",
+      "late/queued updater revival",
+      "oversized output pipe draining",
+      "Core-stop/failed-setup ownership cleanup",
+      "readonly nonentity tunnel lifecycle bypass"
+    ],
+    "remaining_source_limits": [
+      "No supported Core conditional CRUD/CAS or helper ID reservation; after-check local races remain",
+      "Incomplete custom/dynamic/unloaded YAML dependency discovery",
+      "Missing credential/reauth/reconfigure/Supervisor/high-impact administration adapters",
+      "Out-of-band old auth/DB restoration cannot distinguish resurrected delegation from normal boot without independent recovery",
+      "Private native MCP helper seam requires supported-version staging"
+    ]
+  },
+  "ci": {
+    "policy": "Existing public-repository nonprivileged automatic runs only; no workflow dispatch/retry or paid resources",
+    "final_sha_outcomes": "Read from final draft PR checks and recorded in the matching PR description/final engineering report; local passing results do not predeclare CI PASS"
+  },
+  "external_gates": [
+    "Resolve supported-object coordination or obtain explicit owner acceptance without silently narrowing administration",
+    "Independent security review and approved exact transport/route/credential deployment",
+    "Accessible current official docs and actual official tunnel/hosted account/OAuth-or-NoOAuth/mobile approval acceptance",
+    "Sandbox-capable browser and native frontend acceptance",
+    "Supported-version staged upgrade/restore, HAOS/Supervisor, household/physical administration and missing adapters"
+  ],
+  "prohibited_actions": {
+    "production": "NOT AUTHORIZED / NOT PERFORMED",
+    "Probe_A_HAOS_VM": "NOT AUTHORIZED / NOT PERFORMED",
+    "real_tunnel_OAuth_or_credentials": "NOT PERFORMED",
+    "merge_force_push_paid_manual_workflow": "NOT PERFORMED"
+  },
+  "checksums": "NATIVE_ADMIN_CHECKSUMS.sha256: run sha256sum -c docs/security/NATIVE_ADMIN_CHECKSUMS.sha256 at the source or documentation delivery checkout."
+}

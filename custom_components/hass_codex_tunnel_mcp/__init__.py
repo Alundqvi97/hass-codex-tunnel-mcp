@@ -14,6 +14,7 @@ from .binary import TunnelClientError, UnsupportedPlatformError
 from .const import (
     BIN_DIR_NAME,
     CONF_HA_MCP_BEARER_TOKEN,
+    CONF_ADMIN_CONNECTION_ID,
     CONF_HA_MCP_URL,
     DOMAIN,
     PLATFORMS,
@@ -29,6 +30,19 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass: "HomeAssistant", entry: "ConfigEntry") -> bool:
+    """Every failed/cancelled activation releases its owned resources."""
+    try:
+        return await _async_activate_entry(hass, entry)
+    except BaseException:
+        runtime = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+        if runtime is not None:
+            await runtime["tunnel"].close()
+            runtime.get("remove_stop", lambda: None)()
+            hass.data[DOMAIN].pop(entry.entry_id, None)
+        raise
+
+
+async def _async_activate_entry(hass: "HomeAssistant", entry: "ConfigEntry") -> bool:
     """Set up OpenAI Tunnel for HA-MCP."""
     from homeassistant.exceptions import ConfigEntryNotReady
 
@@ -49,7 +63,21 @@ async def async_setup_entry(hass: "HomeAssistant", entry: "ConfigEntry") -> bool
     async def executable_provider(force: bool):
         return await updater.ensure_active_executable(force=force)
 
-    tunnel = TunnelManager(executable_provider, run_dir, notify)
+    def credential_provider(data):
+        identifier = str(data.get(CONF_ADMIN_CONNECTION_ID) or "")
+        if not identifier:
+            return str(data.get(CONF_HA_MCP_BEARER_TOKEN) or "").strip()
+        from urllib.parse import urlsplit
+        if urlsplit(str(data[CONF_HA_MCP_URL])).path != "/api/hass_codex_admin/mcp" or str(data.get(CONF_HA_MCP_BEARER_TOKEN) or "").strip():
+            raise MCPUrlError("admin_connection_requires_scoped_route_without_static_token")
+        administrator = hass.data.get("hass_codex_admin")
+        if administrator is None:
+            raise MCPUrlError("native_administrator_not_ready")
+        if str(data[CONF_HA_MCP_URL]) != administrator["engine"].backend.base+"/api/hass_codex_admin/mcp":
+            raise MCPUrlError("admin_connection_requires_this_loopback_server")
+        return administrator["identity"].transport_credential(identifier)
+
+    tunnel = TunnelManager(executable_provider, run_dir, notify, credential_provider=credential_provider)
     hass.data[DOMAIN][entry.entry_id] = {
         "tunnel": tunnel,
         "updater": updater,
@@ -57,13 +85,20 @@ async def async_setup_entry(hass: "HomeAssistant", entry: "ConfigEntry") -> bool
         "entry_data": _entry_data_factory(entry),
     }
 
+    from homeassistant.const import EVENT_HOMEASSISTANT_STOP
+    async def stop(_event):
+        await tunnel.close()
+    remove_stop = hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, stop)
+    hass.data[DOMAIN][entry.entry_id]["remove_stop"] = remove_stop
+    entry.async_on_unload(remove_stop)
+
     try:
         try:
             entry_data = {**entry.data, **entry.options}
             assessment = assess_mcp_url(str(entry_data[CONF_HA_MCP_URL]))
             await async_probe_mcp_url(
                 assessment.url,
-                bearer_token=str(entry_data.get(CONF_HA_MCP_BEARER_TOKEN) or ""),
+                bearer_token=credential_provider(entry_data),
             )
         except MCPUrlError as err:
             await create_issue(
@@ -125,10 +160,14 @@ async def async_setup_entry(hass: "HomeAssistant", entry: "ConfigEntry") -> bool
 async def async_unload_entry(hass: "HomeAssistant", entry: "ConfigEntry") -> bool:
     """Unload the integration."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    runtime = hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+    if not unload_ok:
+        return False
+    runtime = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if runtime is not None:
-        await runtime["tunnel"].stop()
-    return unload_ok
+        await runtime["tunnel"].close()
+        runtime.get("remove_stop", lambda: None)()
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+    return True
 
 
 async def _async_update_listener(hass: "HomeAssistant", entry: "ConfigEntry") -> None:
@@ -165,16 +204,17 @@ async def _async_register_services(hass: "HomeAssistant") -> None:
                 runtime["tunnel"], runtime["entry_data"]()
             )
 
-    hass.services.async_register(DOMAIN, "restart_tunnel", restart_tunnel)
-    hass.services.async_register(
-        DOMAIN, "redownload_tunnel_client", redownload_tunnel_client
+    from homeassistant.helpers.service import async_register_admin_service
+    async_register_admin_service(hass, DOMAIN, "restart_tunnel", restart_tunnel)
+    async_register_admin_service(
+        hass, DOMAIN, "redownload_tunnel_client", redownload_tunnel_client
     )
-    hass.services.async_register(
-        DOMAIN, "check_tunnel_client_update", check_tunnel_client_update
+    async_register_admin_service(
+        hass, DOMAIN, "check_tunnel_client_update", check_tunnel_client_update
     )
-    hass.services.async_register(DOMAIN, "update_tunnel_client", update_tunnel_client)
-    hass.services.async_register(
-        DOMAIN, "rollback_tunnel_client", rollback_tunnel_client
+    async_register_admin_service(hass, DOMAIN, "update_tunnel_client", update_tunnel_client)
+    async_register_admin_service(
+        hass, DOMAIN, "rollback_tunnel_client", rollback_tunnel_client
     )
     hass.data[DOMAIN]["_services_registered"] = True
 

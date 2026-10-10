@@ -9,7 +9,8 @@
           "tunnel_id": "OpenAI tunnel ID",
           "api_key": "Runtime API key",
           "ha_mcp_url": "HA-MCP server URL",
-          "ha_mcp_bearer_token": "Home Assistant access token",
+          "ha_mcp_bearer_token": "Legacy backend bearer (leave empty for native administrator)",
+          "admin_connection_id": "Native administrator connection ID (from owner panel)",
           "control_plane_base_url": "Control-plane base URL",
           "control_plane_url_path": "Control-plane URL path",
           "auto_update_tunnel_client": "Automatically update tunnel-client"
@@ -37,7 +38,8 @@
           "tunnel_id": "OpenAI tunnel ID",
           "api_key": "Runtime API key",
           "ha_mcp_url": "HA-MCP server URL",
-          "ha_mcp_bearer_token": "Home Assistant access token",
+          "ha_mcp_bearer_token": "Legacy backend bearer (leave empty for native administrator)",
+          "admin_connection_id": "Native administrator connection ID (from owner panel)",
           "control_plane_base_url": "Control-plane base URL",
           "control_plane_url_path": "Control-plane URL path",
           "auto_update_tunnel_client": "Automatically update tunnel-client"

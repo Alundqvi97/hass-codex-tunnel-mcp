@@ -2,7 +2,7 @@
   "domain": "hass_codex_admin",
   "name": "Home Assistant Administrator",
   "version": "0.1.0",
-  "dependencies": ["http", "websocket_api", "mcp_server"],
+  "dependencies": ["http", "websocket_api", "mcp_server", "backup"],
   "requirements": [],
   "codeowners": [],
   "documentation": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp",

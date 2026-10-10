@@ -141,7 +141,19 @@ class Administrator:
                     self.approved_session(prior["approved_by"])
                     self.current(actor)
                     try:
+                        checked_object = False
                         async def final_check():
+                            nonlocal checked_object
+                            # Recheck after durable intent and backend auth, not
+                            # only before them. Native HA has no conditional CRUD:
+                            # this narrows the race, it is not compare-and-swap.
+                            if not checked_object:
+                                observed = await self.backend.snapshot(actor, op)
+                                if fingerprint(observed) != fingerprint(expected_before):
+                                    raise AdminError("object_changed_requires_new_approval")
+                                if dispatched["action"] == "delete" and await self.backend.references(actor, op["target"], op["family"]):
+                                    raise AdminError("referenced_object_requires_explicit_repair")
+                                checked_object = True
                             await self.db("authorize", task, actor, fingerprint(self.policy), plan_hash)
                             self.approved_session(prior["approved_by"])
                             self.current(actor)
