@@ -1,8 +1,77 @@
 # Security implementation plan
 
-Updated 2026-10-09. Repository: Alundqvi97/hass-codex-tunnel-mcp. This work is independent of home-infra-control-plane.
+Updated 2026-10-10. Repository: Alundqvi97/hass-codex-tunnel-mcp. This work is independent of home-infra-control-plane.
 
-## Current Probe A OS engineering delivery
+## Current Probe A remediation and native-source delivery (2026-10-10)
+
+**PARTIAL — EXACT SOURCE OR ENVIRONMENT BLOCKERS.** This assessment supersedes
+historical completion/no-confirmed-defect wording below. Source/test revision
+`6a5d752412d7452008addcf93d78197322ecd157` continues normally from clean PR #2 delivery
+`e483307c3c5ea157068b59c192f6fb0dea27dd1b`, reviewed implementation
+`182c8b7c95513b83abc71f2d49ea82adde7ef4fa` and approved ancestor
+`ad5e0c2ba52901c8384597d3cafd26ce3ffb124d`. PR #2 remains draft and unmerged.
+This documentation receipt is separate; its final GitHub SHA is reported after
+commit, with no self-hash and no source/test changes.
+
+INT-01 outer activated-root fail-stop and INT-02 independent cleanup-audit
+cutoff authority are corrected through their actual integration paths. INT-03
+work/cleanup separation and supervisor failed/cancelled-work retention are
+corrected; native all-exit persistence is **partial**, not complete. A separate
+adversarial self-review corrected capability/descriptor/claim/signature-purpose
+issues; it is not independent certification.
+
+Concrete native source now covers allocation/service composition, protected
+asset/source/ELF/alias collection, existing OpenSSL3 signature verification,
+durable one-attempt claims and existing-grant validation, seven owned scope
+inspection and separate inert provisioning, static policy primitives, bounded
+resource/journal/measurement schemas and C hard-deadline source. The exact 20
+source/test paths and 22 critical hooks are recorded in
+[PROBE_A_NATIVE_COVERAGE.json](phase2l/PROBE_A_NATIVE_COVERAGE.json); actual
+topology, manifest workflow and future Linux falsification cases are in
+[PROBE_A_NATIVE_PACKAGE.md](phase2l/PROBE_A_NATIVE_PACKAGE.md).
+
+Remaining source defects/implementations are explicit: **S1** post-exec package/
+entry loader and exact FD reconstruction/disposal; **S2** guardian-independent
+observer UID-audit handoff; **S3** full policy assets/installed inspector, final
+caps/groups and supervisor confinement; **S4** kernel trace program/loader/
+correlation (clang unavailable, reviewed BTF/ABI/asset missing); **S5** complete
+cleanup/emergency/resource collectors and independent final owner/signing
+boundary; **S6** mandatory hard-deadline and durable all-exit persistence wiring.
+These are source/dependency gaps, not merely missing permission/signatures.
+
+Reproduced baseline **424 Phase 2L / 560 broader passed, one optional HA skip**.
+Three baseline integration reproductions failed as expected before correction.
+Final local **461 Phase 2L passed; 597 broader passed, one optional HA schema
+skip; zero failures**. Python compilation, C syntax only, shell syntax, whitespace
+and protected-file checks passed. Logs `/tmp/probe-a-offline.SURlfu`; workflow
+reference and pinned upstream `fc54437a804858732e4bc927add98e202d879a09` unchanged.
+CI receipts and prior failed L runs are preserved in the new review section;
+no CI retry/dispatch or workflow modification occurred. Full native acceptance
+was not attempted; synthetic results remain blocked.
+
+GitHub source-revision D/I/J/K/L and packaging E/F: **SUCCESS**. Separate AI
+scanning automation: **FAILURE**, with authenticated findings unavailable under
+the existing API restriction. This does not provide independent certification.
+Exact immutable run links are in the review/JSON register; packaging success
+does not authorize HAOS/Supervisor or native OS acceptance.
+
+The next smallest milestone is S1/S2's disabled source-pinned post-exec loader
+and independent guardian-observer handoff, with exact offline FD/grant tests.
+After source completion: independent review, approved immutable runner/kernel/
+confinement policy, external signature trust roots and genuine manifests,
+separately authorized provisioning/runtime, actual independent kernel evidence,
+and final HAOS/Supervisor acceptance remain required. Do not seek runtime
+approval for this incomplete package. No live Probe A, privileged operations,
+VM/QEMU, production/tunnel access, packages or environment publication occurred.
+All workflows and `PROJECT_DESIGN_BLUEPRINT.md` are unchanged; securely authorized
+full Home Assistant administration remains the product requirement.
+
+Probe A execution: UNAUTHORIZED / NOT EXECUTED.
+Trusted runtime PASS: UNAVAILABLE.
+HAOS/Supervisor acceptance: NO-GO.
+Production: NO-GO.
+
+## Historical Probe A OS engineering delivery (2026-10-09)
 
 **COMPLETED — DISABLED OFFLINE ENGINEERING.** Continuation from verified PR #2
 HEAD `8ca67a92f224c57c7ea84c2d32a49d4d439d6e32`; approved source gate

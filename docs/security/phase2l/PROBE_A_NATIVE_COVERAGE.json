@@ -1,0 +1,607 @@
+{
+  "schema": 1,
+  "completion": "PARTIAL \u2014 EXACT SOURCE OR ENVIRONMENT BLOCKERS",
+  "date": "2026-10-10",
+  "repository": "Alundqvi97/hass-codex-tunnel-mcp",
+  "pr": 2,
+  "branch": "security/ha-mcp-phase2d-candidates",
+  "starting_delivery": "e483307c3c5ea157068b59c192f6fb0dea27dd1b",
+  "historical_source_gate": "ad5e0c2ba52901c8384597d3cafd26ce3ffb124d",
+  "review_implementation": "182c8b7c95513b83abc71f2d49ea82adde7ef4fa",
+  "source_test_sha": "6a5d752412d7452008addcf93d78197322ecd157",
+  "documentation_delivery_sha": "REPORTED_EXTERNALLY_AFTER_COMMIT_NO_SELF_HASH",
+  "baseline_documentation_only_difference": [
+    "docs/security/IMPLEMENTATION_PLAN.md",
+    "docs/security/phase2l/PROBE_A_ENGINEERING_REVIEW.md"
+  ],
+  "source_changed_files": [
+    "docs/security/phase2l/probe_a_attestation.py",
+    "docs/security/phase2l/probe_a_deadline_guard.c",
+    "docs/security/phase2l/probe_a_evidence.py",
+    "docs/security/phase2l/probe_a_execution_contract.py",
+    "docs/security/phase2l/probe_a_integrated_bootstrap.py",
+    "docs/security/phase2l/probe_a_inventory_integration.py",
+    "docs/security/phase2l/probe_a_ipc.py",
+    "docs/security/phase2l/probe_a_linux_launcher.py",
+    "docs/security/phase2l/probe_a_native_assembly.py",
+    "docs/security/phase2l/probe_a_native_deadline.py",
+    "docs/security/phase2l/probe_a_native_evidence.py",
+    "docs/security/phase2l/probe_a_native_inventory.py",
+    "docs/security/phase2l/probe_a_native_ledger.py",
+    "docs/security/phase2l/probe_a_native_policy.py",
+    "docs/security/phase2l/probe_a_native_resources.py",
+    "docs/security/phase2l/probe_a_native_scopes.py",
+    "docs/security/phase2l/probe_a_native_verifier.py",
+    "docs/security/phase2l/probe_a_readonly_broker.py",
+    "docs/security/phase2l/probe_a_role_entrypoints.py",
+    "tests/offline/test_phase2l_probe_a_native_delivery.py"
+  ],
+  "documentation_files": [
+    "docs/security/IMPLEMENTATION_PLAN.md",
+    "docs/security/phase2l/PROBE_A_ENGINEERING_REVIEW.md",
+    "docs/security/phase2l/PROBE_A_NATIVE_PACKAGE.md",
+    "docs/security/phase2l/PROBE_A_NATIVE_COVERAGE.json"
+  ],
+  "integration_findings": [
+    {
+      "id": "INT-01",
+      "disposition": "EXCEPTION_BOUNDARY_FIXED",
+      "path": "TrustedActorBootstrap.launch_integrated -> IntegratedBootstrap construction/launch",
+      "smallest_fix": "Enclose every activated-root preparation in fail-stop; claim before factory access and consume one-use receipt; harmless disabled/unprivileged refusal.",
+      "tests": [
+        "OuterRootBoundaryTests",
+        "FinalBoundaryRegressions.test_claim_receipt_is_one_use_and_not_caller_substitutable",
+        "existing integration startup/foundation failures"
+      ],
+      "remaining": [
+        "S6"
+      ]
+    },
+    {
+      "id": "INT-02",
+      "disposition": "CUTOFF_AUTHORITY_ROUTE_FIXED",
+      "path": "authenticated observer audit -> NativeReadCommands.for_audit -> NativeBoundedCapture -> NativeAtomicSpawner -> ReviewedExecutionContract.before_spawn",
+      "smallest_fix": "Derive cleanup authority from kernel-bound supervisor channel; carry it as a server-owned capability through fixed catalog; original end only; incremental audit-first request handling.",
+      "tests": [
+        "CleanupAuditRouteTests",
+        "PolicyStaticFixtures"
+      ],
+      "remaining": [
+        "S6"
+      ]
+    },
+    {
+      "id": "INT-03",
+      "disposition": "PARTIAL_WORK_CLEANUP_DECOUPLING_FIXED_NATIVE_ALL_EXIT_PERSISTENCE_INCOMPLETE",
+      "path": "EvidenceComposer.append/package -> IndependentEvidenceAudit -> IndependentSupervisor run/finish",
+      "smallest_fix": "Independent cleanup domain, forward-only cleanup gaps, authority quarantine, continue available collection after missing work, audit nonzero exit/interruption, retain cancelled/failed work and bounded partial package/journal.",
+      "tests": [
+        "FailedWorkEvidenceTests",
+        "WorkLifecycleComposition",
+        "JournalFixtures",
+        "AdditionalNativeRegressions.test_guardian_nonzero_exit_still_attempts_independent_audit",
+        "AdditionalNativeRegressions.test_partial_package_is_persisted_as_unsigned_fixture"
+      ],
+      "remaining": [
+        "S5",
+        "S6"
+      ]
+    }
+  ],
+  "security_critical_hooks": [
+    {
+      "hook": "actor allocation",
+      "implementation": "probe_a_native_assembly.NativeActorAllocator.__call__",
+      "authority": "claimed root bootstrap",
+      "trusted_responsibility": "actual private sockets, memfd seals, retained exec/pidfds, no overwriting owned FD slots",
+      "external_configuration": "signed inventory vectors and descriptor slots",
+      "later_linux_acceptance": "interrupt every partial allocation/clone/seal boundary; independently inspect inherited descriptors",
+      "remaining_source_blockers": [
+        "S1",
+        "S6"
+      ]
+    },
+    {
+      "hook": "role services factory",
+      "implementation": "probe_a_native_assembly.NativeRoleServiceAssembly._build",
+      "authority": "source-pinned post-exec root entry",
+      "trusted_responsibility": "existing GuardianCore/FixedWorkload/ClientProcess/atomic containment chain",
+      "external_configuration": "authenticated existing grant, separate activation signature, role specs",
+      "later_linux_acceptance": "prove exact post-exec source/grant/channel reconstruction without worker callbacks",
+      "remaining_source_blockers": [
+        "S1",
+        "S2"
+      ]
+    },
+    {
+      "hook": "inventory signature",
+      "implementation": "probe_a_native_verifier.pinned_verifier / OpenSSLEd25519.__call__",
+      "authority": "externally pinned reviewer identity",
+      "trusted_responsibility": "domain-separated existing OpenSSL3 EVP verification; never generate keys",
+      "external_configuration": "public trust roots; protected libcrypto descriptor/hash and dependency closure",
+      "later_linux_acceptance": "reject wrong key/domain, same-byte inode substitution and dependency drift",
+      "remaining_source_blockers": [
+        "S1"
+      ]
+    },
+    {
+      "hook": "asset/metadata/alias readers",
+      "implementation": "probe_a_native_inventory.NativeAssetReader.read_asset / inspect_asset / read_alias",
+      "authority": "trusted source collector",
+      "trusted_responsibility": "no-follow retained path/parent/file identity and bounded bytes",
+      "external_configuration": "complete signed metadata including ordinary and alias-target parents",
+      "later_linux_acceptance": "replace alias/parent/directory/file between reads; all must fail closed",
+      "remaining_source_blockers": []
+    },
+    {
+      "hook": "source verifier",
+      "implementation": "probe_a_native_inventory.PinnedSourceExport.__call__",
+      "authority": "external source reviewer",
+      "trusted_responsibility": "verify commit->export map and actual module bytes; no root git execution",
+      "external_configuration": "signed source export reconciled against immutable Git blobs outside repository",
+      "later_linux_acceptance": "wrong commit/module/export or mutable source mount must block",
+      "remaining_source_blockers": [
+        "S1"
+      ]
+    },
+    {
+      "hook": "ELF dependency collector",
+      "implementation": "probe_a_native_inventory.elf_loading / collect_dependency_closure",
+      "authority": "approved read-only collector",
+      "trusted_responsibility": "bounded ELF64 metadata without ldd/target execution; explicit SONAME/RPATH closure",
+      "external_configuration": "reviewed canonical resolution and dynamic Python/NSS dependency list",
+      "later_linux_acceptance": "unexpected load/config/NSS module or unsupported image must block",
+      "remaining_source_blockers": []
+    },
+    {
+      "hook": "facts/requirements/boot identity",
+      "implementation": "probe_a_native_inventory.NativeKernelFacts.facts / requirements / boot_identity",
+      "authority": "approved kernel collector plus external acceptance authority",
+      "trusted_responsibility": "bounded actual read-only facts; separately verified feature receipt, never infer support from release",
+      "external_configuration": "boot-bound signed independently observed feature receipt",
+      "later_linux_acceptance": "clone3/CLONE_INTO_CGROUP/pidfd/seals/SCM/cgroup support independently falsified",
+      "remaining_source_blockers": []
+    },
+    {
+      "hook": "one-attempt signature/claim",
+      "implementation": "probe_a_native_ledger.NativeAttemptPermit.claim / DurableAttemptLedger.claim_record",
+      "authority": "root bootstrap only",
+      "trusted_responsibility": "durable unique context/boot/source/inventory/policy/purpose/deadline claim before factory preparation",
+      "external_configuration": "external attempt signature and separately provisioned private ledger",
+      "later_linux_acceptance": "power/crash/sync/ack loss, concurrency, disk-full/corruption cannot grant twice",
+      "remaining_source_blockers": [
+        "S1",
+        "S6"
+      ]
+    },
+    {
+      "hook": "cross-exec grant validation",
+      "implementation": "probe_a_native_ledger.ExistingAttemptGrant.validate_approval / active",
+      "authority": "guardian/observer read-only grant verifier",
+      "trusted_responsibility": "verify original signature and exact committed record; do not claim again",
+      "external_configuration": "root-protected ledger read view and original externally signed v2 grant",
+      "later_linux_acceptance": "substitute session/policy/source/boot/deadline or replay after restart",
+      "remaining_source_blockers": [
+        "S1"
+      ]
+    },
+    {
+      "hook": "scope observation",
+      "implementation": "probe_a_native_scopes.NativeScopeObserver.__call__",
+      "authority": "independent observer/owner",
+      "trusted_responsibility": "exact cgroup path/device/inode/ownership/nondelegation/incarnation/population; refuses missing nonempty attachment proof",
+      "external_configuration": "seven actual provisioned scopes and parent identities",
+      "later_linux_acceptance": "wrong ancestry/delegation, detached descendants, stale pidfds and nonempty cleanup block",
+      "remaining_source_blockers": [
+        "S4"
+      ]
+    },
+    {
+      "hook": "provision/teardown permission",
+      "implementation": "probe_a_native_scopes.provision_scopes / teardown_scopes; probe_a_native_ledger.provision_ledger",
+      "authority": "separately approved provisioner",
+      "trusted_responsibility": "exclusive owned resource creation; no PID migration; uncertain partial provisioning reported",
+      "external_configuration": "separate provisioning/teardown signatures; no permission in this task",
+      "later_linux_acceptance": "partial provisioning and uncertain teardown must not delete unrelated or populated resources",
+      "remaining_source_blockers": [
+        "S3"
+      ]
+    },
+    {
+      "hook": "confinement signature/enforcer/inspector",
+      "implementation": "probe_a_native_policy.NativePolicyAdapter.enforce_child / inspect_actor; installed-policy package verifier MISSING",
+      "authority": "independently reviewed bounded Linux runner",
+      "trusted_responsibility": "uninstalled AppArmor transition/seccomp primitive; final caps/mount/profile authentication incomplete",
+      "external_configuration": "complete reviewed profiles, capability sets, immutable mounts and signed installed-policy package",
+      "later_linux_acceptance": "test direct/indirect egress, NSS/filesystem/descriptors and no delegation without broad bypass",
+      "remaining_source_blockers": [
+        "S3",
+        "S6"
+      ]
+    },
+    {
+      "hook": "read-command purpose",
+      "implementation": "probe_a_readonly_broker.NativeReadCommands.for_audit; probe_a_execution_contract.CleanupAuditAuthority.valid",
+      "authority": "observer server authenticated to actual bootstrap",
+      "trusted_responsibility": "fixed server-side purpose through capture/spawner/contract; no client cleanup flag",
+      "external_configuration": "sealed context/bootstrap incarnation and private audit channel",
+      "later_linux_acceptance": "controller impersonation/flood/partial frames/replay cannot acquire reserve; final expiry blocks",
+      "remaining_source_blockers": []
+    },
+    {
+      "hook": "guardian independent UID absence",
+      "implementation": "probe_a_native_assembly.NativeRoleServiceAssembly._build.uid_absent; native descriptor handoff MISSING",
+      "authority": "independent observer BrokerClient",
+      "trusted_responsibility": "no guardian-local absence assertion",
+      "external_configuration": "new reviewed guardian-observer authenticated endpoint/incarnation handoff",
+      "later_linux_acceptance": "detached workers/root peers and lingering UID cannot authorize teardown",
+      "remaining_source_blockers": [
+        "S2"
+      ]
+    },
+    {
+      "hook": "worker on_spawn/on_chunk and stop",
+      "implementation": "probe_a_client_process.ClientProcess.__call__ / stop; probe_a_linux_containment.NativeContainmentAdapter",
+      "authority": "guardian-owned fixed workload",
+      "trusted_responsibility": "internal fixed callbacks only; retained incarnation/UID/listener checks; separate worker/peer group shutdown",
+      "external_configuration": "reviewed native specs and independent observer absence",
+      "later_linux_acceptance": "streamed READY cannot forge identity; detached descendants keep cleanup blocked",
+      "remaining_source_blockers": [
+        "S2",
+        "S4"
+      ]
+    },
+    {
+      "hook": "resource reader",
+      "implementation": "probe_a_native_resources.NativeResourceCollector.numeric_uid_absence / listener_observation / readback",
+      "authority": "independent observer/supervising owner",
+      "trusted_responsibility": "bounded fixed proc/listener/resolver reads; incomplete whole-resource proof",
+      "external_configuration": "reviewed resolver aliases/assets, scope/session and resource schema",
+      "later_linux_acceptance": "inaccessible/racing proc entry, resolver drift and residual listener stay uncertain",
+      "remaining_source_blockers": [
+        "S5",
+        "S6"
+      ]
+    },
+    {
+      "hook": "collector receipt verification",
+      "implementation": "probe_a_native_verifier.OpenSSLEd25519; per-authority verifier dispatch/package binding MISSING",
+      "authority": "external collector trust root",
+      "trusted_responsibility": "authenticate collector implementation/authority, separately validate measurement adequacy",
+      "external_configuration": "external public collector keys/source identity; no private keys here",
+      "later_linux_acceptance": "forged/synthetic/guardian/self-exit receipts and inadequate signed booleans reject",
+      "remaining_source_blockers": [
+        "S1",
+        "S5"
+      ]
+    },
+    {
+      "hook": "independent audit collection/journal",
+      "implementation": "probe_a_native_evidence.UnsignedObservationJournal / SignedJournalCollector; probe_a_evidence.IndependentEvidenceAudit",
+      "authority": "observer before shutdown; supervising owner for other actors; external final owner missing",
+      "trusted_responsibility": "bounded unsigned recording, partial corruption prefix, external signatures; preserve work failures",
+      "external_configuration": "private owned journal/read FDs, independently supplied signatures",
+      "later_linux_acceptance": "missing case/collector failure cannot suppress independent available cleanup",
+      "remaining_source_blockers": [
+        "S4",
+        "S5",
+        "S6"
+      ]
+    },
+    {
+      "hook": "kernel measurement program/loader",
+      "implementation": "MISSING; validators: probe_a_native_evidence.validate_network_measurement / counters",
+      "authority": "independent native trace collector",
+      "trusted_responsibility": "transaction/socket/incarnation/netfilter/counter correlation; validators are not measurements",
+      "external_configuration": "approved BTF/hook ABI, reviewed compiled program/loader; clang unavailable",
+      "later_linux_acceptance": "positive DNS/loopback and attributed reject must distinguish unrelated failures",
+      "remaining_source_blockers": [
+        "S4"
+      ]
+    },
+    {
+      "hook": "cleanup measurement and external final owner",
+      "implementation": "PARTIAL: probe_a_native_evidence.validate_cleanup_measurement; complete resources/emergency/final-owner collection MISSING",
+      "authority": "observer plus legitimate external runner owner",
+      "trusted_responsibility": "no signed booleans/self-disappearance; incomplete facts explicitly blocked",
+      "external_configuration": "reviewed resource schema and external owner after supervisor exit",
+      "later_linux_acceptance": "nonzero guardian/observer loss, deny-barrier failure and residual supervisor/resources remain blocked",
+      "remaining_source_blockers": [
+        "S5"
+      ]
+    },
+    {
+      "hook": "critical callback deadline guard",
+      "implementation": "probe_a_deadline_guard.c; probe_a_native_deadline.NativeDeadlineGuard.call; mandatory wiring MISSING",
+      "authority": "each trusted actor/entry boundary",
+      "trusted_responsibility": "absolute monotonic native fail-stop; no root threads; never disarm final lifetime",
+      "external_configuration": "externally authenticated compiled artifact/closure and all-entry integration",
+      "later_linux_acceptance": "stall Python/native verify/factory/collect/sync; guardian remains independent; no deadline extension",
+      "remaining_source_blockers": [
+        "S6"
+      ]
+    },
+    {
+      "hook": "supervisor cancellation/shutdown/audit",
+      "implementation": "probe_a_linux_launcher.IndependentSupervisor.run / _run / _finish",
+      "authority": "trusted root supervisor",
+      "trusted_responsibility": "record cancelled/failed work, audit despite guardian error, kill owned controller/observer descendants; no new privileged work at expiry",
+      "external_configuration": "separate source-pinned confined owner and external final observation",
+      "later_linux_acceptance": "interrupt supervisor/guardian EOF/observer loss while cleanup remains independent",
+      "remaining_source_blockers": [
+        "S3",
+        "S5",
+        "S6"
+      ]
+    }
+  ],
+  "remaining_source_and_dependency_blockers": [
+    {
+      "id": "S1",
+      "classification": "NATIVE_IMPLEMENTATION_MISSING",
+      "functions": [
+        "NativeActorAllocator.__call__",
+        "NativeRoleServiceAssembly._build",
+        "run_role"
+      ],
+      "detail": "Post-exec pinned package/entry loader, grant/inventory/policy and FD reconstruction, exact descriptor ownership records and complete lifetime disposal are not connected."
+    },
+    {
+      "id": "S2",
+      "classification": "SOURCE_DEFECT",
+      "functions": [
+        "RoleConfiguration.__post_init__",
+        "NativeRoleServiceAssembly._build.uid_absent"
+      ],
+      "detail": "Guardian sealed topology has no authenticated independent observer UID-audit endpoint/incarnation handoff."
+    },
+    {
+      "id": "S3",
+      "classification": "NATIVE_IMPLEMENTATION_MISSING",
+      "functions": [
+        "NativePolicyAdapter.enforce_child",
+        "NativePolicyAdapter.inspect_actor",
+        "IndependentSupervisor"
+      ],
+      "detail": "Complete LSM assets/installed-policy verifier, capability/group installation, immutable mount inspector and separate supervisor containment/lifetime policy are missing."
+    },
+    {
+      "id": "S4",
+      "classification": "NATIVE_IMPLEMENTATION_MISSING",
+      "functions": [
+        "NativeScopeObserver.__call__",
+        "validate_network_measurement",
+        "SignedJournalCollector"
+      ],
+      "detail": "Independent pre-exec attachment/socket/netfilter trace program, loader and actual event correlation are missing; nonempty native scope admission blocks."
+    },
+    {
+      "id": "S4-toolchain",
+      "classification": "REQUIRED_DEPENDENCY_UNAVAILABLE",
+      "functions": [
+        "native measurement build"
+      ],
+      "detail": "Existing libbpf is discoverable; clang is unavailable. No installation permitted. Approved runner BTF/hook ABI/compiled trace assets also absent."
+    },
+    {
+      "id": "S5",
+      "classification": "NATIVE_IMPLEMENTATION_MISSING",
+      "functions": [
+        "validate_cleanup_measurement",
+        "IndependentEvidenceAudit",
+        "NativeResourceCollector"
+      ],
+      "detail": "Complete owned-resource/emergency mutation collector/schema, signed journal producer boundary and legitimate external final owner are missing. Kernel admission explicitly rejects incomplete data."
+    },
+    {
+      "id": "S6",
+      "classification": "SOURCE_DEFECT",
+      "functions": [
+        "NativeDeadlineGuard.call",
+        "TrustedActorBootstrap.launch_integrated",
+        "IntegratedBootstrap.launch",
+        "IndependentSupervisor._finish"
+      ],
+      "detail": "Mandatory guard on all potentially blocking callbacks/entry paths and durable partial storage at every outer/pre-service/final exit are not fully connected."
+    }
+  ],
+  "topology": {
+    "actor_roles": [
+      "guardian",
+      "observer",
+      "controller"
+    ],
+    "child_scopes": [
+      "guardian",
+      "observer",
+      "controller",
+      "worker",
+      "peer",
+      "read-command",
+      "guardian-command"
+    ],
+    "supervisor": "separate trusted root owner, outside seven child scopes; native confinement missing",
+    "descriptor_rules": "sealed readonly config and private named IPC; controller additionally retained peer pidfds; executable/group FDs close across actor exec and reopen only in reviewed post-exec factory",
+    "deadlines": "one immutable end, cutoff=end-60; no extensions",
+    "full_topology": "PROBE_A_NATIVE_PACKAGE.md#actual-intended-topology-and-authority"
+  },
+  "validation": {
+    "baseline": {
+      "phase2l_passed": 424,
+      "broader_passed": 560,
+      "skipped": 1,
+      "exit_code": 0,
+      "logs": "/tmp/probe-a-offline.5U02kT"
+    },
+    "defect_reproduction": {
+      "revision": "e483307c3c5ea157068b59c192f6fb0dea27dd1b",
+      "command": "python3 -B /tmp/probe-a-red-baseline/reproduce.py",
+      "tests": 3,
+      "errors": 3,
+      "exit_code": 1,
+      "expected": "Actual baseline defects; no xfail/skip or regression weakening",
+      "logs": "/tmp/probe-a-red-baseline/results.log"
+    },
+    "final": {
+      "source_tree": "6a5d752412d7452008addcf93d78197322ecd157",
+      "command": "bash /workspace/.cloud-environment/hass-codex-tunnel-mcp/install.sh --verify",
+      "phase2l_passed": 461,
+      "phase2l_failed": 0,
+      "phase2l_skipped": 0,
+      "broader_passed": 597,
+      "broader_failed": 0,
+      "broader_skipped": 1,
+      "skip_reason": "tests/test_config_flow_schema.py: homeassistant.helpers.selector unavailable; optional compatibility dependency",
+      "exit_code": 0,
+      "logs": "/tmp/probe-a-offline.SURlfu",
+      "python_compilation": "PASS; pycache outside checkout",
+      "c_syntax": "PASS; cc -fsyntax-only -std=c11 -Wall -Wextra -Werror; guard not linked/installed/executed",
+      "whitespace": "PASS",
+      "authoritative_workflow": ".github/workflows/phase2l-offline-only.yml",
+      "pinned_upstream": "fc54437a804858732e4bc927add98e202d879a09"
+    },
+    "unexecuted": [
+      "native role entrypoints",
+      "clone3/cgroup attachment/provisioning",
+      "privilege/capability drop experiments",
+      "live firewall/probe traffic",
+      "native policy installation",
+      "kernel trace collection",
+      "complete connected native end-to-end acceptance",
+      "HAOS/Supervisor/VM/production"
+    ],
+    "crypto_fixture": "Existing OpenSSL3 EVP, public RFC8032 vector; library ownership explicitly synthetic in cloud fixture (host uid65534), no native ownership/runner approval",
+    "self_review": "Separate adversarial self-review, not independent certification; confirmed adjacent source defects corrected; omissions listed explicitly",
+    "ci": {
+      "status": "CHECKED_ALL_PRINCIPAL_ENGINEERING_SUCCESS_AI_SCAN_FAILURE",
+      "sha": "6a5d752412d7452008addcf93d78197322ecd157",
+      "manual_dispatch_or_rerun": false,
+      "prior_source": {
+        "sha": "33442c9dd2e1f910c3d155211f3c3c8466c8e67d",
+        "phase2l": "FAILURE",
+        "run_ids": [
+          38010911095,
+          38010915175
+        ],
+        "public_annotation": "Process completed with exit code 1",
+        "authenticated_logs": "api.github.com CONNECT 403; GitHub public step logs require login",
+        "fixture_correction": "Create replacement while original inode is allocated, assert different inode, then replace. This removes ext4 inode-reuse nondeterminism; not asserted to explain inaccessible CI logs."
+      },
+      "checked_at": "2026-10-10T01:00:53.118759+00:00",
+      "runs": {
+        "AI": [
+          {
+            "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011304536",
+            "status": "FAILURE",
+            "commit": "6a5d752412d7452008addcf93d78197322ecd157",
+            "evidence": "public run title/direct full source link"
+          }
+        ],
+        "L": [
+          {
+            "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011302371",
+            "status": "SUCCESS",
+            "commit": "6a5d752412d7452008addcf93d78197322ecd157",
+            "evidence": "public run title/direct full source link"
+          },
+          {
+            "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011299488",
+            "status": "SUCCESS",
+            "commit": "6a5d752412d7452008addcf93d78197322ecd157",
+            "evidence": "public run title/direct full source link"
+          }
+        ],
+        "K": [
+          {
+            "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011302415",
+            "status": "SUCCESS",
+            "commit": "6a5d752412d7452008addcf93d78197322ecd157",
+            "evidence": "public run title plus Git merge source-parent verification"
+          }
+        ],
+        "I": [
+          {
+            "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011302389",
+            "status": "SUCCESS",
+            "commit": "6a5d752412d7452008addcf93d78197322ecd157",
+            "evidence": "public run title plus Git merge source-parent verification"
+          }
+        ],
+        "J": [
+          {
+            "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011302332",
+            "status": "SUCCESS",
+            "commit": "6a5d752412d7452008addcf93d78197322ecd157",
+            "evidence": "public run title plus Git merge source-parent verification"
+          }
+        ],
+        "D": [
+          {
+            "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011302356",
+            "status": "SUCCESS",
+            "commit": "6a5d752412d7452008addcf93d78197322ecd157",
+            "evidence": "public run title/direct full source link"
+          },
+          {
+            "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011299570",
+            "status": "SUCCESS",
+            "commit": "6a5d752412d7452008addcf93d78197322ecd157",
+            "evidence": "public run title/direct full source link"
+          }
+        ],
+        "E": [
+          {
+            "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011299410",
+            "status": "SUCCESS",
+            "commit": "6a5d752412d7452008addcf93d78197322ecd157",
+            "evidence": "public run title/direct full source link"
+          }
+        ],
+        "F": [
+          {
+            "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011299418",
+            "status": "SUCCESS",
+            "commit": "6a5d752412d7452008addcf93d78197322ecd157",
+            "evidence": "public run title/direct full source link"
+          }
+        ]
+      },
+      "phase2l": "SUCCESS",
+      "packaging": "E/F SUCCESS; not HAOS/Supervisor acceptance",
+      "network_limit": "api.github.com CONNECT forbidden; public GitHub metadata read with TLS verification; no settings/auth changes"
+    }
+  },
+  "external_gates": [
+    {
+      "classification": "EXTERNAL_CONFIGURATION_OR_APPROVAL_REQUIRED",
+      "items": [
+        "independent security/source review AFTER source completion",
+        "approved immutable Linux runner/BTF/kernel configuration",
+        "reviewed confinement policy",
+        "external public verification identities and genuine signatures",
+        "separate provisioning permission",
+        "separate one-attempt runtime authorization"
+      ]
+    },
+    {
+      "classification": "RUNTIME_ACCEPTANCE_NOT_EXECUTED",
+      "items": [
+        "actual kernel/process/network/dependency/cleanup evidence",
+        "external supervisor/resource absence observation",
+        "genuine HAOS/Supervisor acceptance"
+      ]
+    }
+  ],
+  "prohibitions": {
+    "probe_execution": "UNAUTHORIZED / NOT EXECUTED",
+    "trusted_runtime_pass": "UNAVAILABLE",
+    "haos_supervisor": "NO-GO",
+    "production": "NO-GO",
+    "environment_changes": false,
+    "workflow_changes": false,
+    "blueprint_changes": false,
+    "package_installation": false,
+    "private_signing_material": false
+  },
+  "next_milestone": "Complete S1/S2 source-pinned post-exec grant and independent guardian/observer handoff; keep runtime disabled."
+}

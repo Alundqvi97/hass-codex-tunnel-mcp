@@ -1,6 +1,174 @@
 # Probe A — recovered implementation and adversarial engineering review
 
-## Current delivery: integrated disabled offline engineering, 2026-10-09
+## Current remediation and native-source delivery, 2026-10-10
+
+**PARTIAL — EXACT SOURCE OR ENVIRONMENT BLOCKERS.** The earlier completion/no-
+confirmed-defect assessment below is historical and is superseded by this source
+review. Concrete primitives have been added; the complete connected native
+package still has S1–S6 source omissions. They are not approval-only gates.
+All privileged components remain inert without explicit reviewed activation;
+there is no native CLI/entry package, automatic privileged workflow or runtime
+permission. No trusted runtime PASS can be produced by these changes.
+
+### Immutable baseline and delivery scope
+
+Work began on a clean `security/ha-mcp-phase2d-candidates` checkout at
+`e483307c3c5ea157068b59c192f6fb0dea27dd1b`. Public GitHub metadata verified
+[PR #2](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/pull/2) open, DRAFT,
+unmerged. The difference from reviewed source
+`182c8b7c95513b83abc71f2d49ea82adde7ef4fa` contained only this review and the
+implementation plan. Approved source gate
+`ad5e0c2ba52901c8384597d3cafd26ce3ffb124d` remains an ancestor. Work continued
+from that valid security branch rather than `main`; no existing changes were
+discarded and no history was rewritten.
+
+Final immutable **source/test revision**:
+[`6a5d752412d7452008addcf93d78197322ecd157`](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/commit/6a5d752412d7452008addcf93d78197322ecd157).
+A subsequent documentation-only receipt commit contains this assessment, the
+plan, [native package specification](PROBE_A_NATIVE_PACKAGE.md) and
+[machine-readable coverage register](PROBE_A_NATIVE_COVERAGE.json). Its immutable
+GitHub SHA is reported externally after commit, avoiding a self-hash. The
+source/test tree is identical between those two revisions.
+
+### Integration defect disposition
+
+| Finding | Correction and verification | Remaining source limitation |
+|---|---|---|
+| INT-01 | The entire activated-root `TrustedActorBootstrap.launch_integrated` preparation, including property/import/constructor errors, is inside irreversible `_exit(76)` handling. Claim happens before factory preparation; an object-bound one-use receipt avoids a second claim. Disabled/unprivileged requests remain harmless. `OuterRootBoundaryTests` and claim-receipt regressions cover the actual outer route. | Mandatory hard-deadline and durable all-exit failure persistence remain S6; no runtime fail-stop claim is made. |
+| INT-02 | Kernel-bound server-owned `CleanupAuditAuthority` follows observer `NativeReadCommands.for_audit` through `NativeBoundedCapture`, atomic spawner and `ReviewedExecutionContract.before_spawn`. Fixed audit reads retain the original 60-second reserve; controller/work requests stop at cutoff. Incremental bounded frames and audit-first turns avoid a stalled controller header monopolizing the audit channel. Tests exercise the actual command-to-spawn-contract path with only the kernel boundary simulated. | Native hard bounds for all verifier/factory/collection calls remain S6. No authorization/deadline extension or caller cleanup flag was introduced. |
+| INT-03 | Evidence work and cleanup domains are distinct. Missing case/work facts cannot suppress available valid cleanup. Failed/cancelled work persists; nonzero guardian exit/interruption still attempts independent audit. Invalid authorities remain quarantined. Optional bounded unsigned partial-journal persistence exists. | **PARTIAL:** outer/pre-service/all-exit native persistence and final independent cleanup owner/measurement composition remain S5/S6. |
+
+Three red baseline reproductions at `e483307` returned three errors and exit 1
+before remediation (`/tmp/probe-a-red-baseline/results.log`). They reproduce
+outer-root escape, audit reads rejected after cutoff and work-prefix suppression
+of valid cleanup. They were not skipped, marked expected failures or weakened.
+
+### Concrete native source and separate adversarial self-review
+
+The coverage register lists all 22 critical hooks, exact functions, authority,
+trusted responsibilities, configuration and future Linux acceptance assertions.
+The specification documents actual topology, missing package wiring and the
+unexecuted manifest-generation/verification process. New source:
+
+- `probe_a_native_assembly.py`: actual private socket/memfd/pidfd allocation and
+  existing GuardianCore/FixedWorkload/ClientProcess/native containment composition.
+- `probe_a_native_ledger.py`: exclusive durable SQLite claims, restart/replay and
+  lost-ack rejection, source/boot/policy/context-bound v2 existing-grant validation.
+- `probe_a_native_inventory.py` and `probe_a_native_verifier.py`: retained protected
+  asset/parent/alias readers, bounded ELF closure, source exports, kernel facts
+  and existing OpenSSL 3 EVP Ed25519 verification using external public trust roots.
+- `probe_a_native_scopes.py` and `probe_a_native_policy.py`: separate inactive
+  provisioning/teardown, owned population/ancestry inspection, AppArmor transition
+  and static seccomp source primitives; missing native proof explicitly blocks.
+- `probe_a_native_resources.py` and `probe_a_native_evidence.py`: fixed bounded
+  resource reads, unsigned partial journals, externally signed receipt adapter,
+  typed counters and structured DNS/loopback/netfilter/cleanup measurement schemas.
+- `probe_a_native_deadline.py` and `probe_a_deadline_guard.c`: inactive monotonic
+  native fail-stop primitive; C syntax only, never linked/installed/executed.
+
+Nine existing modules changed: launcher, integrated bootstrap, execution contract,
+role entrypoints, IPC, read-only broker, inventory integration, evidence and
+attestation. New `test_phase2l_probe_a_native_delivery.py` adds 37 adversarial
+regressions; the original suites remain intact. Exact 20-file source/test paths
+are in the JSON register.
+
+A separate adversarial self-review checked root exception return, claim replay,
+FD collision/inheritance, source/alias substitution, deadline extension, root
+helper bypass, supervisor cancellation and synthetic promotion. Corrections
+include maximum role capability masks/no supplementary groups, denial of
+process_vm/pidfd_getfd/kcmp descriptor-acquisition routes, protected libcrypto
+FD/hash checks, separate activation/attempt signature purpose, actual one-use
+claim handoff and preservation of failed/cancelled work. This is **self-review,
+not qualified independent security certification**. Confirmed outstanding source
+omissions are listed below; no claim of complete native integration is made.
+
+### Source/dependency blockers — distinct from later authorization
+
+| ID | Exact remaining work |
+|---|---|
+| S1 — NATIVE_IMPLEMENTATION_MISSING | Source-pinned post-exec entry/package loader, trusted grant/inventory/policy reconstruction, exact descriptor ownership/handoff and allocation disposal. Reviewed `--sealed-config-fd` vectors have no complete native entry package. |
+| S2 — SOURCE_DEFECT | Sealed guardian config lacks an independently authenticated observer UID-audit endpoint/identity handoff required by the native service assembly. Guardian-local assertions are refused. |
+| S3 — NATIVE_IMPLEMENTATION_MISSING | Complete AppArmor assets, authenticated installed-policy/mount inspector, final role capability/group installation and separate bootstrap/supervisor confinement/lifetime integration. |
+| S4 — NATIVE_IMPLEMENTATION_MISSING / REQUIRED_DEPENDENCY_UNAVAILABLE | Actual kernel socket/netfilter/pre-exec attachment program, loader, correlated event decoder and reviewed ABI/BTF/compiled assets. Existing libbpf is discoverable; clang is unavailable and package installation is prohibited. Validators do not replace measurements. |
+| S5 — NATIVE_IMPLEMENTATION_MISSING | Complete owned-resource/emergency mutation measurement schema/collectors, independent signed journal production boundary and legitimate external owner observing final supervisor exit/residual absence. Current native cleanup admission blocks those missing facts. |
+| S6 — SOURCE_DEFECT | Mandatory native hard guard around every potentially blocking callback/root entry, and durable partial-package persistence on outer/pre-service/all-exit paths. A primitive or optional callback alone is insufficient. |
+
+### Offline validation and CI receipts
+
+Baseline: **424 Phase 2L passed; 560 broader passed, one optional HA schema skip**.
+Final source bytes: **461 Phase 2L passed, zero failed/skipped; 597 broader passed,
+one unchanged optional Home Assistant schema skip, zero failures**. Command:
+`bash /workspace/.cloud-environment/hass-codex-tunnel-mcp/install.sh --verify`.
+It follows unchanged `.github/workflows/phase2l-offline-only.yml`, including
+upstream `fc54437a804858732e4bc927add98e202d879a09`, patched fixture staging,
+Phase 2L discovery, Python compilation, shell syntax and broader regression.
+Logs: `/tmp/probe-a-offline.SURlfu`, wrapper `/tmp/probe-a-fixture-validation.log`.
+Compilation caches, generated fixtures and temporary files stayed outside Git.
+C `-fsyntax-only -std=c11 -Wall -Wextra -Werror` and `git diff --check` passed.
+The OpenSSL vector used the existing library and a public RFC8032 example;
+mocked ownership was explicitly synthetic, not approved native runner identity.
+
+Prior source `33442c9dd2e1f910c3d155211f3c3c8466c8e67d` passed D/I/J/K and E/F,
+but L failed ([push run 38010911095](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38010911095),
+[PR run 38010915175](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38010915175)).
+Public annotation: exit code 1. Authenticated failure logs remain inaccessible
+because `api.github.com` CONNECT is denied; public step logs require login. A
+confirmed test-fixture defect was corrected: unlink/recreate can reuse an ext4
+inode; now the replacement is created while the original exists and inequality
+is asserted before substitution. Its relationship to inaccessible failure logs
+is not assumed. No workflow was dispatched, rerun or edited.
+
+GitHub automatic nonprivileged CI on immutable source `6a5d752412d7452008addcf93d78197322ecd157`:
+
+| Workflow | Conclusion | Runs |
+|---|---|---|
+| D | SUCCESS | [38011302356](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011302356), [38011299570](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011299570) |
+| I | SUCCESS | [38011302389](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011302389) |
+| J | SUCCESS | [38011302332](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011302332) |
+| K | SUCCESS | [38011302415](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011302415) |
+| L | SUCCESS | [38011302371](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011302371), [38011299488](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011299488) |
+| E | SUCCESS | [38011299410](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011299410) |
+| F | SUCCESS | [38011299418](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011299418) |
+| AI | FAILURE | [38011304536](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38011304536) |
+
+Both push and PR L runs passed after the deterministic fixture correction.
+Public run titles bind this source; native PR merge metadata independently
+confirms its full source parent. E/F are packaging-only success, not genuine
+HAOS/Supervisor acceptance. The separate AI scanning failure is preserved;
+authenticated findings/logs could not be read under the existing API network
+restriction, and it provides no independent security certification. No workflow
+dispatch, paid retry, VM run or trigger change was performed.
+
+
+### Preserved restrictions and later external gates
+
+All workflow files, original HAOS VM workflow, application source, production
+configuration, dependency/lockfiles, authorization package and full-administration
+`PROJECT_DESIGN_BLUEPRINT.md` remain byte-for-byte unchanged. No credentials,
+private signing material, real approvals or runtime signatures were generated
+or committed. Environment/authentication/network configuration was reused,
+not modified or published; no packages were installed. Home Assistant release
+compatibility remains optional and does not govern OS security source work.
+
+After S1–S6 are completed, separate gates still require independent security
+review, an approved immutable Linux runner/kernel and confinement policy,
+externally supplied public trust roots and genuine reviewed source/inventory/
+policy/feature signatures, separate provisioning/attempt authorization, actual
+independent kernel/network/cleanup evidence and final HAOS/Supervisor acceptance.
+A read-only root RPC is not kernel read-only privilege. Root/CAP_NET_ADMIN is
+trusted privileged code until independent enforcement evidence exists.
+
+Smallest next source milestone: complete S1/S2's source-pinned post-exec loader
+and independent guardian-observer handoff while leaving every entry inactive;
+then verify their exact FD/source/grant contracts offline. Do not repeat prior
+foundations or request runtime authorization for an incomplete package.
+
+Probe A execution: UNAUTHORIZED / NOT EXECUTED.
+Trusted runtime PASS: UNAVAILABLE.
+HAOS/Supervisor acceptance: NO-GO.
+Production: NO-GO.
+
+## Historical delivery: integrated disabled offline engineering, 2026-10-09
 
 **Decision: COMPLETED — DISABLED OFFLINE ENGINEERING.** Runtime acceptance,
 HAOS/Supervisor acceptance and production deployment remain **NO-GO**. This
