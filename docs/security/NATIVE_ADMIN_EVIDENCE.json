@@ -1,7 +1,7 @@
 {
   "schema": 2,
-  "engineering": "INCOMPLETE for full Blueprint scope: external OAuth/progress/custom-selector frontend and additional high-impact device families remain unimplemented. Finite candidate source/build/offline validation complete; final expanded browser CI pending.",
-  "acceptance": "PENDING owner named-object coordination/release-scope decision, hosted ChatGPT/iPhone and actual Supervisor/HAOS; sandboxed base owner panel passed",
+  "engineering": "INCOMPLETE for full Blueprint scope: external OAuth/progress/custom-selector frontend and additional high-impact device families remain source coverage gaps. The explicitly described finite candidate is implemented, packaged and locally/CI validated; no known outstanding confirmed defect within that scope.",
+  "acceptance": "PENDING owner named-object coordination/release-scope decision, hosted ChatGPT/iPhone and actual Supervisor/HAOS. Real sandboxed owner-panel acceptance VERIFIED on synthetic loopback Core.",
   "deployment": "NOT AUTHORIZED / NOT PERFORMED",
   "repository": "Alundqvi97/hass-codex-tunnel-mcp",
   "branch": "security/ha-mcp-phase2d-candidates",
@@ -15,7 +15,7 @@
     "source_to_delivery": "IMPLEMENTATION_PLAN.md only, eight added lines; inspected",
     "pr_verified": "open/draft/unmerged; no reset/force/merge"
   },
-  "immutable_source": "Recorded in the following implementation-plan receipt after normal source commit; no self-referential source hash",
+  "immutable_source": "d0983cbdb422bb4089a846f1aa34d814432aa735",
   "target": {
     "homeassistant": "2026.10.0",
     "upstream_commit": "6a811d3359c7b2076dc9e1cf900843a129c044af",
@@ -46,28 +46,31 @@
       "passed": 59,
       "failed": 0,
       "skipped": 0,
-      "seconds": 134.331,
+      "seconds": 134.202,
       "command": "python -B -m unittest discover -s tests/staging -p 'test_admin_product.py' -v",
       "installed_archive": true,
-      "scope": "Real Core/auth/HTTP/WS/MCP/config/task/storage; synthetic devices, no household access"
+      "scope": "Real Core/auth/HTTP/WS/MCP/config/task/storage; synthetic devices, no household access",
+      "source_sha": "d0983cbdb422bb4089a846f1aa34d814432aa735"
     },
     "phase2l": {
       "passed": 489,
       "failed": 0,
       "skipped": 0,
-      "seconds": 0.753
+      "seconds": 0.704,
+      "source_sha": "d0983cbdb422bb4089a846f1aa34d814432aa735"
     },
     "broader": {
       "passed": 633,
       "failed": 0,
       "skipped": 1,
-      "seconds": 5.13,
-      "skip": "Optional legacy HA selector dependency; native actual Core schema exercised separately"
+      "seconds": 6.91,
+      "skip": "Optional legacy HA selector dependency; native actual Core schema exercised separately",
+      "source_sha": "d0983cbdb422bb4089a846f1aa34d814432aa735"
     },
     "package": {
       "passed": 1,
       "failed": 0,
-      "seconds": 23.031,
+      "seconds": 21.973,
       "processes": 4,
       "transitions": [
         "reviewed0.1.0 installed",
@@ -75,7 +78,9 @@
         "unsafe0.1.0/schema2 refuses; local owner remains independent",
         "current archive reinstalled and actual task/rollback recovered"
       ],
-      "origin": "Installed engine digest and module path asserted; no checkout source fallback"
+      "origin": "Installed engine digest and module path asserted; no checkout source fallback",
+      "local_source_sha": "fc984cfe2b21e6593748ed8707db5c13933be9f1",
+      "final_source_ci": "Fresh installed final archive package test succeeded inside both native CI jobs at d0983cbdb422bb4089a846f1aa34d814432aa735"
     },
     "official_client": {
       "v0.0.10": {
@@ -89,14 +94,28 @@
       "actual_client": true,
       "actual_retained_manager": true,
       "cases": "tools/list, invalid command then valid, denial before owner approval, actual task and rollback after owned child crash/relaunch",
-      "substituted_boundary": "Loopback metadata/poll/response control plane, synthetic key; no OpenAI control plane connection"
+      "substituted_boundary": "Loopback metadata/poll/response control plane, synthetic key; no OpenAI control plane connection",
+      "final_source_ci": "Actual verified v0.0.16 client, retained manager and loopback fake control plane succeeded in both native jobs at d0983cbdb422bb4089a846f1aa34d814432aa735"
     },
     "browser": {
-      "status": "Base actual sandboxed browser PASS at eb66b4b210596998ffb7cb93735673eca8a0364c, both push and PR jobs; expanded native selector flow pending final SHA CI",
-      "run": 38065394266,
-      "job": 114251876707,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "status": "VERIFIED in sandboxed existing nonprivileged Ubuntu24 CI, push and PR jobs",
+      "source_sha": "d0983cbdb422bb4089a846f1aa34d814432aa735",
+      "runs": [
+        38067667282,
+        38067672474
+      ],
+      "jobs": [
+        114258510722,
+        114258525835
+      ],
+      "pr_step_seconds": 15,
+      "duration_scope": "Entire CI browser step including npm install; not a fabricated exact test duration",
       "sandbox_disabled": false,
-      "scope": "Actual Core HTTP static owned UTF-8 login fixture, native PKCE/token/WS and production owner panel; synthetic provider boundary; not full HA frontend/iPhone/hosted ChatGPT"
+      "scope": "Actual owned Core HTTP static UTF-8 fixture, native PKCE/token/WS and production owner panel; credential issue/revoke, exact effects/window approval, execute/readback/rollback/reject, native menu/password/multiline/number/select/multiple-select clearing and invalid optional values",
+      "substituted_boundary": "Minimal synthetic login document and synthetic Sun ConfigFlow provider; actual HA auth/task/dispatch/storage/panel used. Not full HA frontend, real external provider, native iPhone or hosted ChatGPT."
     },
     "checks": [
       "Python source/fixtures/security compile",
@@ -104,39 +123,42 @@
       "installer shell syntax",
       "git diff --check",
       "validation worktree/index/status unchanged",
-      "protected Blueprint/HAOS workflows unchanged"
+      "protected Blueprint/HAOS workflows unchanged",
+      "Final source checksum file verified",
+      "Downloaded final source GitHub archive and compared every production asset byte-for-byte to immutable source"
     ]
   },
   "bounded_reliability": {
     "iterations": 5,
     "failed": 0,
     "duplicate_writes": 0,
-    "duration_seconds": 0.932,
     "task_and_rollback_ms": [
-      170.88,
-      145.66,
-      152.62,
-      143.46,
-      164.74
+      129.79,
+      135.52,
+      156.67,
+      141.7,
+      136.0
     ],
     "scope": "bounded loopback scheduling variation; not a stability soak",
-    "seconds": 0.932
+    "seconds": 0.844
   },
   "fresh_setup": {
     "command": "ADMIN_DEV_STATE=<new external state> ADMIN_NATIVE_PYTHON=<supplied verified3.14.2> bash scripts/development/install.sh --setup",
-    "checkout": "New clone at initial verified head plus exact source/test/setup candidate files; owned temporary clone retains Git ancestry and corrected origin",
+    "checkout": "New clean detached clone at 7f8dbd8e61fb869c2b69cee5b8f0a016b2cdf3c1, new125-package hash/TLS verified venv; final d0983cb native/package/browser also succeeded in freshly installed CI environments",
     "packages": 125,
     "hashes_and_tls": true,
     "pip_check": "All packages compatible",
-    "native_passed": 55,
-    "native_seconds": 118.614,
+    "native_passed": 59,
+    "native_seconds": 131.761,
     "phase2l_passed": 489,
     "broader_passed": 633,
     "broader_skipped": 1,
     "subtests": 296,
     "broader_seconds": 6.82,
     "repeated_counts": "Reproduction only; never added to independent coverage totals",
-    "environment_published": false
+    "environment_published": false,
+    "source_sha": "7f8dbd8e61fb869c2b69cee5b8f0a016b2cdf3c1",
+    "phase2l_seconds": 0.713
   },
   "proof_cases": [
     "Durable deny before SQL, cancelled late connector activation, pending retirement and symlink marker refusal; task RAM revoke blocks after SQL fault.",
@@ -180,7 +202,8 @@
       "No arbitrary dependency completeness",
       "No external OAuth/provider authentication or add-on restart-incarnation proof",
       "Host boot facts are synthetic Supervisor boundary until separately authorized target acceptance"
-    ]
+    ],
+    "final_pass": "Read-only adversarial reviewer inspected fc984cfe2b21e6593748ed8707db5c13933be9f1 with no additional confirmed defect; subsequent menu schema correction reviewed locally, targeted regression added and actual sandboxed browser/full native CI passed. Review is not qualified independent certification."
   },
   "scanner": {
     "run": 38055930745,
@@ -206,7 +229,11 @@
     "excluded": "Probe A/tests/fixtures/credentials/databases/venvs/caches/toolchains",
     "production_release_published": false,
     "transfer": "Committed immutable GitHub blob/raw artifact; no session-only download claim",
-    "transfer_verified": "Final archive pending committed GitHub download verification"
+    "transfer_verified": "Downloaded final archive via authenticated GitHub contents API at immutable source SHA; digest matches and every production asset equals git show source:path",
+    "source_sha": "d0983cbdb422bb4089a846f1aa34d814432aa735",
+    "entries": 33,
+    "production_assets": 32,
+    "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/raw/d0983cbdb422bb4089a846f1aa34d814432aa735/artifacts/native-admin-0.2.0.zip"
   },
   "remaining_gates": [
     "Owner accepts/rejects maximum15-minute named-object edit window and explicit staging scope; HA unconditional-write race disclosed",
@@ -410,7 +437,101 @@
     "environment_published": false
   },
   "github_ci": {
-    "status": "Final source SHA pending normal commit and automatic workflow results; historical exact-SHA outcomes retained below"
+    "source_sha": "d0983cbdb422bb4089a846f1aa34d814432aa735",
+    "verified_at_utc": "2026-10-10T16:34:14.367008+00:00",
+    "runs": [
+      {
+        "id": 38067673769,
+        "name": "Code scanning AI findings on PR #2",
+        "event": "dynamic",
+        "status": "completed",
+        "conclusion": "failure",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067673769"
+      },
+      {
+        "id": 38067671955,
+        "name": "Phase 2I - Synthetic Offline Harness Only",
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067671955"
+      },
+      {
+        "id": 38067671825,
+        "name": "Phase 2L - DNS and Build Context Offline",
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067671825"
+      },
+      {
+        "id": 38067671946,
+        "name": "Phase 2J - Pure Offline Acceptance Model",
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067671946"
+      },
+      {
+        "id": 38067671889,
+        "name": "Phase 2K - Packaged Initial Policy Offline",
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067671889"
+      },
+      {
+        "id": 38067671948,
+        "name": "Phase 2D - HA-MCP Upstream Patch Candidates",
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067671948"
+      },
+      {
+        "id": 38067672474,
+        "name": "Native Core Administrator Development",
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067672474"
+      },
+      {
+        "id": 38067667306,
+        "name": "Phase 2D - HA-MCP Upstream Patch Candidates",
+        "event": "push",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067667306"
+      },
+      {
+        "id": 38067667292,
+        "name": "Phase 2F - Supported Strict Addon Staging",
+        "event": "push",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067667292"
+      },
+      {
+        "id": 38067667279,
+        "name": "Phase 2E - Disposable Packaged Addon Test",
+        "event": "push",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067667279"
+      },
+      {
+        "id": 38067667282,
+        "name": "Native Core Administrator Development",
+        "event": "push",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067667282"
+      }
+    ],
+    "privileged_jobs_triggered": false,
+    "manual_retry_or_dispatch": false,
+    "scanner": "Automatic existing scanner failed; not a clean scan. No capacity purchased."
   },
   "interim_release_receipt": {
     "schema": 2,
@@ -793,7 +914,11 @@
   "multi_step_repair": {
     "operations": 3,
     "approvals": 1,
-    "execute_ms": 61.37,
-    "rollback_ms": 85.29
+    "execute_ms": 53.81,
+    "rollback_ms": 83.32
+  },
+  "owner_decision": {
+    "edit_window_and_staging_scope": "PENDING; proposed default unaccepted; synthetic test consent is not owner acceptance",
+    "hosted_haos_production": "Separate pending authorizations, never implicitly bundled"
   }
 }
