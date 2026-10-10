@@ -1,6 +1,45 @@
 # Probe A — recovered implementation and adversarial engineering review
 
-## Current remediation and native-source delivery, 2026-10-10
+## Current source/build closeout — 2026-10-10, Europe/Stockholm
+
+**SOURCE_OR_BUILD_INCOMPLETE — EXACT BLOCKERS.** Source/test commit `ce7fd5025c94974bb4c800351759342fff560abe`
+continues from inspected owner delivery `b2dc4eb05f5bda4ec9b32d443a1abba505543a2b`,
+which changed only the Blueprint after initial `a394c0a...`. Reviewed source stays
+`6a5d752...`; approved ancestor `ad5e0c2...` remains. No owner changes were lost.
+
+The reproduced SYS_ADMIN19/21 confusion, inherited socket denial and forbidden
+policy-reader path/double decoding are corrected in source. Sealed guardian↔
+observer UID-only audit and delayed readiness are connected; signed package/
+grant reconstruction, exact FD custody, installed-policy/mount checks, native
+role credentials, partial trace source and nested/clone guard contracts are added.
+All remain disabled; complete AppArmor/entry/measurement/final evidence/lifetime
+wiring is **still missing**, not merely awaiting signatures or live tests.
+
+Final local validation: **489 Phase2L passed; 625 broader passed; one optional
+HA schema skip; Python compilation/Bash parse/diff check passed**. Existing C
+guard compiled and linked, never loaded/executed. Clang/BPF headers/approved BTF
+and AppArmor parser unavailable; no installation or dependency pin changed.
+Adversarial self-review and a separate read-only agent pass corrected confirmed
+additional defects; neither is security certification.
+
+The finite INT01–03/S1–6 register, exact24 source/test paths, durable sanitized
+commands/results/artifact hashes, five-track production matrix, all UX01–12,
+owner reliability requirements and unexecuted acceptance/rollback sequence are
+in [PROBE_A_CLOSEOUT_2026-10-10.md](PROBE_A_CLOSEOUT_2026-10-10.md) and
+[PROBE_A_NATIVE_COVERAGE.json](PROBE_A_NATIVE_COVERAGE.json).
+Source/log artifact SHA256: `5dbbe3c2472b76f812ad41a72f98b146ba30f7392ebfde862d45d0d160dea807`.
+
+No workflow/Blueprint/environment/application/lockfile/production edit;
+no private signing material, native execution, VM, live evidence or trusted PASS.
+PR #2 remains draft/unmerged. Source CI D/I/J/K/L and E/F SUCCESS; AI scanner FAILURE, not clean independent
+coverage. Exact run IDs/merge parents are in the closeout/index. Documentation
+receipt and its HEAD/status are reported externally without a self-hash. Final product task grants/caller binding/
+final effect authorization and full HAOS/recovery observers remain SOURCE
+blockers; a read-only permanent replacement is not accepted.
+
+## Historical delivery — source 6a5d752, preserved record
+
+## Historical remediation and native-source delivery, 2026-10-10
 
 **PARTIAL — EXACT SOURCE OR ENVIRONMENT BLOCKERS.** The earlier completion/no-
 confirmed-defect assessment below is historical and is superseded by this source
