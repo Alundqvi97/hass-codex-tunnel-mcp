@@ -1,5 +1,7 @@
 // Actual panel DOM + real native login/WS + scoped MCP in disposable Core.
 const {chromium} = require('playwright');
+let stage = 'sandboxed-browser-launch';
+const checkpoint = value => { stage = value; console.log('BROWSER_STAGE='+value); };
 (async () => {
   const base = process.env.ADMIN_BROWSER_BASE;
   const browser = await chromium.launch({executablePath: process.env.ADMIN_BROWSER_EXECUTABLE, chromiumSandbox: true, headless: true});
@@ -7,6 +9,7 @@ const {chromium} = require('playwright');
     const context = await browser.newContext({serviceWorkers: 'block'});
     await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
     const page = await context.newPage();
+    checkpoint('panel-load');
     await page.goto(base+'/hass_codex_admin/panel.js');
     await page.setContent('<form><label>Username<input name="username" autocomplete="off"></label><label>Password<input name="password" type="password" autocomplete="off"></label><button>Local fixture login</button></form><hass-codex-admin hidden></hass-codex-admin>');
     await page.addScriptTag({url: base+'/hass_codex_admin/panel.js'});
@@ -43,19 +46,24 @@ const {chromium} = require('playwright');
         })};
       };
     }, {base});
+    checkpoint('native-login');
     await page.getByLabel('Username', {exact:true}).fill(process.env.ADMIN_BROWSER_USERNAME);
     await page.getByLabel('Password', {exact:true}).fill(process.env.ADMIN_BROWSER_PASSWORD);
     await page.getByRole('button', {name:'Local fixture login', exact:true}).click();
+    checkpoint('native-owner-panel-ready');
     await page.getByRole('button', {name:'Issue a connection credential', exact:true}).waitFor();
+    checkpoint('issue-connection');
     await page.getByRole('button', {name:'Issue a connection credential', exact:true}).click();
     await page.getByText(/Save this credential privately now/).waitFor();
     const credentials = (await page.locator('hass-codex-admin').textContent()).match(/hca_[A-Za-z0-9_-]{43}/g);
     if (!credentials || credentials.length !== 1) throw new Error('one-time scoped credential missing');
+    checkpoint('revoke-connection');
     await page.getByRole('button', {name:'Manage connections', exact:true}).click();
     await page.getByRole('button', {name:'Revoke this connection', exact:true}).last().click();
     if ((await page.locator('hass-codex-admin').textContent()).includes(credentials[0])) throw new Error('credential remained in panel');
     const revokedStatus = await page.evaluate(async ({base, credential}) => (await fetch(base+'/api/hass_codex_admin/mcp', {method:'POST', headers:{Authorization:'Bearer '+credential}, body:'{}'})).status, {base, credential:credentials[0]});
     if (revokedStatus !== 401) throw new Error('revoked credential accepted');
+    checkpoint('review-and-approve');
     await page.getByRole('button', {name:'Refresh tasks', exact:true}).click();
     await page.getByRole('button', {name:'Approve this exact task once', exact:true}).click();
     await page.getByText('Review the task and confirm its effects first.', {exact:true}).waitFor();
@@ -68,10 +76,12 @@ const {chromium} = require('playwright');
       const body = await response.json(); if (body.result.isError) throw new Error('scoped tool failed'); return JSON.parse(body.result.content[0].text).result;
     }, {base, credential:process.env.ADMIN_BROWSER_CONNECTOR, name, args});
     const args = {task:process.env.ADMIN_BROWSER_TASK, plan_hash:process.env.ADMIN_BROWSER_HASH};
+    checkpoint('approved-mcp-execute');
     const applied = await call('admin_execute', args);
     if (applied.operations[0].status !== 'applied') throw new Error('approved mutation did not apply');
     await page.getByRole('button', {name:'Refresh tasks', exact:true}).click();
     await page.getByText(/stored_definition_or_ha_state_verified/).waitFor();
+    checkpoint('mcp-rollback');
     const rolled = await call('admin_rollback', args);
     if (rolled.operations[0].status !== 'rolled_back') throw new Error('rollback not verified');
     await page.getByRole('button', {name:'Refresh tasks', exact:true}).click();
@@ -79,4 +89,12 @@ const {chromium} = require('playwright');
     await page.getByRole('heading', {name:/— revoked/}).waitFor();
     console.log('ACTUAL_OWNER_PANEL_BROWSER=PASS login issue revoke plan consent execute outcome rollback reject');
   } finally {await browser.close();}
-})().catch(error => {console.error(error.message); process.exitCode=1;});
+})().catch(error => {
+  let message = String(error.message || error.code || 'browser fixture failed');
+  for (const value of [process.env.ADMIN_BROWSER_PASSWORD, process.env.ADMIN_BROWSER_CONNECTOR]) {
+    if (value) message = message.split(value).join('[redacted]');
+  }
+  message = message.replace(/hca_[A-Za-z0-9_-]{43}/g, '[redacted]').replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[redacted]');
+  console.error('BROWSER_FAILURE_STAGE='+stage+'\n'+message);
+  process.exitCode=1;
+});
