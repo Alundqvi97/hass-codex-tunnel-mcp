@@ -89,92 +89,66 @@ def test_read_health_url(tmp_path: Path) -> None:
     assert _read_health_url(health_file) == "http://127.0.0.1:9"
 
 
-async def _run_tunnel_manager_lifecycle_with_fake_client(tmp_path: Path) -> None:
-    fake_client = tmp_path / "tunnel-client"
-    fake_client.write_text(
-        "#!/usr/bin/env python3\n"
-        "import pathlib, sys, time\n"
-        "health_file = pathlib.Path(sys.argv[sys.argv.index('--health.url-file') + 1])\n"
-        "health_file.write_text('http://127.0.0.1:9/health')\n"
-        "time.sleep(60)\n",
-        encoding="utf-8",
-    )
-    fake_client.chmod(0o755)
-    notifications = 0
+def fixture_client(tmp_path):
+    source = Path(__file__).resolve().parent / "staging"
+    fake = tmp_path / "tunnel-client"
+    fake.write_text("#!/usr/bin/env python3\nimport sys\nsys.path.insert(0, "+repr(str(source))+")\n"+(source / "admin_transport_fixture.py").read_text())
+    fake.chmod(0o755)
+    return fake
 
-    def notify() -> None:
-        nonlocal notifications
-        notifications += 1
 
-    manager = TunnelManager(lambda force: fake_client, tmp_path / "run", notify)
-    await manager.start(
-        {
-            CONF_TUNNEL_ID: "tunnel_0123456789abcdef0123456789abcdef",
-            CONF_API_KEY: "runtime-key",
-            CONF_HA_MCP_URL: "http://127.0.0.1:9584/private_secret",
-            CONF_HA_MCP_BEARER_TOKEN: "",
-            CONF_CONTROL_PLANE_BASE_URL: "",
-            CONF_CONTROL_PLANE_PATH: "",
-        }
-    )
-    for _ in range(20):
-        if manager.status.healthy:
-            break
-        await asyncio.sleep(0.1)
+def entry_data():
+    return {CONF_TUNNEL_ID: "synthetic-tunnel", CONF_API_KEY: "synthetic-platform-key", CONF_HA_MCP_URL: "http://127.0.0.1:9/fixture-only", CONF_HA_MCP_BEARER_TOKEN: ""}
 
-    assert manager.status.healthy is True
-    assert manager.status.health_url == "http://127.0.0.1:9/health"
-    assert notifications > 0
 
-    await manager.stop()
+async def _run_tunnel_manager_lifecycle_with_fake_client(tmp_path):
+    fake = fixture_client(tmp_path)
+    manager = TunnelManager(lambda force: fake, tmp_path / "run", poll_interval=.05)
+    try:
+        await manager.start(entry_data())
+        assert await manager.wait_until_healthy(3)
+        first = manager.process
+        await asyncio.gather(*(manager.start(entry_data()) for _ in range(5)))
+        assert manager.process is first
+        first.kill()
+        for _ in range(100):
+            if manager.process is not first and manager.status.healthy:
+                break
+            await asyncio.sleep(.05)
+        assert manager.process is not first
+        assert manager.status.healthy
+        await manager.restart(entry_data())
+        assert await manager.wait_until_healthy(3)
+    finally:
+        await manager.stop()
     assert manager.status.state == "stopped"
+    await asyncio.sleep(.1)
+    assert manager.process is None
 
 
-async def _run_tunnel_manager_cleans_up_stale_client(tmp_path: Path) -> None:
-    fake_client = tmp_path / "tunnel-client"
-    fake_client.write_text(
-        "#!/usr/bin/env python3\n"
-        "import pathlib, sys, time\n"
-        "health_file = pathlib.Path(sys.argv[sys.argv.index('--health.url-file') + 1])\n"
-        "health_file.write_text('http://127.0.0.1:9/health')\n"
-        "time.sleep(60)\n",
-        encoding="utf-8",
-    )
-    fake_client.chmod(0o755)
-    run_dir = tmp_path / "run"
-    run_dir.mkdir()
-    health_file = run_dir / "health.url"
-    stale = await asyncio.create_subprocess_exec(
-        str(fake_client),
-        "run",
-        "--health.url-file",
-        str(health_file),
-    )
-    for _ in range(20):
-        if health_file.exists():
-            break
-        await asyncio.sleep(0.1)
-
-    manager = TunnelManager(lambda force: fake_client, run_dir)
-    await manager.start(
-        {
-            CONF_TUNNEL_ID: "tunnel_0123456789abcdef0123456789abcdef",
-            CONF_API_KEY: "runtime-key",
-            CONF_HA_MCP_URL: "http://127.0.0.1:9584/private_secret",
-            CONF_HA_MCP_BEARER_TOKEN: "",
-            CONF_CONTROL_PLANE_BASE_URL: "",
-            CONF_CONTROL_PLANE_PATH: "",
-        }
-    )
-
-    await asyncio.wait_for(stale.wait(), timeout=5)
-    assert stale.returncode is not None
-
-    await manager.stop()
+async def _run_tunnel_manager_cleans_up_stale_client(tmp_path):
+    # A stale file cannot assert readiness or justify killing a numeric PID.
+    fake = fixture_client(tmp_path)
+    manager = TunnelManager(lambda force: fake, tmp_path / "run", poll_interval=.05)
+    other = TunnelManager(lambda force: fake, tmp_path / "run", poll_interval=.05)
+    try:
+        await manager.start(entry_data())
+        assert await manager.wait_until_healthy(3)
+        child = manager.process
+        try:
+            await other.start(entry_data())
+        except BlockingIOError:
+            pass
+        else:
+            raise AssertionError("duplicate process owner accepted")
+        assert manager.process is child and child.returncode is None
+    finally:
+        await other.stop()
+        await manager.stop()
 
 
-def test_tunnel_manager_records_unexpected_exit_without_relaunch(tmp_path: Path) -> None:
-    """Source-level reliability baseline: an unexpectedly exited child is not restarted."""
+def test_tunnel_manager_bounds_crash_recovery_without_download(tmp_path: Path) -> None:
+    """Four retries of the same binary, then an explicit exhausted state."""
     asyncio.run(_run_unexpected_exit_test(tmp_path))
 
 
@@ -189,7 +163,7 @@ async def _run_unexpected_exit_test(tmp_path: Path) -> None:
         launches += 1
         return fake
 
-    manager = TunnelManager(provider, tmp_path / "run")
+    manager = TunnelManager(provider, tmp_path / "run", retry_delays=(.01, .02, .04, .08), poll_interval=.02)
     await manager.start({
         CONF_TUNNEL_ID: "tunnel_0123456789abcdef0123456789abcdef",
         CONF_API_KEY: "synthetic-platform-key",
@@ -199,11 +173,158 @@ async def _run_unexpected_exit_test(tmp_path: Path) -> None:
         CONF_CONTROL_PLANE_PATH: "",
     })
     for _ in range(60):
-        if manager.status.state == "exited":
+        if manager.status.state == "exhausted":
             break
         await asyncio.sleep(0.05)
-    assert manager.status.state == "exited"
+    assert manager.status.state == "exhausted"
     assert manager.status.returncode == 17
     assert launches == 1
     assert manager.status.healthy is False
     await manager.stop()
+
+
+def test_repeated_cancellation_still_reaps_owned_child(tmp_path):
+    async def run():
+        fake = fixture_client(tmp_path)
+        source = fake.read_text().replace("from http.server", "import signal\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\nfrom http.server")
+        fake.write_text(source)
+        manager = TunnelManager(lambda force: fake, tmp_path/"run", poll_interval=.02, terminate_timeout=.08)
+        await manager.start(entry_data())
+        assert await manager.wait_until_healthy(3)
+        child = manager.process
+        stopping = asyncio.create_task(manager.stop())
+        await asyncio.sleep(.02);stopping.cancel()
+        await asyncio.sleep(.01);stopping.cancel()
+        try:
+            await stopping
+        except asyncio.CancelledError:
+            pass
+        assert child.returncode is not None
+        assert manager.process is None and manager.status.state == "stopped"
+        await manager.start(entry_data())
+        assert await manager.wait_until_healthy(3)
+        await manager.close()
+    asyncio.run(run())
+
+
+def test_cancelled_spawn_captures_and_cleans_child(tmp_path, monkeypatch):
+    async def run():
+        fake = fixture_client(tmp_path)
+        original = asyncio.create_subprocess_exec
+        spawned, release = asyncio.Event(), asyncio.Event()
+        children = []
+        async def delayed(*args, **kwargs):
+            child = await original(*args, **kwargs)
+            children.append(child);spawned.set()
+            await release.wait()
+            return child
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", delayed)
+        manager = TunnelManager(lambda force: fake, tmp_path/"run", poll_interval=.02, terminate_timeout=.08)
+        starting = asyncio.create_task(manager.start(entry_data()))
+        await asyncio.wait_for(spawned.wait(), 2)
+        starting.cancel();await asyncio.sleep(.01);starting.cancel();release.set()
+        try:
+            await starting
+        except asyncio.CancelledError:
+            pass
+        assert children[0].returncode is not None
+        assert manager.process is None
+        await manager.stop()
+    asyncio.run(run())
+
+
+def test_stale_health_file_cannot_assert_ready_or_follow_network(tmp_path):
+    from custom_components.hass_codex_tunnel_mcp.tunnel import _observe_health
+    health = tmp_path/"health.url"
+    for value in ("http://127.0.0.1:9/readyz", "https://example.invalid/readyz", "http://127.0.0.1:9/?token=x", "http://user:secret@127.0.0.1:9"):
+        health.write_text(value)
+        category, _ = _observe_health(health, entry_data())
+        assert category != "ready"
+    health.unlink()
+    health.symlink_to(tmp_path/"missing")
+    assert _read_health_url(health) == ""
+
+
+def test_lifecycle_epoch_blocks_late_update_and_close_blocks_restart(tmp_path):
+    async def run():
+        fake = fixture_client(tmp_path)
+        manager = TunnelManager(lambda force: fake, tmp_path/"run", poll_interval=.02)
+        await manager.start(entry_data())
+        epoch = manager.epoch
+        await manager.stop()
+        try:
+            await manager.start(entry_data(), executable_override=fake, expected_epoch=epoch)
+        except RuntimeError as exc:
+            assert "superseded" in str(exc)
+        else:
+            raise AssertionError("late updater revived stopped transport")
+        assert manager.process is None
+        await manager.close()
+        try:
+            await manager.start(entry_data())
+        except RuntimeError as exc:
+            assert "closed" in str(exc)
+        else:
+            raise AssertionError("closed integration restarted")
+    asyncio.run(run())
+
+
+def test_long_output_is_drained_without_logging_secrets(tmp_path, caplog):
+    async def run():
+        fake = fixture_client(tmp_path)
+        source = fake.read_text().replace("from http.server", "import sys\nsys.stdout.write('synthetic-secret'*20000+'\\n');sys.stdout.flush()\nfrom http.server")
+        fake.write_text(source)
+        manager = TunnelManager(lambda force: fake, tmp_path/"run", poll_interval=.02)
+        try:
+            await manager.start(entry_data())
+            assert await manager.wait_until_healthy(3)
+            assert "synthetic-secret" not in caplog.text
+        finally:
+            await manager.close()
+    asyncio.run(run())
+
+
+def test_close_cancellation_while_start_owns_lifecycle_lock(tmp_path):
+    async def scenario():
+        entered, release = asyncio.Event(), asyncio.Event()
+        async def provider(force):
+            entered.set()
+            await release.wait()
+            return fixture_client(tmp_path)
+        manager = TunnelManager(provider, tmp_path/'run', poll_interval=.01)
+        starting = asyncio.create_task(manager.start(entry_data()))
+        await entered.wait()
+        closing = asyncio.create_task(manager.close())
+        await asyncio.sleep(.01)
+        closing.cancel()
+        release.set()
+        await starting
+        child = manager.process
+        result = await asyncio.gather(closing, return_exceptions=True)
+        assert isinstance(result[0], asyncio.CancelledError)
+        assert child.returncode is not None
+        assert manager.process is None
+        assert manager.status.state == 'stopped'
+    asyncio.run(scenario())
+
+
+def test_uncertain_reaping_keeps_ownership_and_prevents_replacement(tmp_path):
+    class StalledProcess:
+        returncode = None
+        def terminate(self): pass
+        def kill(self): raise ProcessLookupError()
+        async def wait(self): await asyncio.Event().wait()
+    async def scenario():
+        manager = TunnelManager(lambda force: fixture_client(tmp_path), tmp_path/'run', terminate_timeout=.01)
+        manager._process = child = StalledProcess()
+        for operation in (manager.stop, lambda: manager.start(entry_data())):
+            try:
+                await asyncio.wait_for(operation(), .5)
+            except RuntimeError as error:
+                assert str(error) == 'owned_child_reaping_incomplete'
+            else:
+                raise AssertionError('uncertain cleanup was promoted to success')
+            assert manager.process is child
+            assert manager.status.state == 'cleanup_incomplete'
+        # This fake owns no actual resources.
+    asyncio.run(scenario())

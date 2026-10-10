@@ -1,3 +1,41 @@
+# Current release-candidate threat boundary
+
+Keep scoped connection → native MCP/custom LLM → independent native owner task approval → fixed trusted loopback backend → durable acknowledgment/readback/recovery. An attacker holding the connector credential can inspect/propose but cannot approve, call general native APIs or widen the exact accepted task. Owner identities derive from current native sessions, not supplied headers, client_id or platform tunnel delegation.
+
+New durable deny intents prevent SQL revocation failure and cancelled late issuance from reviving a connection on ordinary restart. Pending issuance is retired at boot; task RAM deny blocks dispatch even if its SQL revocation fails. Failures of every durable medium still require independent local recovery. Supported native backup restoration retires authority; unsupported copying of old auth/SQLite files is not treated as preserving later revocation.
+
+HA-assigned creations bind returned canonical ID/definition to the original task/index and fresh prior inventory; same-task references cannot substitute arbitrary targets. Backend acknowledgment is persisted before readback; absent attribution cannot be recovered from merely identical configuration. Rollback never adopts or deletes an unexpected object's name match.
+
+Unconditional HA editing APIs are a platform constraint: real independent final-check-gap editing can still be overwritten. The optional short named-object owner window is explicit and disabled by default; the owner accepted it for isolated staging only in this assignment, while production acceptance remains pending; it is human cooperation, not atomicity. Loaded configuration/group/dashboard dependency coverage remains bounded; unknown dynamic/custom references are disclosed for destructive consent.
+
+Finite native flow/Supervisor adapters do not open arbitrary service/URL/shell routes. Native owner input stays outside MCP and diagnostics. Flow lock order is engine→flow; final authorization occurs inside the acquired flow lock; cleanup after grant retirement still requires fresh owner session. Terminal flow success requires observed reload, not already-loaded state. Reauth obtains its initialized form through the same bounded public API as native GET. Core restart uses a new kernel-derived process incarnation and persisted acknowledgment; host reboot requires native boot facts for the same host. Shutdown/disconnect and unobserved external flow outcomes stay uncertain. Actual Supervisor and hosted control plane remain external acceptance boundaries.
+
+The retained official client uses verifiedv0.0.16 binaries and filtered settings; no extra inherited transport channel is activated. Local synthetic control-plane protocol tests are not official hosted identity/access evidence. Organization/workspace tunnel-use delegation is not a human identity, and NoOAuth does not replace local capabilities or owner decisions.
+
+Production-only ZIP checksums establish candidate integrity, not vendor signature or independent certification. SQLitev2 intentionally refuses vulnerable old software downgrade; local HA remains independent and tested reinstall recovery restores the candidate. Two source reviewers found/corrected retained-path defects; the failed quota-blocked scanner is not a clean review. No privileged, production, Probe A or VM operation occurred.
+
+## Previous native model and historical analysis — preserved
+
+# Current native administrator threat model
+
+The active boundary is verified scoped connection → custom credential adapter to native MCP/LLM → exact native owner task decision → fixed own-loopback backend → readback/consumed intent/recovery. Only explicit configuration enables it. Official OpenAI transport is retained; the community manager and custom administrator are not vendor-certified. Retired Probe A has no runtime dependency or fallback.
+
+| Principal/asset | Authority and credential custody | Negative proof / remaining boundary |
+|---|---|---|
+| Remote connection/attacker reusing connector credential | Opaque hash-backed connection capability; MCP inspect/propose/status plus only exact owner-approved execute/rollback | Same credential fails native REST/WS/base MCP/Assist/SSE and native JWT fails scoped route; production external/internal reachability not inspected |
+| Official tunnel workspace/client | Official runtime key stays in existing local transport environment; scoped backend header injected locally, stable ID lookup in trusted HA process | Workspace access is not human approval; no new OAuth provider; hosted NoOAuth/routing/account/iPhone not accepted |
+| Independent native human owner | Active owner native session from configured frontend-client allowlist; explicit exact hash/effects consent; normal HA local APIs retained | Client_id/header/URL alone is not proof; actual local OAuth HTTP tested, owner panel browser blocked |
+| Custom administrator/backend | Native owner JWT minted only at own-loopback backend request; fixed typed APIs, no arbitrary service/URL/WS/shell proxy | Broad native JWT never supplied to connector; trusted HA/component compromise remains outside this application isolation |
+| SQLite and restart/restore | Intent before dispatch; consumed uncertainty, scope/replay/expiry checks; boot grants retired; bearer bytes rotate; supported restore retires stable connections via retained native event | DB receipts can outlive HA saves; out-of-band old auth/DB copy is an unsupported authority-revival risk without independent non-restored recovery |
+| Tunnel lifecycle/update | One process owner/lease, bounded backoff, permanent auth/config denial, Core-stop/unload cleanup, bounded TERM/KILL, generation checks | No process tree/kernel confinement claim; local transport fixture is not official control-plane evidence; uncertain reap retains lease and blocks replacement |
+| Local edits/dependencies | Post-intent final snapshot/dependency checks; reference guard and ID mismatch uncertain; no unrelated automatic deletion | No native CAS/ID reservation; arbitrary dynamic/YAML dependencies and all-writer coordination unresolved |
+| Logs/untrusted definitions | Strict bounded JSON/IPC, duplicate keys rejected, backend redirect/proxy denial, native WS debug auth/issue suppression, omitted child payloads, textContent panel | Redaction is not global HA secret classification; reviewed owner effects required for scripts/automations; sandboxed browser unavailable |
+| Versions/persistence/artifacts | Exact Core source and unchanged hash lock; checked-in fresh setup; source/protected bytes checksummed | Private MCP helper seam version-sensitive; future patches need staging; no actual power-loss/production/HAOS restore acceptance |
+
+No root helper, privileged probe, cgroup/firewall mutation, VM, production or household operation occurred. Source review is not independent certification. Missing hosted/physical/kernel evidence remains missing; this candidate does not claim full administration is complete.
+
+## Historical threat model — preserved
+
 # Tunnel security threat model
 
 ## Assets and trust boundaries

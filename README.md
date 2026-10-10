@@ -8,6 +8,12 @@ first run, verifies the SHA256 digest, extracts each version under
 `.hass_codex_tunnel_mcp/bin/<version>/`, and supervises it as a Home Assistant
 subprocess. The bundled pinned fallback and first install target is `v0.0.10`.
 
+## Native administrator candidate (draft PR #2)
+
+The optional native administrator is under development for Core2026.10.0. It uses a distinct scoped connection at `/api/hass_codex_admin/mcp`; a normal Home Assistant bearer must not be handed to that remote administrator. The retained official tunnel client supplies its backend header using a locally approved stable connection ID. Normal restart renews the volatile credential; supported Core restore requires a new owner-issued connection. The existing task approval, readback and rollback paths remain in place.
+
+This candidate is **incomplete**, with native concurrent-write/ID allocation limits and hosted/browser/full-administration gates. The generic MCP transport instructions below describe the retained wrapper, not authorization to deploy this administrator. See [the development setup](scripts/development/start.md), [candidate plan](docs/security/IMPLEMENTATION_PLAN.md), [capability evidence](docs/security/TOOL_POLICY_MATRIX.md) and [operator runbook](docs/security/RECOVERY_DESIGN.md). No live/production connection or environment publication is included.
+
 ## Install with HACS
 
 1. In HACS, add this repository as a custom repository with category
@@ -73,6 +79,8 @@ version, deferred-until time, last check, last successful update, last error,
 and failed update versions.
 
 ## Runtime Behavior
+
+The existing manager now owns bounded crash recovery (1/2/4/8-second backoff, then exhausted), reuses the installed known-good binary and stops on authentication/configuration denial. User stop, unload and Core shutdown cancel ownership. Stale health files are insufficient: readiness checks actual health and, for the scoped administrator, authenticated MCP discovery. Provider/backend outages remain distinct degraded states. No additional watchdog service was added.
 
 The integration validates the configured HA-MCP URL, then starts:
 

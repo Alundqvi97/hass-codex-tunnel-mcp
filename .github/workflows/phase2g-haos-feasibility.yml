@@ -1,0 +1,34 @@
+name: Phase 2G - HAOS VM Feasibility (No Guest Boot)
+on:
+  push:
+    branches: [security/ha-mcp-phase2d-candidates]
+    paths: [.github/workflows/phase2g-haos-feasibility.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-feasibility:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Record bare runner capabilities without provisioning
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "stage=github-hosted-ephemeral-ubuntu-24.04"
+          echo "runner_os=$(uname -s)"
+          echo "memory_gib=$(awk '/MemTotal/ {printf "%.1f", $2/1024/1024}' /proc/meminfo)"
+          echo "root_free_gib=$(df -BG --output=avail / | tail -1 | tr -d ' G')"
+          echo "vcpu_count=$(nproc)"
+          if [ -e /dev/kvm ]; then echo "kvm_device=present"; else echo "kvm_device=absent"; fi
+          if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then echo "kvm_usable=true"; else echo "kvm_usable=false"; fi
+          if grep -Eq '(^| )(vmx|svm)( |$)' /proc/cpuinfo; then echo "vm_extensions=yes"; else echo "vm_extensions=no"; fi
+          for binary in qemu-system-x86_64 qemu-img virt-install; do
+            if command -v "$binary" >/dev/null; then echo "tool_$binary=available"; else echo "tool_$binary=not-preinstalled"; fi
+          done
+          if find /usr/share/OVMF /usr/share/edk2 -type f -iname '*CODE*.fd' 2>/dev/null | grep -q .; then echo "uefi_firmware=present"; else echo "uefi_firmware=not-preinstalled"; fi
+          echo "haos_image_download=none"
+          echo "packages_installed=none"
+          echo "vm_started=false"
+          echo "network_changes=none"
+          echo "external_resources=none"

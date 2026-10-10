@@ -1,0 +1,95 @@
+name: Phase 2G - Real MCP Approval Enforcement
+on:
+  push:
+    branches: [security/ha-mcp-phase2d-candidates]
+    paths:
+      - tests/staging/test_phase2g_approval_dispatch.py
+      - tests/staging/test_phase2g_convenience.py
+      - docs/security/phase2g/**
+      - .github/workflows/phase2g-approvals.yml
+permissions:
+  contents: read
+concurrency:
+  group: phase2g-approval-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  synthetic-final-dispatch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with: {persist-credentials: false}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: homeassistant-ai/ha-mcp
+          ref: fc54437a804858732e4bc927add98e202d879a09
+          path: ha_mcp_pinned
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with: {python-version: '3.13'}
+      - name: Verify genuine source revision and tests
+        run: |
+          test "$(git -C ha_mcp_pinned rev-parse HEAD)" = fc54437a804858732e4bc927add98e202d879a09
+          python -m py_compile tests/staging/test_phase2g_approval_dispatch.py
+      - name: Install locked runtime and test dependencies
+        run: |
+          python -m pip install --disable-pip-version-check 'uv==0.12.20'
+          cd ha_mcp_pinned
+          uv sync --locked --no-dev --python 3.13
+          uv pip install --python .venv/bin/python 'pytest==8.4.2' 'pytest-asyncio==1.4.0' 'pytest-timeout==2.4.0'
+      - name: Record upstream expected legacy approval behavior
+        env:
+          PYTHONPATH: ha_mcp_pinned/src
+          HOMEASSISTANT_URL: http://127.0.0.1:1
+          HOMEASSISTANT_TOKEN: synthetic-not-real
+        run: |
+          ha_mcp_pinned/.venv/bin/python -m pytest -q -rs -x \
+            ha_mcp_pinned/tests/src/unit/policy/test_middleware.py \
+            ha_mcp_pinned/tests/src/unit/policy/test_approval_queue.py \
+            ha_mcp_pinned/tests/src/unit/policy/test_approval_overlap.py \
+            ha_mcp_pinned/tests/src/unit/policy/test_allow_list.py \
+            ha_mcp_pinned/tests/src/unit/policy/test_handlers.py
+      - name: Evaluate separate synthetic household convenience proposal
+        env:
+          PYTHONPATH: ha_mcp_pinned/src
+          HOMEASSISTANT_URL: http://127.0.0.1:1
+          HOMEASSISTANT_TOKEN: synthetic-not-real
+        run: |
+          ha_mcp_pinned/.venv/bin/python -m pytest -q -rs -x tests/staging/test_phase2g_convenience.py
+      - name: Apply exact SHA-guarded final-dispatch hardening candidate
+        run: |
+          python docs/security/phase2g/middleware_revalidation.py --apply
+          python -m compileall -q ha_mcp_pinned/src/ha_mcp/policy/middleware.py
+          git -C ha_mcp_pinned diff --check
+          git -C ha_mcp_pinned diff > /tmp/phase2g-middleware.diff
+          test -s /tmp/phase2g-middleware.diff
+          git -C ha_mcp_pinned apply --check -R /tmp/phase2g-middleware.diff
+      - name: Real FastMCP policy and synthetic final-action tests
+        env:
+          PYTHONPATH: ha_mcp_pinned/src
+          HOMEASSISTANT_URL: http://127.0.0.1:1
+          HOMEASSISTANT_TOKEN: synthetic-not-real
+          HTTP_PROXY: http://127.0.0.1:9
+          HTTPS_PROXY: http://127.0.0.1:9
+          ALL_PROXY: http://127.0.0.1:9
+        run: |
+          ha_mcp_pinned/.venv/bin/python -m pytest -q -rs -x tests/staging/test_phase2g_approval_dispatch.py
+      - name: Run applicable upstream middleware lifecycle regressions under intentionally stricter dispatch revalidation
+        env:
+          PYTHONPATH: ha_mcp_pinned/src
+          HOMEASSISTANT_URL: http://127.0.0.1:1
+          HOMEASSISTANT_TOKEN: synthetic-not-real
+        run: |
+          ha_mcp_pinned/.venv/bin/python -m pytest -q -rs -x \
+            -k 'not switching_to_an_allow_list_mid_wait and not a_waiter_under_an_allow_list_does_not_ride_the_winners_window' \
+            ha_mcp_pinned/tests/src/unit/policy/test_middleware.py \
+            ha_mcp_pinned/tests/src/unit/policy/test_approval_queue.py \
+            ha_mcp_pinned/tests/src/unit/policy/test_approval_overlap.py \
+            ha_mcp_pinned/tests/src/unit/policy/test_allow_list.py \
+            ha_mcp_pinned/tests/src/unit/policy/test_handlers.py
+      - name: Restore exact original middleware source blob
+        run: |
+          git -C ha_mcp_pinned apply -R /tmp/phase2g-middleware.diff
+          git -C ha_mcp_pinned diff --exit-code
+          test "$(git -C ha_mcp_pinned hash-object src/ha_mcp/policy/middleware.py)" = 5b431906fe7a37bbc19e466ca92a34b491289298
+          echo 'PHASE2G_MIDDLEWARE_SOURCE_ROLLBACK_PASS'

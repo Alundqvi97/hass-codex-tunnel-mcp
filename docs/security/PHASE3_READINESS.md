@@ -44,3 +44,130 @@ Require a real staged backend/authorization test (not the existing simulated fix
 Before any production deployment, require an upstream HA-MCP fail-closed policy initialization remediation (separate project), a secret-path logging remediation, authenticated operator-only policy inventory, a genuine least-privilege gate across every alternative admin tool, and an out-of-band recovery route. Existing HA-MCP add-on auto-update and watchdog being enabled does not independently guarantee tunnel-client crash recovery, source compatibility, or update rollback. A source-level watchdog design remains separate in `RECOVERY_DESIGN.md`.
 
 OpenAI-hosted negative attachment and exact deployed add-on image digest still need verification. Maintain the draft unmerged; do not restart, reconfigure or rotate production.
+
+
+## Phase 2D readiness (review-only)
+
+**NO-GO** persists after successful isolated source tests: the candidate fail-fast policy can intentionally stop MCP startup, meaning the OpenAI tunnel cannot serve as its own repair route. Preserve and independently exercise local HA/Supervisor admin, pinned images and backups, plus a tested reversal before any upgrade. Confirm actual rule coverage and a strict-mode deployment mechanism; stage packaged HA-MCP boot and synthetic logging; hosted attachment negative tests and LAN/IPv6 isolation remain unverified. The tunnel crash/recovery design remains separate from HA-MCP policy/log patches.
+
+
+## Phase 2E gates — production still NO-GO
+
+The user supplied administrator UI screenshots of 18 approval rules; generic service, bulk, add-on/backup and HA restart tools are not listed in the visible rules. Source semantics and runtime middleware status still need to be correlated before claiming effective protection. Most critical is that switching these rules unchanged to allow-list mode would automatically allow destructive named operations.
+
+A disposable pinned add-on Docker image has been built and exercised with fake Supervisor token. Initial packaged acceptance detected startup log disclosure of a synthetic secret despite the first redaction patch; suppressing the actual FastMCP banner/HTTP access logger is now being retested. This is not full Supervisor/HAOS validation.
+
+Existing backup list shows 39 snapshots, but newest backups are labeled HA 2026.9.4 while running Core reports 2026.10.0. Require a verified protected current-version backup and independently tested recovery before any update.
+
+The strict-mode option is NOT implemented in stable Supervisor schema, does not survive add-on reboot reliably under a supported path, and could silently disappear if configuration defaults. `phase2e/STRICT_OPTION_DESIGN.md` identifies a durable opt-in and migration marker requirement. **No deployment approval.**
+
+
+### Final Phase 2E packaged result and gating decision
+
+The real pinned 8.6.0 Dockerfile image passed seven synthetic network-isolated entrypoint scenarios including same-volume invalid-policy to valid-policy recovery and no synthetic path exposure in collected startup/request logs ([run #37843820868](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37843820868)). Selected source and rollback CI also passed ([#37843820900](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37843820900)).
+
+This is **VERIFIED PACKAGED without Supervisor**, not HAOS/Supervisor integration nor production restore. Strict startup now fails closed within the tested container. Automatic updates, independent host recovery, persistent strict option/marker, current-version backup, real permission coverage, hosted attachment authorization and IPv6/LAN ingress remain unverified or incomplete. Do not deploy or merge. Phase 3 remains **NO-GO**.
+
+
+## Phase 2F gate decision (2026-10-08)
+
+**NO-GO remains.** Pinned source and isolated packaged Docker tests passed: initial legacy opt-out, strict-mode opt-in, fail-closed missing/corrupt options/policy, no silent downgrade after marker, same-volume recovery and no synthetic path in collected logs. Exact source reversal passed. See `phase2f/STRICT_MODE_TEST_RESULTS.md`.
+
+Current live rule effect confirmed `require_approval` by official administrator screenshot. Destructive bare rules would automatically allow operations if naively switched to `allow`; candidate instead constructs a fresh positive read-only allow-list. No hard-deny exists in original policy model, and nested proxy + approval expiry/replay remain separate tests.
+
+Production gates still block: real HAOS/Supervisor option persistence/recovery, current-version backup restore, least-privilege/risky route audit, middleware registration status, hosted unauthorized attachment, LAN/IPv6 isolation and tunnel-client crash recovery. The durable marker is not a guarantee against an administrator deleting both marker and options; trusted admin recovery must be independent of tunnel.
+
+
+### Phase 2G read-only feasibility and approval dispatch result
+
+Genuine Supervisor/HAOS staging is **BLOCKED**, not 'tested': public GitHub runner had /dev/kvm inaccessible and lacked QEMU/UEFI. New VM / ephemeral runner privilege changes require separate user authorization; no VM created. Verified [preflight #37847835408](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37847835408).
+
+Genuine FastMCP synthetic approval sequence uncovered a pinned upstream race: an approval pending before policy corruption could execute afterward. Separate single-file patch rechecks policy immediately before the privileged tool's `call_next`, stopping the tested race (13 new cases passed, 194 selected upstream after 2 intentional old-semantics exclusions, original 196 passed; exact reverse patch). [CI #37848485823](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37848485823). Must update excluded upstream expectations and perform final nested/real backend review before merge.
+
+A more convenient native policy only auto-allows verified bounded reads. Generic `ha_call_service` light rules do not reject additional data/target payloads, so writes stay approval-required. Neither per-tool approval nor server middleware is a universal hard deny. Full Supervisor, independent local restore, hosted unauthorized attachment, add-on update survival, backup integrity and IPv4/IPv6 boundaries remain **BLOCKED/NOT VERIFIED**.
+
+**Production NO-GO.** No production/service/router/credential change.
+
+
+## Phase 2H — actual acceptance and regression boundary
+
+Security-code regression [#37851968013](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37851968013) PASS: 196 original tests, 211 revised/patched tests with ZERO exclusions, exact original source and tests restored. The two old test expectations were actively rewritten for stricter no-stale-approval semantics. This proves in-process gate behavior only.
+
+Real HAOS VM first preflight #37851700140 FAILED before any guest/image was used due old OVMF firmware name, cleanup PASS. Actual authorized one-guest run #37851915146 **IN PROGRESS** as of this note; its Supervisor start/configuration, watchdog, policy corruption/deny, host reboot, complete rollback and recovery are NOT VERIFIED unless independently documented in the final run log.
+
+Even if a guest boots, Phase 3 stays **NO-GO** until the full 16 acceptance cases, hosted attachment boundary, independent production restore, auth and direct LAN/IPv6 exposure gates pass; no production changes, merge, Auth0 or router settings authorized.
+
+
+### Phase 2H FINAL gate disposition: REAL HAOS ACCEPTANCE BLOCKED
+
+One authorized GitHub-hosted HAOS VM [#37851915146](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37851915146) downloaded and verified official image SHA256, staged review-only local add-on files into guest disk, configured loopback host forwards and one rootless QEMU guest. **PASS:** image hash, QEMU KVM ACL, staged source, guest teardown and private files removal. **BLOCKED:** observer not seen, Home Assistant HTTP timed out after 780s; no real Supervisor login/install/options/policy/recovery. **NOT VERIFIED:** kernel boot completion, actual add-on image, log secret-path behavior, host reboot, watchdog and real restore. Do not claim Docker equivalence.
+
+Full actual-middleware source [#37851968013](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37851968013): 196 original tests and **211 revised/patched passing without exclusions**, original file rollback PASS. The actual guest does not validate these runtime invariants. Static harness improvement [#37853632264](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37853632264) PASS only for Bash/Python syntax and hostforward firewall-rule ordering. Last guest experiment authorization exhausted; no further VM without a new approval. All high-impact deployment gates remain outstanding: **PRODUCTION NO-GO**.
+
+
+## Phase 2I offline follow-up (2026-10-09; not part of original guest result)
+
+Phase 2I adds only synthetic diagnostics, guard and cleanup models in `docs/security/phase2i/offline_harness.py` and `tests/offline/test_phase2i_harness.py`, with a dedicated no-QEMU Python-only workflow. The historical run #37851915146 stays FAILED/BLOCKED. Classifiers do not contact a socket, boot a VM, validate kernel conntrack or prove Supervisor. See `docs/security/phase2i/REVIEW_AND_FUTURE_ACCEPTANCE.md`. No new guest authorization; any later acceptance must pin reviewed commit/hashes and obtain separate explicit approval. Phase 3 production NO-GO.
+
+
+### Phase 2I subsequent offline runtime-observer addendum (not historical VM evidence)
+
+Review-only commit `6617d6cded7cb6edb712c79af9f95045aab574c2` improved the *future* guest script's fixed-label transport observations (`HTTP_404`, `TCP_REFUSED`, `TCP_TIMEOUT`, absent listener vs no response), explicit QEMU user network `ipv6=off` and defensive no-body/no-exception-text outputs. The pure classifier and mock regression suite passed **13/13** in GitHub Actions [#37913475390](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37913475390) and [#37913479830](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37913479830); static syntax/isolation [#37913475242](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37913475242) SUCCESS. The original failed run has no new findings. No guest/network experiment was started; these are code-only outputs, not runtime proof. The runner shell cleanup, real DNS resolver and supported Supervisor data seeding remain under review. No further VM authorized. Production NO-GO.
+
+
+## Phase 2I second static hardening follow-up — no guest execution
+
+Future-only `runner_once.sh` now requires a **unique ext4 block device labelled `hassos-data`** before mounting the disposable NBD partition; the old positional `/dev/nbd0p8` mount assumption was removed. It stops before guest creation if the filesystem label or local source staging is not verified. It now attempts partial firewall-chain cleanup after the first chain is created, stops its watchdog in the exit trap and emits separate read-back receipts for IPv4/IPv6 rules, KVM ACL, test UID and mounts. These are **source-level improvements, unexecuted**, not proof of actual privileged rollback. The local-source staging itself remains a supportability hypothesis (legacy `addons/` vs current `apps/`), and guest bootstrap DNS remains unresolved. Existing CI performs bash syntax and synthetic source/cleanup checks only. No VM, sudo, iptables or NBD command was executed by Phase 2I.
+
+
+### Phase 2I final-acceptance fail-closed correction (2026-10-09; offline only)
+
+Independent source review found a **false-green risk**: the future guest script's `main()` returned exit 0 even when `test_addon()` returned early (store discovery blocked) or raised an exception, while many of the 16 Supervisor acceptance cases were still unimplemented. This was a defect in the *unexecuted test harness*, not a proven production flaw. The review candidate now refuses a false-green result: it requires a confirmed running Supervisor for the preliminary gate, reports `FULL_SUPERVISOR_ACCEPTANCE=BLOCKED_INCOMPLETE_16_CASES` and returns exit **6** after partial add-on testing. This deliberately cannot claim a successful guest acceptance until all mandatory cases receive independently proven PASS results. Pure offline mocks test success-like responses, exceptions and absent source without launching a guest, starting a network service, or using privileged commands.
+
+**Still unverified:** real QEMU owner/conntrack/DNS, actual HAOS boot and installed Supervisor, supported current-apps local store seeding, full strict-policy negative tests, genuine backup restore and watchdog behavior. No additional VM authorization or production change; preserve historical failed run unchanged. Source-gate review only; CI status must be checked on the exact commit.
+
+
+## Phase 2J final offline acceptance gate (2026-10-09)
+
+The 16-case pure state-machine and adversarial negative tests live in `docs/security/phase2j/acceptance.py` and `tests/offline/test_phase2j_acceptance.py` with a dedicated Python-only CI workflow. No live guest, network or privileged activity is performed. The review identifies unresolved host-side DNS upstream+TCP fallback, unsupported direct Supervisor `/data` provisioning, incomplete live 16-case observers and separate cleanup-readback gaps. This is **NOT READY** for another VM authorization. The historical failed Phase 2H guest is immutable; the future guest launcher intentionally continues to return nonzero for partial acceptance. See `phase2j/FINAL_OFFLINE_READINESS.md`; independent reviewer sign-off remains outstanding. Phase 3 production NO-GO.
+
+
+## Phase 2K — first-install packaged policy candidate (2026-10-09)
+
+The future-only HAOS harness no longer preloads tool_policy.json into Supervisor's private addons/data directory. It stages only local add-on source beneath apps/local. A reviewed Phase 2K patch adds a Supervisor-schema boolean bootstrap_reviewed_policy option (false by default) and a packaged fixed, minimal positive policy. If expressly enabled with strict policy, the add-on itself creates its *own* persistent /data/tool_policy.json once, exclusively with 0600 permissions; existing/corrupt policies and mandatory markers are never overwritten. The HAOS add-on Settings ingress HTTP 403 boundary is not bypassed. This is an offline developer-side candidate, NOT a verified official HA-MCP import mechanism or installed production security.
+
+Offline CI applies pinned patches and tests failure, interruption, identity, startup, and recovery classifications with synthetic data. Real Supervisor local-store discovery, app image identity, backup restoration, DNS path, all 16 genuine security gates and full privileged cleanup remain NOT TESTED/BLOCKED. See phase2k/INSTALLATION_AND_POLICY_PROVISIONING.md. Verdict: **NOT READY** for another VM, **Phase 3 production NO-GO**, no installation, merger or restart.
+
+
+## Phase 2L — DNS preflight and real pinned build-context validation (2026-10-09)
+
+The future-only harness now fails BEFORE sudo, firewall, guest download or QEMU when an independent QEMU host-side resolver/network attestation is unavailable. The static preflight distinguishes unsafe DNS and forwarding configurations and refuses all unverified paths; no broad web/DNS/NTP public egress remains in the dormant proposed firewall. Exact staging of the pinned Phase 2K candidate and required Docker COPY helper/template succeeded with 33 Phase 2L offline tests (source CI #37927463857). No Docker image was built, no kernel rules were tested, and Supervisor 16-case acceptance remains BLOCKED. See docs/security/phase2l/DNS_AND_PACKAGING_PREFLIGHT.md. **NOT READY** for another guest, Phase 3 NO-GO.
+
+
+## Consolidated pre-VM engineering closure — 2026-10-09
+
+Proposed deterministic IPv4/IPv6 owner firewall recipes, exact QEMU localhost forward AST regression, TTL-bound web snapshot review, 16-gate acceptance inventory and 13 independent cleanup readback requirements are now implemented **offline only** under docs/security/phase2l. The future-only runner remains blocked before sudo/network/guest work and has an additional exit-6 guard for unproven cleanup. Pure Phase 2L CI demonstrated 61 tests passing at 7daa6234, including the pinned patched Docker COPY source context; no Docker image or live network enforcement was performed. See docs/security/PRE_VM_CONSOLIDATED_ACCEPTANCE.md. Single immediate blocker is an independently reviewable, separately authorized non-VM libslirp resolver + firewall enforcement probe, not another general research phase. Phase 3 NO-GO, VM and deployment authorization absent.
+
+
+## Single bounded network probe package — 2026-10-09
+
+The future Probe A package is INERT source-only; no new workflow or privileged action is authorized. Scoped owner-UID iptables/ip6tables argv, deny-first dual-family setup, exact DNS UDP/TCP destination, narrow established-loopback reply and independently required rollback/readbacks live in docs/security/phase2l/probe_contract.py. Old potentially dangerous iptables-restore payload is replaced by non-loadable inert comments; unrelated firewall tables must never be flushed. Ordinary Linux process probe A does NOT prove QEMU/libslirp; QEMU probe B would need separate explicit QEMU approval and guest-originated DNS to prove upstream routing. See docs/security/phase2l/PROBE_APPROVAL_PACKAGE.md. NOT READY for live probe: bounded command executor, DNS client, kernel counters, deadlines and independent cleanup readbacks are not yet implemented; HAOS/Supervisor and production remain NO-GO.
+
+
+### Final offline transaction rehearsal (2026-10-09)
+
+The inert module docs/security/phase2l/probe_rehearsal.py now drives injected *synthetic callbacks only* through preflight, deny-first dual-stack setup, hook readback before workload, exact effective-order readback, workload-once, stop, both-family teardown, and all mandatory independent cleanup readbacks. It always returns SYNTHETIC or BLOCKED; no subprocess or network is available. Negative tests simulate failure at every setup/teardown step, missing dual-family hook, wrong UID/order, fake provenance, process-stop/cleanup failure, and a deliberately failing first cleanup readback while verifying **all** readbacks are still attempted. Phase 2L CI on source commit e208ba8c9c9030e41e722d7d2bb4e6e9661beca2: 91/91 passed (run #37933409551). This does not close the live command controller/DNS client/counter/readback engineering blocker or authorize Probe A; it provides a safer tested scaffold for that exact correction.
+
+
+## Probe A recovery and engineering closure (2026-10-09)
+
+The previously committed inert probe_contract/rehearsal/approval package remains intact. New separately committed Phase 2L modules supply a bounded DNS wire verifier, fixed negative socket primitives, strict offline kernel-state/counter parser, dependency-injected 240-second controller with cleanup reserve, exact argv sequencing and an unactivated host process boundary. At source commit 252ced34a63ba07ac450f8edaf7842d956770b82 the existing non-VM Phase 2L workflow passed **128 tests** (run #37937261004). No live network evidence, no VMs or privileged networking. **NOT READY** for one Probe A approval: an actual privilege-dropping runner/loopback peer, independent kernel observer, external cancellation-safe cleanup watchdog, bounded streaming output and independent review remain missing. Do not use the code reference as execution authority. See docs/security/phase2l/PROBE_A_ENGINEERING_REVIEW.md. Probe B QEMU and production stay NO-GO.
+
+
+## Additional mandatory release gate — preserve full ChatGPT Home Assistant administration (2026-10-09)
+
+See [PROJECT_DESIGN_BLUEPRINT.md](PROJECT_DESIGN_BLUEPRINT.md) for the authoritative **user-desired outcomes** and numbered UX-01–UX-12 acceptance cases. The required product is an effective **Home Assistant administrator**: investigate traces and logs, diagnose failures, build/modify/delete automations and scripts, create/edit dashboards and helpers, and safely apply/verifiably test approved changes. Treat a lone automatically allowed `ha_get_overview` as a temporary strict-policy bootstrap, **not** acceptable final parity.
+
+**Phase 3 production decision now has two independent gates:** (1) all existing security, hosted authorization, real Supervisor/HAOS, recovery, provenance and reviewer gates; and (2) demonstrated administrative workflow parity, task-scoped proportionate approvals where safely supported, typed/normalized final authorization across generic/alternate routes, tested end-to-end repair execution, and explicit user acceptance of any material capability loss. Passing one track cannot waive the other. No repeated per-tool consent loops for a previously approved bounded task unless the scope changes. Never grant a broad standing master permission to recover convenience.
+
+**NOT IMPLEMENTED / NOT VERIFIED:** Task-scoped approval tokens, full admin parity test matrix and the final production operation-policy matrix; these require future engineering and staging evidence. No change in authorization to modify production or run security probes.

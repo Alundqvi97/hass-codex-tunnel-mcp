@@ -1,0 +1,54 @@
+name: Phase 2H - Full Approval Semantics Regression
+on:
+  push:
+    branches: [security/ha-mcp-phase2d-candidates]
+    paths: ['docs/security/phase2h/**', 'docs/security/phase2g/middleware_revalidation.py', 'docs/security/IMPLEMENTATION_PLAN.md', '.github/workflows/phase2h-policy-regression.yml']
+permissions: {contents: read}
+concurrency:
+  group: phase2h-regression-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  original-and-revised:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: homeassistant-ai/ha-mcp
+          ref: fc54437a804858732e4bc927add98e202d879a09
+          path: ha_mcp_pinned
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with: {python-version: '3.13'}
+      - name: Install locked runtime and pinned testing tools
+        run: |
+          set -euo pipefail
+          test "$(git -C ha_mcp_pinned rev-parse HEAD)" = fc54437a804858732e4bc927add98e202d879a09
+          python -m pip install --disable-pip-version-check 'uv==0.12.20'
+          cd ha_mcp_pinned
+          uv sync --locked --no-dev --python 3.13
+          uv pip install --python .venv/bin/python 'pytest==8.4.2' 'pytest-asyncio==1.4.0' 'pytest-timeout==2.4.0'
+      - name: Run genuine unmodified upstream policy suite
+        env: {PYTHONPATH: ha_mcp_pinned/src, HOMEASSISTANT_URL: 'http://127.0.0.1:1', HOMEASSISTANT_TOKEN: synthetic-not-real}
+        run: |
+          ha_mcp_pinned/.venv/bin/python -m pytest -q -x ha_mcp_pinned/tests/src/unit/policy/test_middleware.py ha_mcp_pinned/tests/src/unit/policy/test_approval_queue.py ha_mcp_pinned/tests/src/unit/policy/test_approval_overlap.py ha_mcp_pinned/tests/src/unit/policy/test_allow_list.py ha_mcp_pinned/tests/src/unit/policy/test_handlers.py
+      - name: Apply source-guarded middleware patch and revise the two expectations
+        run: |
+          python docs/security/phase2g/middleware_revalidation.py --apply
+          python docs/security/phase2h/revise_approval_tests.py --apply
+          python -m compileall -q ha_mcp_pinned/src/ha_mcp/policy/middleware.py ha_mcp_pinned/tests/src/unit/policy/test_middleware.py
+          git -C ha_mcp_pinned diff --check
+          git -C ha_mcp_pinned diff > /tmp/phase2h-exact-reverse.patch
+          test -s /tmp/phase2h-exact-reverse.patch
+      - name: Run full revised suite without deselections
+        env: {PYTHONPATH: ha_mcp_pinned/src, HOMEASSISTANT_URL: 'http://127.0.0.1:1', HOMEASSISTANT_TOKEN: synthetic-not-real}
+        run: |
+          ha_mcp_pinned/.venv/bin/python -m pytest -q -x ha_mcp_pinned/tests/src/unit/policy/test_middleware.py ha_mcp_pinned/tests/src/unit/policy/test_approval_queue.py ha_mcp_pinned/tests/src/unit/policy/test_approval_overlap.py ha_mcp_pinned/tests/src/unit/policy/test_allow_list.py ha_mcp_pinned/tests/src/unit/policy/test_handlers.py tests/staging/test_phase2g_approval_dispatch.py
+      - name: Verify exact original source and tests restored
+        run: |
+          git -C ha_mcp_pinned apply -R /tmp/phase2h-exact-reverse.patch
+          git -C ha_mcp_pinned diff --exit-code
+          test "$(git -C ha_mcp_pinned hash-object src/ha_mcp/policy/middleware.py)" = 5b431906fe7a37bbc19e466ca92a34b491289298
+          echo PHASE2H_ORIGINAL_SOURCE_AND_TESTS_RESTORED

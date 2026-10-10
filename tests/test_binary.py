@@ -35,8 +35,8 @@ def test_select_asset_for_linux_amd64_and_arm64() -> None:
 
     assert amd64 == PINNED_ASSETS[("linux", "amd64")]
     assert arm64 == PINNED_ASSETS[("linux", "arm64")]
-    assert amd64.sha256 == "b9e0388a343f2d7adeff3992f411a0bd3d916a64bc56534aac5fd15ac1b20cd5"
-    assert arm64.sha256 == "b842a9b2352eebd80514cf01a1fbb1c0d400a7d24a4015e85a7ea5f1aeaa5b30"
+    assert amd64.sha256 == "d60cdba019bce451bcc3a15478cc5b9cb11270b049f5b56ea39a80b517f8b117"
+    assert arm64.sha256 == "963d0384aaa7c798778479c45673f9051a4039dd891aef8f8978d2a1a628b74f"
 
 
 def test_install_from_zip_bytes_verifies_and_extracts(tmp_path: Path) -> None:

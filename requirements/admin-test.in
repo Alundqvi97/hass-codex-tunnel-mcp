@@ -1,0 +1,13 @@
+# Disposable native-Core fixture only; production requirements are supplied by HA.
+# Core release and its official MCP, frontend and conversation manifests.
+homeassistant==2026.10.0
+mcp==1.28.1
+anyio==4.14.2
+aiohttp-sse==2.2.0
+home-assistant-frontend==20260930.2
+gazetteer-matcher==1.1.0
+hassil==3.12.1
+home-assistant-intents==2026.10.6
+
+# Official Core Supervisor manifest dependency for isolated native-handler tests.
+aiohasupervisor==0.6.0

@@ -11,6 +11,7 @@ from .const import (
     CONF_CONTROL_PLANE_BASE_URL,
     CONF_CONTROL_PLANE_PATH,
     CONF_HA_MCP_BEARER_TOKEN,
+    CONF_ADMIN_CONNECTION_ID,
     CONF_HA_MCP_URL,
     CONF_TUNNEL_ID,
     DEFAULT_AUTO_UPDATE_TUNNEL_CLIENT,
@@ -54,7 +55,11 @@ def normalize_user_input(user_input: dict[str, Any]) -> dict[str, Any]:
         mcp_url = normalize_mcp_url(str(user_input[CONF_HA_MCP_URL]))
     except MCPUrlError as err:
         raise InputValidationError(str(err)) from err
+    identifier = str(user_input.get(CONF_ADMIN_CONNECTION_ID) or "").strip()
+    if identifier and not re.fullmatch(r"[a-f0-9]{32}", identifier):
+        raise InputValidationError("invalid_admin_connection_id")
     return {
+        **({CONF_ADMIN_CONNECTION_ID: identifier} if identifier else {}),
         CONF_TUNNEL_ID: validate_tunnel_id(str(user_input[CONF_TUNNEL_ID])),
         CONF_API_KEY: api_key,
         CONF_HA_MCP_URL: mcp_url,

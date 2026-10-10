@@ -1,0 +1,1115 @@
+{
+  "schema": 2,
+  "engineering": "COMPLETE for owner-accepted isolated staging scope: source, package and connected local/CI acceptance pass. Full Blueprint administration remains unfinished; external OAuth/custom forms and additional high-impact device adapters remain explicit future full-product gaps.",
+  "acceptance": "PENDING hosted ChatGPT/iPhone and actual Supervisor/HAOS/physical acceptance. Owner accepted isolated staging policy/scope; sandboxed synthetic Core/native owner panel VERIFIED.",
+  "deployment": "NOT AUTHORIZED / NOT PERFORMED",
+  "repository": "Alundqvi97/hass-codex-tunnel-mcp",
+  "branch": "security/ha-mcp-phase2d-candidates",
+  "draft_pr": 2,
+  "baseline": {
+    "reviewed_source": "a7ad7a6a3362262e0a5f3b8d8a04998106d42acc",
+    "documentation_delivery": "27a78774c792ab8dfcf8a9abaed57329032d6483",
+    "owner_amendment": "b2dc4eb05f5bda4ec9b32d443a1abba505543a2b",
+    "initial_head": "27a78774c792ab8dfcf8a9abaed57329032d6483",
+    "initial_tree": "clean",
+    "source_to_delivery": "IMPLEMENTATION_PLAN.md only, eight added lines; inspected",
+    "pr_verified": "open/draft/unmerged; no reset/force/merge"
+  },
+  "immutable_source": "d0983cbdb422bb4089a846f1aa34d814432aa735",
+  "target": {
+    "homeassistant": "2026.10.0",
+    "upstream_commit": "6a811d3359c7b2076dc9e1cf900843a129c044af",
+    "python": "3.14.2",
+    "mcp": "1.28.1",
+    "development_locked_packages": 125,
+    "lock_change": "Only official Core aiohasupervisor0.6.0 added, existing124 package/hash blocks unchanged",
+    "component": "0.2.0",
+    "wrapper": "0.1.0 candidate source",
+    "official_tunnel_client": "v0.0.16",
+    "tunnel_source_commit": "5f99daabd4aa4a77049e6d81d54a0d8c18335397",
+    "official_amd64_archive_sha256": "d60cdba019bce451bcc3a15478cc5b9cb11270b049f5b56ea39a80b517f8b117",
+    "official_arm64_archive_sha256": "963d0384aaa7c798778479c45673f9051a4039dd891aef8f8978d2a1a628b74f",
+    "arm64_execution": "NOT TESTED",
+    "previous_candidate_client": "v0.0.10; actual production versions NOT INSPECTED",
+    "core_gate": "2026.10.x staged range; only2026.10.0 accepted locally",
+    "retained_phase2l_upstream": "fc54437a804858732e4bc927add98e202d879a09"
+  },
+  "baseline_reproduced": {
+    "native_passed": 42,
+    "phase2l_passed": 489,
+    "broader_passed": 633,
+    "broader_skipped": 1,
+    "skip": "Optional legacy HA selector unavailable in separate security venv"
+  },
+  "final_validation": {
+    "native": {
+      "passed": 59,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 134.202,
+      "command": "python -B -m unittest discover -s tests/staging -p 'test_admin_product.py' -v",
+      "installed_archive": true,
+      "scope": "Real Core/auth/HTTP/WS/MCP/config/task/storage; synthetic devices, no household access",
+      "source_sha": "d0983cbdb422bb4089a846f1aa34d814432aa735"
+    },
+    "phase2l": {
+      "passed": 489,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 0.704,
+      "source_sha": "d0983cbdb422bb4089a846f1aa34d814432aa735"
+    },
+    "broader": {
+      "passed": 633,
+      "failed": 0,
+      "skipped": 1,
+      "seconds": 6.91,
+      "skip": "Optional legacy HA selector dependency; native actual Core schema exercised separately",
+      "source_sha": "d0983cbdb422bb4089a846f1aa34d814432aa735"
+    },
+    "package": {
+      "passed": 1,
+      "failed": 0,
+      "seconds": 21.973,
+      "processes": 4,
+      "transitions": [
+        "reviewed0.1.0 installed",
+        "0.2.0/schema2 upgrade",
+        "unsafe0.1.0/schema2 refuses; local owner remains independent",
+        "current archive reinstalled and actual task/rollback recovered"
+      ],
+      "origin": "Installed engine digest and module path asserted; no checkout source fallback",
+      "local_source_sha": "fc984cfe2b21e6593748ed8707db5c13933be9f1",
+      "final_source_ci": "Fresh installed final archive package test succeeded inside both native CI jobs at d0983cbdb422bb4089a846f1aa34d814432aa735"
+    },
+    "official_client": {
+      "v0.0.10": {
+        "passed": 1,
+        "seconds": 1.796
+      },
+      "v0.0.16": {
+        "passed": 1,
+        "seconds": 2.085
+      },
+      "actual_client": true,
+      "actual_retained_manager": true,
+      "cases": "tools/list, invalid command then valid, denial before owner approval, actual task and rollback after owned child crash/relaunch",
+      "substituted_boundary": "Loopback metadata/poll/response control plane, synthetic key; no OpenAI control plane connection",
+      "final_source_ci": "Actual verified v0.0.16 client, retained manager and loopback fake control plane succeeded in both native jobs at d0983cbdb422bb4089a846f1aa34d814432aa735"
+    },
+    "browser": {
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "status": "VERIFIED in sandboxed existing nonprivileged Ubuntu24 CI, push and PR jobs",
+      "source_sha": "d0983cbdb422bb4089a846f1aa34d814432aa735",
+      "runs": [
+        38067667282,
+        38067672474
+      ],
+      "jobs": [
+        114258510722,
+        114258525835
+      ],
+      "pr_step_seconds": 15,
+      "duration_scope": "Entire CI browser step including npm install; not a fabricated exact test duration",
+      "sandbox_disabled": false,
+      "scope": "Actual owned Core HTTP static UTF-8 fixture, native PKCE/token/WS and production owner panel; credential issue/revoke, exact effects/window approval, execute/readback/rollback/reject, native menu/password/multiline/number/select/multiple-select clearing and invalid optional values",
+      "substituted_boundary": "Minimal synthetic login document and synthetic Sun ConfigFlow provider; actual HA auth/task/dispatch/storage/panel used. Not full HA frontend, real external provider, native iPhone or hosted ChatGPT."
+    },
+    "checks": [
+      "Python source/fixtures/security compile",
+      "panel/browser JS parse",
+      "installer shell syntax",
+      "git diff --check",
+      "validation worktree/index/status unchanged",
+      "protected Blueprint/HAOS workflows unchanged",
+      "Final source checksum file verified",
+      "Downloaded final source GitHub archive and compared every production asset byte-for-byte to immutable source"
+    ]
+  },
+  "bounded_reliability": {
+    "iterations": 5,
+    "failed": 0,
+    "duplicate_writes": 0,
+    "task_and_rollback_ms": [
+      129.79,
+      135.52,
+      156.67,
+      141.7,
+      136.0
+    ],
+    "scope": "bounded loopback scheduling variation; not a stability soak",
+    "seconds": 0.844
+  },
+  "fresh_setup": {
+    "command": "ADMIN_DEV_STATE=<new external state> ADMIN_NATIVE_PYTHON=<supplied verified3.14.2> bash scripts/development/install.sh --setup",
+    "checkout": "New clean detached clone at 7f8dbd8e61fb869c2b69cee5b8f0a016b2cdf3c1, new125-package hash/TLS verified venv; final d0983cb native/package/browser also succeeded in freshly installed CI environments",
+    "packages": 125,
+    "hashes_and_tls": true,
+    "pip_check": "All packages compatible",
+    "native_passed": 59,
+    "native_seconds": 131.761,
+    "phase2l_passed": 489,
+    "broader_passed": 633,
+    "broader_skipped": 1,
+    "subtests": 296,
+    "broader_seconds": 6.82,
+    "repeated_counts": "Reproduction only; never added to independent coverage totals",
+    "environment_published": false,
+    "source_sha": "7f8dbd8e61fb869c2b69cee5b8f0a016b2cdf3c1",
+    "phase2l_seconds": 0.713
+  },
+  "proof_cases": [
+    "Durable deny before SQL, cancelled late connector activation, pending retirement and symlink marker refusal; task RAM revoke blocks after SQL fault.",
+    "Lost create acknowledgment never adopts independently created identical object; HA assigns collision-free actual ID, same-task receipt references and rollback preserve unrelated helpers.",
+    "Actual during-dispatch local edit demonstrates unconditional HA overwrite gap; after-dispatch drift remains uncertain and rollback refuses. Owner window accepted only by synthetic test owner.",
+    "Actual native ConfigFlow manager, basic owner password input outside MCP, wrong owner/plan/replay/secret suppression, reauth/reconfigure, reload observation and terminal-without-reload stays uncertain.",
+    "Actual native Supervisor WS handler fixed endpoint contract; only its remote service substituted, unsupported addon exact-version reservation rejects, backup latest update contract, restart remains uncertain.",
+    "Mixed repeated concurrent duplicate/invalid then valid tasks and reverse rollback; no duplicate writes, scoped credential alternate route denial, local owner access preserved.",
+    "Retained native abrupt death, buffered config vs SQLite receipt, native backup restore, ordinary restart and authority retirement reproduced with owned processes.",
+    "Actual hash-verified official clients through retained manager and production-only installed archives execute permitted tasks after crash/upgrade/reinstall.",
+    "Native Core restart uses kernel process creation identity, actual two-process receipt reconciliation and boot grant retirement; same-incarnation reload never PASS; no mutation replay.",
+    "Fixed native Supervisor host reboot/shutdown endpoints, supported feature and bounded host/boot facts; reboot requires new boot facts and acknowledgment; shutdown remains uncertain. Supervisor service is synthetic, no host reboot/shutdown occurred.",
+    "Native menu, standard select/multi-select/password/multiline/number/bool contracts; defaults/secrets never exported. Empty multi-select clearing and fractional numbers supported; invalid included optional values block without losing secret input."
+  ],
+  "source_review": {
+    "reviewers": 2,
+    "mode": "Separate read-only adversarial source passes within existing resources; not independent certification",
+    "confirmed_findings_fixed": [
+      "Revocation SQL failure and late cancelled issuance revival",
+      "Unattributed create adoption",
+      "Flow lock inversion and queued authorization",
+      "Revoked flow cleanup/permanent capacity",
+      "Owner logout while cancel waits",
+      "Terminal flow success before actual reload",
+      "Supervisor addon update endpoint/version contract",
+      "Bound helper rollback reconciliation",
+      "Duplicated panel flow block",
+      "Blank optional native selector coerced to first choice/zero",
+      "Native password cleared before later invalid field",
+      "Multiline selector lost line breaks",
+      "Number selector rejected valid fraction",
+      "Multi-select clearing rejected empty list",
+      "Reauth partial progress mistaken for initialized native form",
+      "Native select accessible label included embedded option text",
+      "Native menu next_step_id incorrectly treated as optional setting instead of required navigation"
+    ],
+    "final_confirmed_new_defects": [],
+    "limits": [
+      "No universal storage-failure guarantee",
+      "No native CAS",
+      "No arbitrary dependency completeness",
+      "No external OAuth/provider authentication or add-on restart-incarnation proof",
+      "Host boot facts are synthetic Supervisor boundary until separately authorized target acceptance"
+    ],
+    "final_pass": "Read-only adversarial reviewer inspected fc984cfe2b21e6593748ed8707db5c13933be9f1 with no additional confirmed defect; subsequent menu schema correction reviewed locally, targeted regression added and actual sandboxed browser/full native CI passed. Review is not qualified independent certification."
+  },
+  "scanner": {
+    "run": 38055930745,
+    "job": 114224377837,
+    "api_verified": "completed/failure; Processing Request (Linux) failed",
+    "owner_report": "HTTP402 monthly quota exhaustion",
+    "logs": "Detailed log redirect inaccessible here; quota text not independently reverified",
+    "retried_or_paid": false,
+    "clean_review": false
+  },
+  "references": {
+    "requested_primary_urls": "All six shell fetches CONNECT403; no available web tool; not represented as current webpage verification",
+    "official_tunnel_source": "v0.0.16 permissions/protocol/onboarding/end-user guides at5f99daabd4aa4a77049e6d81d54a0d8c18335397",
+    "ha_developer_docs": "883072b5555988737f681e91a8b2f0d2cf27af70 docs/core/llm/index.md and docs/auth_api.md",
+    "ha_integration_docs": "c86a3009cad7e856b78d8ce3342e47750cf96fb0 source/_integrations/mcp_server.markdown",
+    "decision": "Official transport and native HA interfaces retained; public LLM registration used; small private scoped-MCP compatibility seam isolated. Community wrapper/custom administrator not vendor-certified."
+  },
+  "release_archive": {
+    "path": "artifacts/native-admin-0.2.0.zip",
+    "sha256": "deb0a0507f8a3105c4c5f14fcb7eabb3952a5dd5d48fabcdff180548df3981d8",
+    "manifest": "Embedded per-file SHA256/size; verified installed archive",
+    "contents": "Two production components and release_manifest.json only",
+    "excluded": "Probe A/tests/fixtures/credentials/databases/venvs/caches/toolchains",
+    "production_release_published": false,
+    "transfer": "Committed immutable GitHub blob/raw artifact; no session-only download claim",
+    "transfer_verified": "Downloaded final archive via authenticated GitHub contents API at immutable source SHA; digest matches and every production asset equals git show source:path",
+    "source_sha": "d0983cbdb422bb4089a846f1aa34d814432aa735",
+    "entries": 33,
+    "production_assets": 32,
+    "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/raw/d0983cbdb422bb4089a846f1aa34d814432aa735/artifacts/native-admin-0.2.0.zip"
+  },
+  "remaining_gates": [
+    "Owner accepted isolated staging window/scope. Hosted staging still needs exact separate authorization; production/full-product policy and scope are not accepted by this limited decision.",
+    "External OAuth/progress/custom/multiple-text provider frontend and additional high-impact physical device families remain missing source coverage; full-product scope is not silently reduced",
+    "Hosted organization/workspace/operator access, intended ChatGPT/iPhone positive/denial/recovery staging",
+    "Actual Supervisor/HAOS maintenance/install/update/backup restoration and physical acceptance",
+    "Separately approved live version inspection, protected backup/local recovery and production cutover"
+  ],
+  "approval_sheet": "docs/security/RECOVERY_DESIGN.md; separate rows, no approval inherited or implicitly bundled",
+  "previous_delivery_evidence": {
+    "schema": 1,
+    "status": "CANDIDATE INCOMPLETE",
+    "repository": "Alundqvi97/hass-codex-tunnel-mcp",
+    "branch": "security/ha-mcp-phase2d-candidates",
+    "draft_pr": 2,
+    "baseline": {
+      "reviewed_source": "14fca17f54f364019b6bfa9074d1e016ccb6f92b",
+      "documentation_delivery": "7603213f386d802c9fd225dde015c10026d8aebd",
+      "owner_amendment": "b2dc4eb05f5bda4ec9b32d443a1abba505543a2b",
+      "initial_tree": "clean",
+      "source_to_delivery": "IMPLEMENTATION_PLAN.md receipt only (8 lines)",
+      "pr_verified": "open/draft/unmerged"
+    },
+    "source_revision": "The immutable source commit is recorded in IMPLEMENTATION_PLAN.md by the following documentation receipt; this checksum manifest binds the exact tested files.",
+    "target": {
+      "homeassistant": "2026.10.0",
+      "upstream_commit": "6a811d3359c7b2076dc9e1cf900843a129c044af",
+      "python": "3.14.2",
+      "mcp": "1.28.1",
+      "development_locked_packages": 124,
+      "official_tunnel_client": "v0.0.10",
+      "tunnel_tag_commit": "ab3b64ba1818d67ae625fb91c9b8ef850759579a",
+      "retained_phase2l_upstream": "fc54437a804858732e4bc927add98e202d879a09",
+      "browser_client": "Playwright1.62.1 optional separate npm integrity lock"
+    },
+    "baseline_reproduced": {
+      "native_passed": 30,
+      "phase2l_passed": 489,
+      "broader_passed": 626,
+      "broader_skipped": 1,
+      "skip": "Optional legacy HA selector module unavailable in the separate security venv"
+    },
+    "final_validation": {
+      "native": {
+        "command": "python -B -m unittest discover -s tests/staging -p 'test_admin_product.py' -v",
+        "passed": 42,
+        "failed": 0,
+        "skipped": 0,
+        "boundaries": "Actual Core/native HTTP/WebSocket/MCP/auth/entities/SQLite, task-owned processes and native backup/restore; local transport fixture substitutes official control plane",
+        "seconds": 110.188,
+        "representative_three_operation_task": {
+          "approvals": 1,
+          "execute_ms": 59.57,
+          "rollback_ms": 87.35,
+          "scope": "Single local synthetic run; no household latency guarantee"
+        }
+      },
+      "phase2l": {
+        "command": "python3 -B -m unittest discover -s tests/offline -p 'test_phase2l_*.py' -v",
+        "passed": 489,
+        "failed": 0,
+        "skipped": 0,
+        "seconds": 0.706
+      },
+      "broader": {
+        "command": "python -B -m pytest -q -rs -p no:cacheprovider tests --ignore=tests/staging (loopback-only temporary pytest guard)",
+        "passed": 633,
+        "failed": 0,
+        "skipped": 1,
+        "subtests": 296,
+        "skip": "Optional old HA selector dependency absent; native schema/lifecycle exercised in Core venv",
+        "seconds": 6.74
+      },
+      "compilation": "Python application/security/test compilation; both component paths and native fixtures; JS panel/browser fixture syntax; installer and historical VM runner parsed only; git diff --check and unchanged validation checkout snapshots passed"
+    },
+    "fresh_setup": {
+      "command": "ADMIN_DEV_STATE=<owned external state> ADMIN_NATIVE_PYTHON=<supplied Python3.14.2> bash scripts/development/install.sh --setup; --verify after final queued-updater correction",
+      "checkout": "Owned fresh clone of verified baseline plus exact candidate source/test/setup bytes",
+      "dependency_integrity": "New empty venvs, 124 existing hash-locked native packages, trusted TLS; separate existing pytest>=8,<10 range resolved pytest9.1.1; uv pip check passed",
+      "state": "External checkout caches/temp/fixtures/credentials; before/after worktree/index/status identical; no unpublished environment file dependency",
+      "environment_published": false
+    },
+    "proof_cases": [
+      "Old native admin and native read-only tokens actually reach nonentity service; distinct connector cannot use native REST/WS/base/alternate MCP/Assist/SSE/config routes; independent local owner can.",
+      "Owner WS issue/list/revoke, no secret redisplay or DB raw bearer, native DEBUG redaction; wrong caller/hash/expiry/revoke/replay denial followed by useful valid operations.",
+      "Three actual approved repair sequences through recovered local transport with concurrent duplicate executions and rollback; child crash/concurrent starts/disconnect/provider outage/backend listener loss/reconnect/permanent credential revoke.",
+      "Real manager known-good rollback after injected candidate spawn failure; actual later native MCP; stopped/closed and queued update/rollback cannot revive; failed setup tail and actual Core-stop reap child; native readonly lifecycle services denied.",
+      "Injected repeated cancellation before child acquisition, during TERM and while waiting on lifecycle lock; fake stalled post-KILL reap stays cleanup_incomplete and retains ownership.",
+      "Actual post-intent local edit detected and preserved, fresh repair/rollback useful; local helper allocated after final check yields wrong returned ID, uncertain result, no unrelated deletion and no replay.",
+      "Actual cover/media entity/service/readback plus retained light/switch; native group membership blocks inverse deletion; all eight helper families/dashboard/automation/script paths retained.",
+      "Twelve owned Core processes exercise four abrupt-death boundaries, including applied SQLite helper receipt before buffered HA save; no blind mutation retry and drift remains explicit.",
+      "Four actual Core processes exercise native local backup and startup restore; restored definition, grants retired, old bearer401 and old stable delegation cannot renew; fresh owner consent required.",
+      "Actual native owner OAuth discovery/login HTTP/PKCE, invalid verifier/code replay/wrong-client refresh, token refresh/revoke; native JWT cannot enter scoped MCP. Not hosted/browser consent evidence."
+    ],
+    "browser": {
+      "selected_tests": 1,
+      "passed": 0,
+      "failed": 1,
+      "status": "BLOCKED BEFORE PANEL EXECUTION",
+      "actual_failure": "Chromium SUID sandbox helper misconfigured; sandbox retained; alternate user-namespace sandbox launch also reported No usable sandbox",
+      "source": "Optional actual DOM/native WS test committed, separately locked client installed fresh outside checkout",
+      "not_performed": "No system sandbox change, no no-sandbox workaround, no iPhone/native frontend/hosted acceptance"
+    },
+    "official_references": {
+      "primary_urls": [
+        "https://developers.openai.com/api/docs/guides/custom-mcp-server",
+        "https://developers.openai.com/api/docs/guides/secure-mcp-tunnels",
+        "https://developers.openai.com/plugins/deploy/connect-chatgpt",
+        "https://www.home-assistant.io/integrations/mcp_server/",
+        "https://developers.home-assistant.io/docs/core/llm/",
+        "https://developers.home-assistant.io/docs/auth_api/"
+      ],
+      "outcome": "All six normal and approved read-only requests blocked by proxy CONNECT403; no permission-settings change",
+      "fallback": "Official GitHub tunnel-client README/connectors/permissions, v0.0.10 source/metrics and installed exact Core source",
+      "readme_blob": "ebbe7bc7b328fa1e214af26e56ae3b4b13428961"
+    },
+    "review": {
+      "kind": "Separate read-only adversarial source self-review; not independent certification",
+      "confirmed_corrections": [
+        "credential DEBUG leakage",
+        "supported-restore stable delegation revival",
+        "cancellation orphan risks including lock acquisition",
+        "unbounded post-KILL wait",
+        "candidate generation rollback failure",
+        "late/queued updater revival",
+        "oversized output pipe draining",
+        "Core-stop/failed-setup ownership cleanup",
+        "readonly nonentity tunnel lifecycle bypass"
+      ],
+      "remaining_source_limits": [
+        "No supported Core conditional CRUD/CAS or helper ID reservation; after-check local races remain",
+        "Incomplete custom/dynamic/unloaded YAML dependency discovery",
+        "Missing credential/reauth/reconfigure/Supervisor/high-impact administration adapters",
+        "Out-of-band old auth/DB restoration cannot distinguish resurrected delegation from normal boot without independent recovery",
+        "Private native MCP helper seam requires supported-version staging"
+      ]
+    },
+    "ci": {
+      "policy": "Existing public-repository nonprivileged automatic runs only; no workflow dispatch/retry or paid resources",
+      "final_sha_outcomes": "Read from final draft PR checks and recorded in the matching PR description/final engineering report; local passing results do not predeclare CI PASS"
+    },
+    "external_gates": [
+      "Resolve supported-object coordination or obtain explicit owner acceptance without silently narrowing administration",
+      "Independent security review and approved exact transport/route/credential deployment",
+      "Accessible current official docs and actual official tunnel/hosted account/OAuth-or-NoOAuth/mobile approval acceptance",
+      "Sandbox-capable browser and native frontend acceptance",
+      "Supported-version staged upgrade/restore, HAOS/Supervisor, household/physical administration and missing adapters"
+    ],
+    "prohibited_actions": {
+      "production": "NOT AUTHORIZED / NOT PERFORMED",
+      "Probe_A_HAOS_VM": "NOT AUTHORIZED / NOT PERFORMED",
+      "real_tunnel_OAuth_or_credentials": "NOT PERFORMED",
+      "merge_force_push_paid_manual_workflow": "NOT PERFORMED"
+    },
+    "checksums": "NATIVE_ADMIN_CHECKSUMS.sha256: run sha256sum -c docs/security/NATIVE_ADMIN_CHECKSUMS.sha256 at the source or documentation delivery checkout."
+  },
+  "changed_file_inventory": [
+    ".github/workflows/admin-core-development.yml",
+    "artifacts/native-admin-0.2.0.zip",
+    "artifacts/native-admin-0.2.0.zip.sha256",
+    "custom_components/hass_codex_admin/__init__.py",
+    "custom_components/hass_codex_admin/approval.py",
+    "custom_components/hass_codex_admin/auth.py",
+    "custom_components/hass_codex_admin/backend.py",
+    "custom_components/hass_codex_admin/diagnostics.py",
+    "custom_components/hass_codex_admin/engine.py",
+    "custom_components/hass_codex_admin/flows.py",
+    "custom_components/hass_codex_admin/llm_api.py",
+    "custom_components/hass_codex_admin/manifest.json",
+    "custom_components/hass_codex_admin/model.py",
+    "custom_components/hass_codex_admin/panel.js",
+    "custom_components/hass_codex_admin/store.py",
+    "custom_components/hass_codex_admin/supervisor.py",
+    "custom_components/hass_codex_tunnel_mcp/binary.py",
+    "custom_components/hass_codex_tunnel_mcp/const.py",
+    "custom_components/hass_codex_tunnel_mcp/tunnel.py",
+    "docs/security/IMPLEMENTATION_PLAN.md",
+    "docs/security/NATIVE_ADMIN_CHECKSUMS.sha256",
+    "docs/security/NATIVE_ADMIN_EVIDENCE.json",
+    "docs/security/RECOVERY_DESIGN.md",
+    "docs/security/THREAT_MODEL.md",
+    "docs/security/TOOL_POLICY_MATRIX.md",
+    "requirements/admin-test.in",
+    "requirements/admin-test.lock.txt",
+    "scripts/development/install.sh",
+    "scripts/development/package.py",
+    "scripts/development/start.md",
+    "tests/staging/admin_browser_fixture.cjs",
+    "tests/staging/admin_official_transport.py",
+    "tests/staging/admin_package_process.py",
+    "tests/staging/admin_process_fixture.py",
+    "tests/staging/test_admin_browser.py",
+    "tests/staging/test_admin_official_transport.py",
+    "tests/staging/test_admin_package.py",
+    "tests/staging/test_admin_product.py",
+    "tests/test_binary.py"
+  ],
+  "github_access": {
+    "current": "Existing API/push access recovered without authentication/security/settings mutation",
+    "logs": "Detailed Actions log redirect remains proxy403; sanitized GitHub check annotations used",
+    "environment_published": false
+  },
+  "github_ci": {
+    "source_sha": "d0983cbdb422bb4089a846f1aa34d814432aa735",
+    "verified_at_utc": "2026-10-10T16:34:14.367008+00:00",
+    "runs": [
+      {
+        "id": 38067673769,
+        "name": "Code scanning AI findings on PR #2",
+        "event": "dynamic",
+        "status": "completed",
+        "conclusion": "failure",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067673769"
+      },
+      {
+        "id": 38067671955,
+        "name": "Phase 2I - Synthetic Offline Harness Only",
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067671955"
+      },
+      {
+        "id": 38067671825,
+        "name": "Phase 2L - DNS and Build Context Offline",
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067671825"
+      },
+      {
+        "id": 38067671946,
+        "name": "Phase 2J - Pure Offline Acceptance Model",
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067671946"
+      },
+      {
+        "id": 38067671889,
+        "name": "Phase 2K - Packaged Initial Policy Offline",
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067671889"
+      },
+      {
+        "id": 38067671948,
+        "name": "Phase 2D - HA-MCP Upstream Patch Candidates",
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067671948"
+      },
+      {
+        "id": 38067672474,
+        "name": "Native Core Administrator Development",
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067672474"
+      },
+      {
+        "id": 38067667306,
+        "name": "Phase 2D - HA-MCP Upstream Patch Candidates",
+        "event": "push",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067667306"
+      },
+      {
+        "id": 38067667292,
+        "name": "Phase 2F - Supported Strict Addon Staging",
+        "event": "push",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067667292"
+      },
+      {
+        "id": 38067667279,
+        "name": "Phase 2E - Disposable Packaged Addon Test",
+        "event": "push",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067667279"
+      },
+      {
+        "id": 38067667282,
+        "name": "Native Core Administrator Development",
+        "event": "push",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38067667282"
+      }
+    ],
+    "privileged_jobs_triggered": false,
+    "manual_retry_or_dispatch": false,
+    "scanner": "Automatic existing scanner failed; not a clean scan. No capacity purchased."
+  },
+  "interim_release_receipt": {
+    "schema": 2,
+    "engineering": "INCOMPLETE: sandboxed owner-panel CI failure cannot be diagnosed/fixed while existing GitHub credential is invalid; full-scope capability gaps remain explicit",
+    "acceptance": "PENDING owner window/scope acceptance, browser failure correction, hosted ChatGPT/iPhone and real Supervisor/HAOS",
+    "deployment": "NOT AUTHORIZED / NOT PERFORMED",
+    "repository": "Alundqvi97/hass-codex-tunnel-mcp",
+    "branch": "security/ha-mcp-phase2d-candidates",
+    "draft_pr": 2,
+    "baseline": {
+      "reviewed_source": "a7ad7a6a3362262e0a5f3b8d8a04998106d42acc",
+      "documentation_delivery": "27a78774c792ab8dfcf8a9abaed57329032d6483",
+      "owner_amendment": "b2dc4eb05f5bda4ec9b32d443a1abba505543a2b",
+      "initial_head": "27a78774c792ab8dfcf8a9abaed57329032d6483",
+      "initial_tree": "clean",
+      "source_to_delivery": "IMPLEMENTATION_PLAN.md only, eight added lines; inspected",
+      "pr_verified": "open/draft/unmerged; no reset/force/merge"
+    },
+    "immutable_source": "c38e776e94cdc8efb469ef57ff97832ec1a7ecbe",
+    "target": {
+      "homeassistant": "2026.10.0",
+      "upstream_commit": "6a811d3359c7b2076dc9e1cf900843a129c044af",
+      "python": "3.14.2",
+      "mcp": "1.28.1",
+      "development_locked_packages": 125,
+      "lock_change": "Only official Core aiohasupervisor0.6.0 added, existing124 package/hash blocks unchanged",
+      "component": "0.2.0",
+      "wrapper": "0.1.0 candidate source",
+      "official_tunnel_client": "v0.0.16",
+      "tunnel_source_commit": "5f99daabd4aa4a77049e6d81d54a0d8c18335397",
+      "official_amd64_archive_sha256": "d60cdba019bce451bcc3a15478cc5b9cb11270b049f5b56ea39a80b517f8b117",
+      "official_arm64_archive_sha256": "963d0384aaa7c798778479c45673f9051a4039dd891aef8f8978d2a1a628b74f",
+      "arm64_execution": "NOT TESTED",
+      "previous_candidate_client": "v0.0.10; actual production versions NOT INSPECTED",
+      "core_gate": "2026.10.x staged range; only2026.10.0 accepted locally",
+      "retained_phase2l_upstream": "fc54437a804858732e4bc927add98e202d879a09"
+    },
+    "baseline_reproduced": {
+      "native_passed": 42,
+      "phase2l_passed": 489,
+      "broader_passed": 633,
+      "broader_skipped": 1,
+      "skip": "Optional legacy HA selector unavailable in separate security venv"
+    },
+    "final_validation": {
+      "native": {
+        "passed": 55,
+        "failed": 0,
+        "skipped": 0,
+        "seconds": 120.085,
+        "command": "python -B -m unittest discover -s tests/staging -p 'test_admin_product.py' -v",
+        "installed_archive": true,
+        "scope": "Real Core/auth/HTTP/WS/MCP/config/task/storage; synthetic devices, no household access"
+      },
+      "phase2l": {
+        "passed": 489,
+        "failed": 0,
+        "skipped": 0,
+        "seconds": 0.697
+      },
+      "broader": {
+        "passed": 633,
+        "failed": 0,
+        "skipped": 1,
+        "seconds": 5.1,
+        "skip": "Optional legacy HA selector dependency; native actual Core schema exercised separately"
+      },
+      "package": {
+        "passed": 1,
+        "failed": 0,
+        "seconds": 22.463,
+        "processes": 4,
+        "transitions": [
+          "reviewed0.1.0 installed",
+          "0.2.0/schema2 upgrade",
+          "unsafe0.1.0/schema2 refuses; local owner remains independent",
+          "current archive reinstalled and actual task/rollback recovered"
+        ],
+        "origin": "Installed engine digest and module path asserted; no checkout source fallback"
+      },
+      "official_client": {
+        "v0.0.10": {
+          "passed": 1,
+          "seconds": 1.796
+        },
+        "v0.0.16": {
+          "passed": 1,
+          "seconds": 1.956
+        },
+        "actual_client": true,
+        "actual_retained_manager": true,
+        "cases": "tools/list, invalid command then valid, denial before owner approval, actual task and rollback after owned child crash/relaunch",
+        "substituted_boundary": "Loopback metadata/poll/response control plane, synthetic key; no OpenAI control plane connection"
+      },
+      "browser": {
+        "status": "FAILED in actual existing nonprivileged GitHub runner",
+        "run": 38061621359,
+        "job": 114240873250,
+        "step": "Sandboxed actual owner panel and native login",
+        "public_annotation": "Process completed with exit code 1",
+        "cause": "UNAVAILABLE: detailed logs require existing repository credential refresh; no unjustified fixture/sandbox change",
+        "sandbox_disabled": false,
+        "scope": "Synthetic native login_flow/PKCE/token form and actual panel, not native iPhone or full HA frontend",
+        "preceding_validation": "Sequential workflow reached browser after native/package/compilation step; native local counts documented separately",
+        "official_client_ci": "Skipped after browser failure; local actual-client contracts passed"
+      },
+      "checks": [
+        "Python source/fixtures/security compile",
+        "panel/browser JS parse",
+        "installer shell syntax",
+        "git diff --check",
+        "validation worktree/index/status unchanged",
+        "protected Blueprint/HAOS workflows unchanged"
+      ]
+    },
+    "bounded_reliability": {
+      "iterations": 5,
+      "failed": 0,
+      "duplicate_writes": 0,
+      "seconds": 1.073,
+      "task_and_rollback_ms": [
+        141.96,
+        136.34,
+        142.11,
+        151.85,
+        222.81
+      ],
+      "scope": "Varied scheduling on loopback, not uptime soak or physical latency guarantee"
+    },
+    "fresh_setup": {
+      "command": "ADMIN_DEV_STATE=<new external state> ADMIN_NATIVE_PYTHON=<supplied verified3.14.2> bash scripts/development/install.sh --setup",
+      "checkout": "New clone at initial verified head plus exact source/test/setup candidate files; owned temporary clone retains Git ancestry and corrected origin",
+      "packages": 125,
+      "hashes_and_tls": true,
+      "pip_check": "All packages compatible",
+      "native_passed": 55,
+      "native_seconds": 118.614,
+      "phase2l_passed": 489,
+      "broader_passed": 633,
+      "broader_skipped": 1,
+      "subtests": 296,
+      "broader_seconds": 6.82,
+      "repeated_counts": "Reproduction only; never added to independent coverage totals",
+      "environment_published": false
+    },
+    "proof_cases": [
+      "Durable deny before SQL, cancelled late connector activation, pending retirement and symlink marker refusal; task RAM revoke blocks after SQL fault.",
+      "Lost create acknowledgment never adopts independently created identical object; HA assigns collision-free actual ID, same-task receipt references and rollback preserve unrelated helpers.",
+      "Actual during-dispatch local edit demonstrates unconditional HA overwrite gap; after-dispatch drift remains uncertain and rollback refuses. Owner window accepted only by synthetic test owner.",
+      "Actual native ConfigFlow manager, basic owner password input outside MCP, wrong owner/plan/replay/secret suppression, reauth/reconfigure, reload observation and terminal-without-reload stays uncertain.",
+      "Actual native Supervisor WS handler fixed endpoint contract; only its remote service substituted, unsupported addon exact-version reservation rejects, backup latest update contract, restart remains uncertain.",
+      "Mixed repeated concurrent duplicate/invalid then valid tasks and reverse rollback; no duplicate writes, scoped credential alternate route denial, local owner access preserved.",
+      "Retained native abrupt death, buffered config vs SQLite receipt, native backup restore, ordinary restart and authority retirement reproduced with owned processes.",
+      "Actual hash-verified official clients through retained manager and production-only installed archives execute permitted tasks after crash/upgrade/reinstall."
+    ],
+    "source_review": {
+      "reviewers": 2,
+      "mode": "Separate read-only adversarial source passes within existing resources; not independent certification",
+      "confirmed_findings_fixed": [
+        "Revocation SQL failure and late cancelled issuance revival",
+        "Unattributed create adoption",
+        "Flow lock inversion and queued authorization",
+        "Revoked flow cleanup/permanent capacity",
+        "Owner logout while cancel waits",
+        "Terminal flow success before actual reload",
+        "Supervisor addon update endpoint/version contract",
+        "Bound helper rollback reconciliation",
+        "Duplicated panel flow block"
+      ],
+      "final_confirmed_new_defects": [],
+      "limits": [
+        "No universal storage-failure guarantee",
+        "No native CAS",
+        "No arbitrary dependency completeness",
+        "No external authentication/restart-incarnation proof"
+      ]
+    },
+    "scanner": {
+      "run": 38055930745,
+      "job": 114224377837,
+      "api_verified": "completed/failure; Processing Request (Linux) failed",
+      "owner_report": "HTTP402 monthly quota exhaustion",
+      "logs": "Detailed log redirect inaccessible here; quota text not independently reverified",
+      "retried_or_paid": false,
+      "clean_review": false
+    },
+    "references": {
+      "requested_primary_urls": "All six shell fetches CONNECT403; no available web tool; not represented as current webpage verification",
+      "official_tunnel_source": "v0.0.16 permissions/protocol/onboarding/end-user guides at5f99daabd4aa4a77049e6d81d54a0d8c18335397",
+      "ha_developer_docs": "883072b5555988737f681e91a8b2f0d2cf27af70 docs/core/llm/index.md and docs/auth_api.md",
+      "ha_integration_docs": "c86a3009cad7e856b78d8ce3342e47750cf96fb0 source/_integrations/mcp_server.markdown",
+      "decision": "Official transport and native HA interfaces retained; public LLM registration used; small private scoped-MCP compatibility seam isolated. Community wrapper/custom administrator not vendor-certified."
+    },
+    "release_archive": {
+      "path": "artifacts/native-admin-0.2.0.zip",
+      "sha256": "14fd06bf3d9873839881dae0959555617ac6c7445b643e5dab3f63f2a3e54674",
+      "manifest": "Embedded per-file SHA256/size; verified installed archive",
+      "contents": "Two production components and release_manifest.json only",
+      "excluded": "Probe A/tests/fixtures/credentials/databases/venvs/caches/toolchains",
+      "production_release_published": false,
+      "transfer": "Committed immutable GitHub blob/raw artifact; no session-only download claim",
+      "transfer_verified": "Downloaded via GitHub contents API after source push; SHA256 matches committed archive byte-for-byte"
+    },
+    "remaining_gates": [
+      "Owner accepts or rejects proposed named-object edit window/staging scope; residual HA unconditional-write race disclosed",
+      "Complex provider selectors/external OAuth/MFA and unsupported host maintenance/physical types scope decision",
+      "Fix actual sandboxed browser CI failure after existing GitHub access is refreshed",
+      "Hosted organization/workspace/operator access, intended ChatGPT/iPhone denial/positive/recovery staging",
+      "Actual Supervisor/HAOS install/update/backup restore and physical outcomes",
+      "Separately approved production/version inspection/protected backup/local recovery/cutover"
+    ],
+    "approval_sheet": "docs/security/RECOVERY_DESIGN.md; separate rows, no approval inherited or implicitly bundled",
+    "changed_file_inventory": [
+      ".github/workflows/admin-core-development.yml",
+      "artifacts/native-admin-0.2.0.zip",
+      "artifacts/native-admin-0.2.0.zip.sha256",
+      "custom_components/hass_codex_admin/__init__.py",
+      "custom_components/hass_codex_admin/approval.py",
+      "custom_components/hass_codex_admin/auth.py",
+      "custom_components/hass_codex_admin/backend.py",
+      "custom_components/hass_codex_admin/diagnostics.py",
+      "custom_components/hass_codex_admin/engine.py",
+      "custom_components/hass_codex_admin/flows.py",
+      "custom_components/hass_codex_admin/llm_api.py",
+      "custom_components/hass_codex_admin/manifest.json",
+      "custom_components/hass_codex_admin/model.py",
+      "custom_components/hass_codex_admin/panel.js",
+      "custom_components/hass_codex_admin/store.py",
+      "custom_components/hass_codex_admin/supervisor.py",
+      "custom_components/hass_codex_tunnel_mcp/binary.py",
+      "custom_components/hass_codex_tunnel_mcp/const.py",
+      "custom_components/hass_codex_tunnel_mcp/tunnel.py",
+      "docs/security/IMPLEMENTATION_PLAN.md",
+      "docs/security/NATIVE_ADMIN_CHECKSUMS.sha256",
+      "docs/security/NATIVE_ADMIN_EVIDENCE.json",
+      "docs/security/RECOVERY_DESIGN.md",
+      "docs/security/THREAT_MODEL.md",
+      "docs/security/TOOL_POLICY_MATRIX.md",
+      "requirements/admin-test.in",
+      "requirements/admin-test.lock.txt",
+      "scripts/development/install.sh",
+      "scripts/development/package.py",
+      "scripts/development/start.md",
+      "tests/staging/admin_browser_fixture.cjs",
+      "tests/staging/admin_official_transport.py",
+      "tests/staging/admin_package_process.py",
+      "tests/staging/admin_process_fixture.py",
+      "tests/staging/test_admin_browser.py",
+      "tests/staging/test_admin_official_transport.py",
+      "tests/staging/test_admin_package.py",
+      "tests/staging/test_admin_product.py",
+      "tests/test_binary.py"
+    ],
+    "github_access": {
+      "initial_source_push": "success",
+      "later_api_and_git": "HTTP401, invalid existing GH_TOKEN; no authentication/environment/security modification",
+      "public_status_fallback": "Actual GitHub public run pages consulted; detailed logs require renewed access",
+      "final_receipt_push": "Blocked HTTP401; local documentation commit preserved, not represented as published"
+    },
+    "github_ci": {
+      "source_sha": "c38e776e94cdc8efb469ef57ff97832ec1a7ecbe",
+      "runs": [
+        {
+          "workflow": "D",
+          "id": 38061621317,
+          "conclusion": "success",
+          "evidence": "Public run status at actual source SHA",
+          "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38061621317"
+        },
+        {
+          "workflow": "I",
+          "id": 38061621356,
+          "conclusion": "success",
+          "evidence": "API at source SHA",
+          "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38061621356"
+        },
+        {
+          "workflow": "J",
+          "id": 38061621269,
+          "conclusion": "success",
+          "evidence": "API at source SHA",
+          "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38061621269"
+        },
+        {
+          "workflow": "K",
+          "id": 38061621293,
+          "conclusion": "success",
+          "evidence": "API at source SHA",
+          "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38061621293"
+        },
+        {
+          "workflow": "L",
+          "id": 38061621261,
+          "conclusion": "success",
+          "evidence": "API at source SHA",
+          "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38061621261"
+        },
+        {
+          "workflow": "E",
+          "id": 38061619255,
+          "conclusion": "success",
+          "evidence": "Public run status at actual source SHA",
+          "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38061619255"
+        },
+        {
+          "workflow": "F",
+          "id": 38061619252,
+          "conclusion": "success",
+          "evidence": "Public run status at actual source SHA",
+          "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38061619252"
+        },
+        {
+          "workflow": "native",
+          "id": 38061621359,
+          "conclusion": "failure",
+          "evidence": "Public run page; API credential invalid",
+          "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38061621359",
+          "failed_step": "Sandboxed actual owner panel and native login"
+        },
+        {
+          "workflow": "scanner",
+          "id": 38061624025,
+          "conclusion": "failure",
+          "evidence": "Public run status; quota detail not yet accessible",
+          "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/38061624025"
+        }
+      ]
+    }
+  },
+  "validation_history": [
+    {
+      "sha": "eb66b4b210596998ffb7cb93735673eca8a0364c",
+      "browser": "push and PR sandboxed browser passed",
+      "push_native_run": 38065394266,
+      "push_native": "success",
+      "pr_native_run": 38065397082,
+      "pr_native": "failure",
+      "failure": "Queued revoke test observed earlier durable claim boundary, permitting a legitimate earlier denial; fixed by observing actual flows.begin queue entry without changing timeout/denial assertions."
+    },
+    {
+      "kind": "local final candidate rerun before reauth correction",
+      "native": 59,
+      "failed": 1,
+      "seconds": 136.234,
+      "failure": "Strict form rendering rejected partial reauth progress. Fixed by bounded native public async_configure without submitted input, matching native GET; initialized-form assertion strengthened.",
+      "targeted_after_fix": {
+        "passed": 1,
+        "seconds": 1.324
+      }
+    },
+    {
+      "kind": "Browser diagnosis",
+      "failures": "Cloud sandbox unavailable; existing CI sandbox never disabled. Early login fixture caused Chrome local-network checks; owned Core static HTML fixes real network origin. UTF-8 document fixes JS emdash; revocation waits actual exact owner acknowledgment, not early UI click.",
+      "logs": "Authenticated API works; private log redirects remain proxy403. Sanitized annotations used; no fabricated log access."
+    },
+    {
+      "sha": "7f8dbd8e61fb869c2b69cee5b8f0a016b2cdf3c1",
+      "native_local": {
+        "passed": 59,
+        "seconds": 134.331
+      },
+      "browser_push_run": 38066970514,
+      "browser_push": "failure",
+      "failure": "Menu/control labels included option text; exact field label unavailable. Explicit HTML label-for control IDs correct production accessibility; body35s, assertions and sandbox unchanged."
+    },
+    {
+      "sha": "fc984cfe2b21e6593748ed8707db5c13933be9f1",
+      "browser_pr_run": 38067182614,
+      "browser_pr": "failure",
+      "failure": "Menu selection progressed; subsequent password field absent. Added bounded sanitized actual DOM diagnostic. Also corrected fixture multiline literal to an actual line break; expected assertion unchanged."
+    },
+    {
+      "sha": "fbd9b2bd801199d5541cbb06743c09d3673dc270",
+      "browser_push_run": 38067474866,
+      "browser_pr_run": 38067479210,
+      "browser": "failure",
+      "failure": "Sanitized DOM exposed optional next_step_id checkbox. Core permits menu omission for GET; submit navigation needs an explicit choice. Source now marks only native MENU next_step_id required; targeted contract assertion strengthened. No assertion/deadline/sandbox weakened."
+    }
+  ],
+  "multi_step_repair": {
+    "operations": 3,
+    "approvals": 1,
+    "execute_ms": 53.81,
+    "rollback_ms": 83.32
+  },
+  "owner_decision": {
+    "edit_window_and_staging_scope": "ACCEPTED explicitly by owner in this assignment, isolated staging only: maximum15-minute exact named-object edit window with independent local editors cooperating; residual non-CAS race acknowledged",
+    "default_configuration": "Production/default remains unaccepted; no live config or connection was changed",
+    "hosted_haos_production": "Separate authorizations remain pending; policy/scope consent does not authorize these",
+    "full_product": "Accepted staging subset does not mark Blueprint full administration complete"
+  },
+  "codex_cloud_staging_2026_10_10": {
+    "starting_sha": "d3dd1e41d60320e13b1758abbc7f681d721360b3",
+    "candidate_source_sha": "d0983cbdb422bb4089a846f1aa34d814432aa735",
+    "archive_sha256": "deb0a0507f8a3105c4c5f14fcb7eabb3952a5dd5d48fabcdff180548df3981d8",
+    "archive_retrieved_from_immutable_github": true,
+    "pr": "2 open/draft/unmerged; ancestry verified, dirty work preserved, normal history only",
+    "runtime": {
+      "python": "3.14.2",
+      "core": "2026.10.0",
+      "administrator": "0.2.0",
+      "official_client": "v0.0.16",
+      "client_binary_sha256": "01260ee973d5510861bc32979739561edd33869f99f9f8cd324f6d0da5b2e692",
+      "production_components_changed": false,
+      "locks_changed": false
+    },
+    "fresh_validation": {
+      "native": {
+        "passed": 59,
+        "failed": 0,
+        "skipped": 0,
+        "seconds": 133.699,
+        "installed_archive": true
+      },
+      "phase2l": {
+        "passed": 489,
+        "failed": 0,
+        "seconds": 0.703
+      },
+      "broader": {
+        "passed": 633,
+        "skipped": 1,
+        "seconds": 5.11,
+        "skip": "Optional legacy HA selector absent in separate security venv"
+      },
+      "launcher_lifecycle": {
+        "passed": 4,
+        "seconds": 18.003,
+        "cases": [
+          "stop before initialization",
+          "stop during partial Core setup",
+          "startup deadline never ready",
+          "uncertain teardown preserves owned private state until explicit recovery"
+        ]
+      },
+      "official_client": {
+        "passed": 1,
+        "seconds": 1.984,
+        "actual_manager_and_client": true,
+        "substituted_boundary": "loopback metadata/poll/response control plane; no hosted connection"
+      },
+      "cloud_browser": {
+        "failed": 1,
+        "seconds": 1.677,
+        "cause": "Chromium sandbox launch unavailable; no sandbox disabling"
+      },
+      "checks": [
+        "Python compile with external pycache",
+        "shell/node syntax",
+        "dependency compatibility/hash lock/TLS",
+        "validation worktree/index unchanged",
+        "git diff --check",
+        "protected source/archive/Blueprint/VM triggers unchanged"
+      ]
+    },
+    "single_staging_instance": {
+      "passed": [
+        "connector denied privileged REST while native owner works",
+        "actual broken automation trace diagnosis",
+        "one exact native owner repair approval, mutation, readback and rollback",
+        "native owner credential and connector revocation",
+        "intentional stop reaped owned child and removed private state/credentials"
+      ],
+      "duration_seconds": 6.689,
+      "hosted": false,
+      "browser_UI": false,
+      "live_household_or_OpenAI_credentials": false
+    },
+    "reliability": {
+      "iterations": 5,
+      "failed": 0,
+      "duplicate_writes": 0,
+      "seconds": 0.85,
+      "task_and_rollback_ms": [
+        133.24,
+        133.17,
+        134.55,
+        158.06,
+        149.73
+      ],
+      "scope": "bounded varied scheduling, not a soak; repeated suites are not added coverage"
+    },
+    "three_operation_repair": {
+      "approvals": 1,
+      "execute_ms": 61.55,
+      "rollback_ms": 81.25
+    },
+    "staging_helper": {
+      "path": "scripts/development/staging.py",
+      "listener": "127.0.0.1",
+      "runtime_state": "task-owned external directory0700; synthetic login0600",
+      "foreground_ready_lifetime_seconds_maximum": 900,
+      "startup_observation_seconds": 45,
+      "cleanup_observation_seconds_per_step": 10,
+      "hard_process_exit_bound": false,
+      "uncertain_cleanup": "no PASS; retain private state; inspect/recover only owned processes/resources",
+      "actual_successful_stop_and_expiry": "owned client reaped; Core listener closed; private credentials/state removed",
+      "synthetic_objects": [
+        "codex_staging_fault",
+        "codex_staging_script",
+        "codex_staging_helper",
+        "codex-staging-board",
+        "switch.synthetic_lamp",
+        "switch.synthetic_second_lamp"
+      ],
+      "network_claim": "source guard plus actual socket inspection; not kernel confinement"
+    },
+    "cloud_hosting": {
+      "interactive_hosted_suitability": "NOT ESTABLISHED",
+      "openai_https": "CONNECT403 through cloud proxy, including narrow approved anonymous exception",
+      "references_https": "three current OpenAI webpages CONNECT403; not read successfully",
+      "persistence": "onboarding snapshot contract does not guarantee processes/connections/runtime auth; no supported lease/resume hosting tool",
+      "no_unsupported_keepalive": true,
+      "all_task_staging_services_stopped": true,
+      "environment_published": false,
+      "auth_network_settings_changed": false
+    },
+    "official_reference": {
+      "current_github_source": "b91e6c992dfd33e5c5ea94b00449c527c110851e",
+      "selected_client_source": "5f99daabd4aa4a77049e6d81d54a0d8c18335397",
+      "facts": "Platform organization, ChatGPT workspace and CodexCloud membership distinct. Creator Read+Manage; restricted runtime principal and intended ChatGPT operator Read+Use, preferably per tunnel. Workspace association and actual NoOAuth denial/positive acceptance remain external. No real key/tunnel/account modification."
+    },
+    "separate_review": {
+      "mode": "existing read-only adversarial reviewer; not certification",
+      "confirmed_launcher_issues_corrected": [
+        "startup stop did not cancel initialization",
+        "partial Core forced cleanup",
+        "cleanup observation cannot prove hard process-exit deadline",
+        "private-state finalization must not erase uncertain cleanup evidence"
+      ],
+      "final_review": "no further confirmed blocker in reviewed staging paths",
+      "application_defects_found": []
+    },
+    "starting_sha_ci": {
+      "sha": "d3dd1e41d60320e13b1758abbc7f681d721360b3",
+      "native_sandboxed_panel": {
+        "run": 38068489555,
+        "conclusion": "success"
+      },
+      "D": {
+        "run": 38068489534,
+        "conclusion": "success"
+      },
+      "I": {
+        "run": 38068489562,
+        "conclusion": "success"
+      },
+      "J": {
+        "run": 38068489574,
+        "conclusion": "success"
+      },
+      "K": {
+        "run": 38068489598,
+        "conclusion": "success"
+      },
+      "L": {
+        "run": 38068489565,
+        "conclusion": "success"
+      },
+      "E": {
+        "run": 38068486635,
+        "conclusion": "success"
+      },
+      "F": {
+        "run": 38068486643,
+        "conclusion": "success"
+      },
+      "scanner": {
+        "run": 38068490861,
+        "conclusion": "failure",
+        "clean_review": false,
+        "paid_or_retry": false
+      }
+    },
+    "new_commit_ci": "Observe actual immutable staging-source SHA in PR2 after normal push; existing success is not evidence of new CI.",
+    "next_decision": "One already available nonproduction computer with supported Codex access and session lifetime; non-secret Platformorg/workspace/account identification; separately authorize only new isolated tunnel/restricted runtime key/test connection and actual owner ChatGPT/iPhone actions. Agent handles isolated installation/run/cleanup; zero incremental budget; no production/HAOS authorization.",
+    "hosted_chatgpt_iphone": "NOT AUTHORIZED / NOT PERFORMED / NOT VERIFIED",
+    "production_haos_probe": "NOT AUTHORIZED / NOT PERFORMED",
+    "durable_delivery": "This committed sanitized receipt and checksum inventory; runtime credentials/logins/databases not committed. Existing archive unchanged."
+  }
+}

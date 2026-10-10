@@ -1,0 +1,79 @@
+# Phase 2D — Isolated HA-MCP v8.6.0 remediation candidates
+
+**Status:** Engineering candidate; **not approved for production**. Exact upstream `homeassistant-ai/ha-mcp@fc54437a804858732e4bc927add98e202d879a09`. Existing tunnel PR #1 remains independent. Date: 2026-10-08.
+
+## Candidate provenance and reproducibility
+
+`patch_candidates.py` is a deterministic, source-hash-checked **patch builder**, not an installed HA add-on. It refuses any upstream commit other than `fc54437a804858732e4bc927add98e202d879a09` and any source file whose Git blob differs:
+
+| Candidate | Source file | Original Git blob |
+|---|---|---|
+| policy | `src/ha_mcp/server.py` | `bf848dcec8345eba603295933768fca6724c913b` |
+| logging | `homeassistant-addon/start.py` | `88e926a59f568dc9a9bf7bcd719b518b42f52baa` |
+
+Each candidate changes only its own upstream file. A disposable checkout executes the builder, produces a conventional `git diff`, verifies the reverse patch with `git apply --check -R`, reverses it, checks `git diff --exit-code`, and compares exact baseline Git blobs. A new upstream repo/fork is **not** created, nor is an upstream PR submitted.
+
+Exact runtime test setup: Ubuntu 24.04 runner, Python 3.13, `uv==0.12.20`, upstream `uv.lock` applied with `uv sync --locked --no-dev`, `pytest==8.4.2`, `pytest-asyncio==1.4.0`, immutable SHA-pinned GitHub checkout/setup-python actions. The application uses synthetic credentials and no bound listener; no production environment variables or secrets are read.
+
+### Candidate 1: fail-closed policy initialization — HIGH
+
+- **Prior behavior (VERIFIED STAGING Phase 2C):** With `enable_tool_security_policies=true`, `HomeAssistantSmartMCPServer._apply_tool_security_policies` logs and returns on `ImportError` or a middleware registration exception. That permits server initialization to continue with privileged tools not gated by policies.
+- **Changed behavior:** These two paths raise a sanitized `RuntimeError` rather than return. Import failure, registration failure, and earlier unhandled listener/queue exceptions stop the normal application setup path, before the server's external `mcp.run` is reached. No fallback to ungated tool access.
+- **Opt-in strict default:** Environment `HA_MCP_REQUIRE_STRICT_POLICY=true` additionally requires `enable_tool_security_policies=true`, a persisted `tool_policy.json`, at least one rule, and `rule_effect="allow"`. All are checked before middleware registration and again within the live per-request policy provider. Removal, corruption, emptying, or switching back to require-approval mode makes subsequent calls fail closed.
+- **Legacy compatibility:** Without the new strict environment flag, a valid/default policy's rule semantics remain unchanged; when policies are deliberately enabled, initialization failures now stop startup rather than silently opening access. When policy engine is disabled and strict flag unset, behavior remains unchanged.
+- **Important limitation:** An unmatched call in `allow` mode *requires approval*, which is NOT an irreversible hard deny. These patches do not add per-user identity, RBAC, or hard deny. Changes to strict env values require another explicit startup and secure deployment path; the current add-on UI does not expose this new setting.
+- **Operator diagnostic:** Sanitized static message suitable for a HA repair/alert integration. Fail-fast can make remote ChatGPT administration unavailable; HA/Supervisor local UI or console must remain independently operable.
+
+### Candidate 2: startup secret-log suppression — HIGH conditional
+
+- **Prior behavior (VERIFIED SOURCE/STAGING):** Add-on emits `secret_path` in startup URL and separate path lines, in invalid-path logs, and in persistence errors. Generic crash tracebacks and FastMCP startup banners may include secret URL contents.
+- **Changed behavior:** Removes known interpolated credential disclosures from own startup/validation/persistence/crash messages; preserves the persisted secret path. A bounded filter redacts the exact configured secret, its URL-encoded representation and escaped form on *existing* standard Python logging handlers at bootstrap.
+- **Limitation:** Cannot claim Supervisor-wide secret safety: future third-party handlers, direct stderr writes, loggers with separate sinks, and reverse proxies may still expose secret path. Generic crash traceback is suppressed (reduces troubleshooting detail); diagnostics need a separate admin-only error-correlation channel. Do not merge without packaged add-on boot and captured synthetic logging review.
+- **Recovery:** The existing stored path and authenticated add-on Configuration interface are retained. No unauthenticated reveal endpoint or credential rotation.
+
+## Security test scope and result records
+
+Tests execute pinned real policy evaluation, middleware, server initialization helper and add-on logging functions. Staging is not a full Supervisor add-on image. The existing Phase 2C in-process MCP app tests establish exact HTTP secret-path behavior; they must be run on the clean unpatched source before patches, because historical tests intentionally expect legacy fail-open behavior.
+
+Independent tests and all rollback results must be recorded from GitHub Actions job logs; no test pass may be claimed based on code review. First candidate-run failures from test harness targeting earlier middleware and from a missing upstream pytest-asyncio dependency were diagnosed as test configuration issues; later runs must demonstrate full success.
+
+## Operational rollback layers
+
+- Patches reverse only their own exact source files; tested `git apply -R` is code rollback, not production deployment.
+- Production approval later requires pinning the upstream HA-MCP image, Home Assistant backup and independent HA/Supervisor recovery, then staged restart, watchdog and out-of-band rollback.
+- The tunnel-client crash-recovery design and OpenAI hosted attachment validation stay outside this patch.
+
+## Remaining critical unknowns
+
+Actual deployed image digest and effective policy rules; upstream add-on packaging/entrypoint compatibility; backend native inbound bearer; hosted attachment authorization; unrestricted generic tool paths; startup logging from third-party FastMCP/uvicorn and Supervisor; IPv6/LAN ingress and end-to-end reboot/update rollback.
+
+**Deployment decision: NO-GO.** No running system, credentials, router, OpenAI apps, Auth0, or Control Plane modified.
+
+
+## Final engineering test receipt
+
+[GitHub Actions #37840801696](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37840801696) **SUCCESS**. Exact original v8.6.0 baseline: 38 passed. Independent policy candidate: 14 passed, 5 deselected. Independent logging candidate: 5 passed, 14 deselected. Both changes combined: 19 passed. Selected pinned upstream tests: 20 passed. The workflow performed independent reverse application and exact source Git blob comparison, followed by combined reverse application and byte-exact restoration.
+
+A sanitized top-level policy initialization wrapper was added after the earlier combined-candidate green run; the final run above includes this additional protection. All tests use synthetic inputs and the real pinned code without a live HA connection. No claim of packaged add-on, Supervisor, hosted OpenAI or production readiness is made.
+
+**Phase 2D offline engineering acceptance: COMPLETE; deployment: NO-GO.**
+
+
+## Phase 2E adverse review and packaged validation work
+
+Additional source defects identified while extending engineering:
+1. Before enhancement, malformed `HA_MCP_REQUIRE_STRICT_POLICY` values silently evaluated false. Candidate now rejects unknown values. Strict policy migration errors fail closed rather than continuing with inconsistent conditions. A global bare `*` rule is rejected in strict mode.
+2. Switching an existing bare approval rule to `allow` mode changes it into an automatic allow. Real source test records a destructive automation deletion rule inversion. Safe strict migration requires new positive rules and cannot be done by flipping current production mode.
+3. **FAILED PACKAGED STAGING, initial logging candidate:** Full pinned Dockerfile image built and real `/start.py` accepted synthetic MCP initialization; packaged stdout/stderr still contained a synthetic credential. The earlier source-only logger tests did not cover FastMCP's Rich startup banner/access logs. New logging candidate disables FastMCP server banner (`show_banner=False`) and Uvicorn HTTP access logging. Complete packaged rerun and log-negative verification required before granting a packaged pass.
+4. An initial packaged test failed due to synthetic runner-owned data directory permissions with a cap-drop container; addressed in fixture. No production involvement.
+
+No full Supervisor/HAOS VM has been started or restored. Container `--network none` only, no host port mapping, dummy Supervisor token, synthetic on-disk policy and harmless MCP initialize. Real add-on image built locally in a disposable GitHub runner but is not a Supervisor-managed installation.
+
+Pending proof: the latest packaged negative-log result, fail-start cases, and approved update/rollback behavior. Preserve distinction between a successful image build and a successful entire packaged acceptance matrix.
+
+
+## Phase 2E final test correction
+
+The earlier failing packaged log test was reproduced as a genuine **synthetic path exposure** in the packaged image, despite a successful real MCP request. The pinned FastMCP transport logged its full URL after startup, independently of the banner. The isolated candidate was amended to disable that banner and Uvicorn access logging, and to install a future-handler-safe Python log-record scrubber. Final real packaged run [#37843820868](https://github.com/Alundqvi97/hass-codex-tunnel-mcp/actions/runs/37843820868) passed seven synthetic startup/negative-log cases and a same-volume policy-restoration test. Exact scope and limitations: `../phase2e/PACKAGED_STAGING.md`. No proof of the real Supervisor-packaged deployment or arbitrary direct stderr/proxy log redaction is claimed.
+
+Additional real policy tests reject malformed mandatory-mode values, strict migration failure and a blanket bare wildcard allow rule, and demonstrate rule-effect inversion of a destructive tool. No signed/approved policy migration or stable add-on strict option is implemented.

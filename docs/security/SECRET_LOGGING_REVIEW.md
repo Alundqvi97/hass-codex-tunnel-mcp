@@ -33,3 +33,12 @@ Pinned [`homeassistant-addon/start.py`](https://github.com/homeassistant-ai/ha-m
 ## Regression requirements
 
 Run pinned-startup synthetic logger test, plus upgraded-source test asserting full path absent from normal startup output and error branches, and a bounded test for redaction of common URL encodings. Full Supervisor-packaged boot must be separately staged. This existing reproduction test should be updated to expect the **absence** of the secret only after an upstream patch is approved and implemented.
+
+
+## Phase 2D logging patch candidate and limitations
+
+`phase2d/patch_candidates.py logging --apply` modifies only the pinned upstream `homeassistant-addon/start.py`. The review candidate removes the known startup URL/secret-path lines, invalid input path values, exception details from local secret file access and addon-options persistence, and raw generic startup crash tracebacks. It preserves the path's storage and authorized add-on Configuration retrieval.
+
+A synthetic path logging test covers stdout/stderr and known Python FastMCP handler formats (literal path, URL-encoded and JSON-escaped). **Caveat:** A filter installed on *existing* Python handlers is not guaranteed to cover handlers created later, direct stderr output, subprocess banners or reverse-proxy logs. No claim of complete Supervisor-wide secret safety is made.
+
+The startup exception change reduces diagnostic detail. Before deployment, design admin-only exception correlation without logging credential paths and prove a packaged add-on boot/restart/rollback with synthetic secrets. Never put the path in support archives or GitHub test logs.

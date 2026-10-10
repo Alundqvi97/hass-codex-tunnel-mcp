@@ -1,3 +1,54 @@
+# Release-candidate capability, security and reliability matrix
+
+Selected candidate: native administrator0.2.0, Core2026.10.0/Python3.14.2/MCP1.28.1, official tunnelv0.0.16. Optional explicit enablement, scoped `/api/hass_codex_admin/mcp`, native owner panel, SQLitev2; no production change. Full Blueprint scope is not declared complete.
+
+| Capability | Implemented evidence | Exact boundary / release status |
+|---|---|---|
+| Diagnose/repair automation and script; CRUD | Real native config/trace/fault, exact multi-step consent, readback, rollback; useful commands after denials | Owner accepted named-object edit window for isolated staging only; arbitrary indirect/custom/YAML behavior not proven |
+| Helpers (eight storage families) | Native HA-assigned ID, exact approved definition; task receipt-bound follow-ups and inverse; local allocation collision preserves unrelated object | Exact pre-reserved ID is unsupported; final-check gap not CAS; no adoption after lost create acknowledgment |
+| Dashboards | Real storage config/metadata CRUD and restoration; untrusted text rendered as text | Named-object window accepted for isolated staging only; actual sandboxed panel/menu/selector CI passed; card/device visual effects not target-tested |
+| Device service control | Existing finite verified light/switch/cover/media paths, explicit physical-effects consent | Synthetic device observations, not household outcomes; other high-impact types are absent |
+| Integration repair/credentials | Native reload, bound reauth/reconfigure initiation/status/standard-selector owner input/cancel; actual unload→loaded observation | Standard menu/select/number/text/password/bool supported; external OAuth/progress/custom selectors/provider frontend coverage pending; no secret in MCP |
+| Core configuration/backup | Native validation, local backup and actual process restoration; durable intents vs buffered config exercised | Owned Core restart/reconcile uses new kernel process incarnation; host reboot uses native boot facts, shutdown stays uncertain. Actual Supervisor/HAOS/power loss not accepted |
+| Supervisor/add-ons | Fixed actual native Supervisor handler contract, start/stop state and update version readback; backup:true, explicit latest add-on release | Service backend replaced by synthetic Supervisor. Restart uncertain without incarnation evidence; no root fallback |
+| Remote authority | Distinct opaque connection capability fails native REST/WS/base/alternate MCP/Assist; local owner remains usable; wrong caller/plan/expiry/revoke/replay | Platform org/workspace sharing and production route reachability need isolated hosted staging |
+| Revocation/restore | Pending issuance, persistent private deny intent before SQL, task RAM deny, boot rotation/retirement; cancellation and SQL faults | All durable storage failure/unsupported copying needs independent local retirement; response loss cannot undo already-issued authority |
+| Recovery/update | One process owner, finite backoff, auth-denial stop, no per-crash download; actual official clientv10/v16 scoped tasks after crash; updater rollback | Loopback fake control plane; hosted provider behavior, long soak and target reboot pending |
+| Packaged lifecycle | Archive-only installed execution, old→new schema upgrade, unsafe old downgrade refusal, independent local HA and reinstall recovery | Reinstall current verified archive is tested; old0.1 is not a supported software rollback |
+| Repeated use | Five varied-schedule mixed task/rollback iterations, zero failed/duplicate writes; invalid then useful commands | Bounded local development run, not uptime or physical-performance guarantee |
+
+Annotations accurately distinguish writes/reads. A ChatGPT confirmation is additional to server consent, not a human identity attestation or replacement for task authorization. The native owner window is enforced as explicit policy/consent; other editors' cooperation is not enforceable by HA's APIs. Owner accepted that limitation for isolated staging only during this assignment; production acceptance remains pending.
+
+See [NATIVE_ADMIN_EVIDENCE.json](NATIVE_ADMIN_EVIDENCE.json) for exact fresh counts, substituted boundaries and review limits; [RECOVERY_DESIGN.md](RECOVERY_DESIGN.md) for one finite approval sheet. Historical tables below describe earlier candidates, not new test counts.
+
+## Previous candidate matrix and historical evidence — preserved
+
+# Administrator capability, security and reliability evidence
+
+Current candidate: Core2026.10.0/Python3.14.2, scoped `/api/hass_codex_admin/mcp`, existing official tunnel clientv0.0.10, one custom administrator and SQLite. **CANDIDATE INCOMPLETE.** See the committed [evidence receipt](NATIVE_ADMIN_EVIDENCE.json) and [implementation plan](IMPLEMENTATION_PLAN.md). Historical evidence follows unchanged.
+
+| Outcome | Connected evidence in this assignment | Remaining limit |
+|---|---|---|
+| Investigate/repair automations and scripts | Actual native trace/fault/CRUD, approved multi-step repair, fresh readback, reverse rollback | Arbitrary dynamic/custom/YAML effect/dependency completeness; physical behavior |
+| Create/modify/delete helpers | All eight storage families; exact definitions, rollback, local post-check ID collision remains uncertain; no automatic unrelated deletion | No supported atomic ID reservation or native conditional writes |
+| Dashboard administration | Actual stored views/cards and metadata create/update/delete/restore | Native owner panel browser and card rendering acceptance blocked locally |
+| Device operation | Real HA synthetic light/switch/cover/media service/state interfaces, explicit elevated consent | Synthetic hardware does not prove household physical effects |
+| Integration/config/backup | Calculated integration reload, config validation, native local backup and actual Core restore/restart | Credential/reauth/reconfigure/Supervisor/add-on/OS adapters absent; HAOS acceptance absent |
+| One task approval | Up to20 exact operations; owner WS decision, effects consent, every-send scope check; useful repair after invalid/replayed requests | ChatGPT confirmation is additional; hosted/mobile total prompt count untested |
+| Alternate route isolation | Old native admin and read-only token nonentity bypass reproduced; new capability rejected by REST/WS/base/alternate MCP/Assist/SSE; local owner still works | Actual production reachability, hosted tunnel/workspace custody and ingress not inspected |
+| Caller/session control | Capability expiry/revoke/wrong caller/modified plan; actual native OAuth discovery/PKCE/code exchange/refresh/revoke; debug secret suppression | Connection identity is not a human; actual hosted account/browser consent still separate |
+| Recovery | Owned child crash/exhaustion/concurrent start/cancellation, disconnect/provider/backend outage, actual subsequent MCP; known-good update rollback; late stop/close cannot revive | Official OpenAI control plane substituted by a local transport fixture; outage telemetry aging/long soak and host reboot not accepted |
+| Crash/restore durability | Twelve owned Core processes at four abrupt-death boundaries; four-process native backup/restore; helper buffered-save loss detected; no blind retry | Disk-full/power loss/host reboot/HAOS restore untested; out-of-band old auth/DB copy cannot preserve revocation without independent recovery |
+| Routine operation/updates | Native owner session validation replaces routine reenrollment; stable local connection ID renews volatile bearer after ordinary restart; default automatic updates unchanged | Owner login renewal/connection expiry and after-restore new connection remain genuine setup steps; only one Core release exercised |
+
+Final dispatch binds a verified scoped connection and exact approved plan, not caller headers or OAuth client metadata. The native backend credential remains confined to this process's fixed loopback adapter. Definitions are untrusted data; no service/URL/shell proxy exists. Native owners remain trusted and independent local management is available. The application boundary is not kernel confinement against a compromised HA process.
+
+Snapshot checks narrow conflicts but do not supply CAS. Unknown YAML/custom/dynamic references remain uncertainty. SQLite intent durability is distinct from HA configuration persistence. Supported restore retires delegations via the native backup manager event; arbitrary copying of old state is not accepted as safe remote restore.
+
+Evidence labels: actual application development = real Core HTTP/WS/MCP/auth/entities/SQLite/backup; substituted boundary = local transport/control telemetry, spawn/reap faults, lost acknowledgment or delayed persistence; synthetic physical entity = real HA service with in-memory hardware; unexecuted = official control plane, hosted ChatGPT/iPhone, actual browser here, household/HAOS/Supervisor/kernel privileged acceptance. No synthetic evidence is promoted to trusted runtime PASS.
+
+## Historical upstream policy evidence — preserved
+
 # HA-MCP v8.6.0 administrative tool-policy matrix
 
 **VERIFIED SOURCE** against pinned `homeassistant-ai/ha-mcp@fc54437a804858732e4bc927add98e202d879a09`; **production effective rules NOT VERIFIED**.
@@ -45,3 +96,8 @@ The pinned HA-MCP source, not a custom evaluator, ran in 38 passing staged tests
 **Important:** This policy model implements allow/approval-required, not irrevocable hard-deny/RBAC. In default `require_approval` mode, unmatched calls run. In `allow` mode, unmatched calls require approval (not permanent deny). Only a stronger hard-deny/visibility guard or independent privilege boundary can enforce “never execute Class 3.” See `POLICY_FAIL_CLOSED_REVIEW.md`.
 
 Neither the stage's synthetic bypass nor its middleware initialization test proves which rules are in force on the user's production add-on; effective rules remain blocked behind HTTP 403. Mandatory policy initialization must fail closed in a separate **upstream** remediation and be staged with independent recovery before deployment.
+
+
+## Phase 2D proposed strict baseline (not configured)
+
+See `phase2d/POLICY_BASELINE.md` for per-operation classes and alternative routes. The candidate strict startup mode is only available in a reviewed upstream source patch, not live 8.6.0. It enforces **nonempty allow-list + middleware initialization** and per-request strict policy revalidation. Existing engine only supports allow vs approval-required; hard-deny of privileged writes needs a server-side canonical action guard, removed tool registration, or separate least-privileged backend.

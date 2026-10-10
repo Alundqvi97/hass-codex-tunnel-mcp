@@ -45,3 +45,16 @@ A minimal, dependency-light **deny-all** middleware placed earlier than the opti
 Unit: synthetic import and registration failures require startup exception, check no leaked secret; corrupt/missing file, allow/approval policy behavior, unknown tools, policy changes. Staging: actual packaged startup failure with fake Supervisor data, service denied ingress, local recovery and reversible deployment. Do not publish a security patch upstream without separate approval.
 
 **Decision:** Keep HA-MCP server remedy in the correct upstream project/review workflow, **not** in `hass-codex-tunnel-mcp`. A new fork/repo or upstream PR requires separate authorization.
+
+
+## Phase 2D implementation candidate
+
+Review-only `phase2d/patch_candidates.py policy --apply` modifies **only** pinned HA-MCP `src/ha_mcp/server.py`.
+
+- When policy enforcement is enabled, both middleware import and registration failures now **raise sanitized errors** instead of returning normally. The normal `_initialize_server` call wraps all unexpected policy initialization failures with a sanitized top-level startup abort.
+- Optional `HA_MCP_REQUIRE_STRICT_POLICY=true` requires enabled engine, existing `tool_policy.json`, nonempty rules and `rule_effect=allow`; missing/empty/invalid settings prevent startup. Per-request policy provider reevaluates file, so removal or invalid edits later cause errors instead of allowing new calls.
+- Backward-compatible baseline semantics for healthy non-strict deployments are unchanged. Behavior during *failure* when security policies are enabled intentionally changes from availability-over-security to fail closed.
+- This does not introduce hard-deny or identity scopes. The new strict environment switch has no existing add-on UI schema wiring, and must not be enabled on production without a separately tested configuration and recovery path.
+- The strict/allow mode prevents unreviewed future tools being silently **allowed**, but unknown tools remain **approval-required**, not absolutely prohibited.
+- Exact modified code is reproducibly generated from two known Git source blob hashes and reversed via Git. Synthetic fault-injection tests cover successful registration, imported dependency missing, registration failure, server initialization abort, incomplete/invalid strict files and live reload.
+- **No upstream source committed to tunnel runtime, no upstream PR, no deployment.**
