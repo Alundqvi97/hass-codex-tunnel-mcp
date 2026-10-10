@@ -38,9 +38,9 @@ process.once('SIGTERM', () => {
     page.on('websocket', socket => socket.on('socketerror', error => console.error('BROWSER_WS_ERROR='+scrub(error))));
     page.on('console', message => { if (/^FIXTURE_(?:LOGIN_STAGE|OWNER_CODE)=[a-z_-]+$/.test(message.text())) console.log(message.text()); });
     checkpoint('panel-load');
-    // A normal HTML document gives PKCE/auth a defined loopback origin; HA's
-    // full frontend is intentionally not installed in this minimal Core fixture.
-    await page.route(base+'/__admin_browser_fixture', route => route.fulfill({contentType:'text/html', body:'<!doctype html><html><body></body></html>'}));
+    // Core serves this task-owned document over an actual loopback connection.
+    // A Playwright-fulfilled navigation has no real peer address and Chrome's
+    // local-network check then rejects native WS. Do not disable that check.
     await page.goto(base+'/__admin_browser_fixture');
     if (!(await page.evaluate(base => location.origin === base && isSecureContext && !!crypto.subtle, base))) throw new Error('owned loopback secure origin required for PKCE');
     await page.setContent('<form><label>Username<input name="username" autocomplete="off"></label><label>Password<input name="password" type="password" autocomplete="off"></label><button>Local fixture login</button></form><hass-codex-admin hidden></hass-codex-admin>');

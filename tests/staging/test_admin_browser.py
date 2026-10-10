@@ -14,6 +14,12 @@ class OwnerPanelBrowser(unittest.IsolatedAsyncioTestCase):
         fixture = product.NativeAdministrator()
         await fixture.asyncSetUp()
         try:
+            from homeassistant.components.http import StaticPathConfig
+            document = fixture.root / "browser-fixture.html"
+            document.write_text("<!doctype html><html><body></body></html>")
+            await fixture.hass.http.async_register_static_paths([
+                StaticPathConfig("/__admin_browser_fixture", str(document), False)
+            ])
             provider = fixture.hass.auth.get_auth_provider("homeassistant", None)
             password = secrets.token_urlsafe(24)
             await provider.async_add_auth("browser_owner", password)
