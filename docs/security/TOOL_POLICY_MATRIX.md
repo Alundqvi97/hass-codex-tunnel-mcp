@@ -4,9 +4,9 @@ Selected candidate: native administrator0.2.0, Core2026.10.0/Python3.14.2/MCP1.2
 
 | Capability | Implemented evidence | Exact boundary / release status |
 |---|---|---|
-| Diagnose/repair automation and script; CRUD | Real native config/trace/fault, exact multi-step consent, readback, rollback; useful commands after denials | Owner must accept named-object edit window; arbitrary indirect/custom/YAML behavior not proven |
+| Diagnose/repair automation and script; CRUD | Real native config/trace/fault, exact multi-step consent, readback, rollback; useful commands after denials | Owner accepted named-object edit window for isolated staging only; arbitrary indirect/custom/YAML behavior not proven |
 | Helpers (eight storage families) | Native HA-assigned ID, exact approved definition; task receipt-bound follow-ups and inverse; local allocation collision preserves unrelated object | Exact pre-reserved ID is unsupported; final-check gap not CAS; no adoption after lost create acknowledgment |
-| Dashboards | Real storage config/metadata CRUD and restoration; untrusted text rendered as text | Named-object window still requires acceptance; actual sandboxed panel/menu/selector CI passed; card/device visual effects not target-tested |
+| Dashboards | Real storage config/metadata CRUD and restoration; untrusted text rendered as text | Named-object window accepted for isolated staging only; actual sandboxed panel/menu/selector CI passed; card/device visual effects not target-tested |
 | Device service control | Existing finite verified light/switch/cover/media paths, explicit physical-effects consent | Synthetic device observations, not household outcomes; other high-impact types are absent |
 | Integration repair/credentials | Native reload, bound reauth/reconfigure initiation/status/standard-selector owner input/cancel; actual unload→loaded observation | Standard menu/select/number/text/password/bool supported; external OAuth/progress/custom selectors/provider frontend coverage pending; no secret in MCP |
 | Core configuration/backup | Native validation, local backup and actual process restoration; durable intents vs buffered config exercised | Owned Core restart/reconcile uses new kernel process incarnation; host reboot uses native boot facts, shutdown stays uncertain. Actual Supervisor/HAOS/power loss not accepted |
@@ -17,7 +17,7 @@ Selected candidate: native administrator0.2.0, Core2026.10.0/Python3.14.2/MCP1.2
 | Packaged lifecycle | Archive-only installed execution, old→new schema upgrade, unsafe old downgrade refusal, independent local HA and reinstall recovery | Reinstall current verified archive is tested; old0.1 is not a supported software rollback |
 | Repeated use | Five varied-schedule mixed task/rollback iterations, zero failed/duplicate writes; invalid then useful commands | Bounded local development run, not uptime or physical-performance guarantee |
 
-Annotations accurately distinguish writes/reads. A ChatGPT confirmation is additional to server consent, not a human identity attestation or replacement for task authorization. The native owner window is enforced as explicit policy/consent; other editors' cooperation is not enforceable by HA's APIs. Release acceptance has not accepted that limitation.
+Annotations accurately distinguish writes/reads. A ChatGPT confirmation is additional to server consent, not a human identity attestation or replacement for task authorization. The native owner window is enforced as explicit policy/consent; other editors' cooperation is not enforceable by HA's APIs. Owner accepted that limitation for isolated staging only during this assignment; production acceptance remains pending.
 
 See [NATIVE_ADMIN_EVIDENCE.json](NATIVE_ADMIN_EVIDENCE.json) for exact fresh counts, substituted boundaries and review limits; [RECOVERY_DESIGN.md](RECOVERY_DESIGN.md) for one finite approval sheet. Historical tables below describe earlier candidates, not new test counts.
 

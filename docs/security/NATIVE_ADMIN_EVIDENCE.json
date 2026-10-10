@@ -1,7 +1,7 @@
 {
   "schema": 2,
-  "engineering": "INCOMPLETE for full Blueprint scope: external OAuth/progress/custom-selector frontend and additional high-impact device families remain source coverage gaps. The explicitly described finite candidate is implemented, packaged and locally/CI validated; no known outstanding confirmed defect within that scope.",
-  "acceptance": "PENDING owner named-object coordination/release-scope decision, hosted ChatGPT/iPhone and actual Supervisor/HAOS. Real sandboxed owner-panel acceptance VERIFIED on synthetic loopback Core.",
+  "engineering": "COMPLETE for owner-accepted isolated staging scope: source, package and connected local/CI acceptance pass. Full Blueprint administration remains unfinished; external OAuth/custom forms and additional high-impact device adapters remain explicit future full-product gaps.",
+  "acceptance": "PENDING hosted ChatGPT/iPhone and actual Supervisor/HAOS/physical acceptance. Owner accepted isolated staging policy/scope; sandboxed synthetic Core/native owner panel VERIFIED.",
   "deployment": "NOT AUTHORIZED / NOT PERFORMED",
   "repository": "Alundqvi97/hass-codex-tunnel-mcp",
   "branch": "security/ha-mcp-phase2d-candidates",
@@ -236,7 +236,7 @@
     "url": "https://github.com/Alundqvi97/hass-codex-tunnel-mcp/raw/d0983cbdb422bb4089a846f1aa34d814432aa735/artifacts/native-admin-0.2.0.zip"
   },
   "remaining_gates": [
-    "Owner accepts/rejects maximum15-minute named-object edit window and explicit staging scope; HA unconditional-write race disclosed",
+    "Owner accepted isolated staging window/scope. Hosted staging still needs exact separate authorization; production/full-product policy and scope are not accepted by this limited decision.",
     "External OAuth/progress/custom/multiple-text provider frontend and additional high-impact physical device families remain missing source coverage; full-product scope is not silently reduced",
     "Hosted organization/workspace/operator access, intended ChatGPT/iPhone positive/denial/recovery staging",
     "Actual Supervisor/HAOS maintenance/install/update/backup restoration and physical acceptance",
@@ -918,7 +918,9 @@
     "rollback_ms": 83.32
   },
   "owner_decision": {
-    "edit_window_and_staging_scope": "PENDING; proposed default unaccepted; synthetic test consent is not owner acceptance",
-    "hosted_haos_production": "Separate pending authorizations, never implicitly bundled"
+    "edit_window_and_staging_scope": "ACCEPTED explicitly by owner in this assignment, isolated staging only: maximum15-minute exact named-object edit window with independent local editors cooperating; residual non-CAS race acknowledged",
+    "default_configuration": "Production/default remains unaccepted; no live config or connection was changed",
+    "hosted_haos_production": "Separate authorizations remain pending; policy/scope consent does not authorize these",
+    "full_product": "Accepted staging subset does not mark Blueprint full administration complete"
   }
 }
