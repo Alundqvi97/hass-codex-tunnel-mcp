@@ -149,3 +149,43 @@ def socket_channel_pair(*, clock=time.monotonic):
         left.close()
         right.close()
         raise
+
+
+class IncrementalRequest:
+    """One authenticated request, without waiting on a partial controller frame.
+
+    The observer multiplexes private channels in one trusted thread. One read
+    per turn, bounded allocation, no pipelining and a fixed first-byte timeout
+    preserve audit capacity under controller flooding or slow partial frames.
+    """
+    def __init__(self, channel, *, end, maximum=MAX_REQUEST, frame_seconds=1):
+        self.channel, self.end, self.maximum = channel, end, maximum
+        self.frame_seconds, self.started = frame_seconds, None
+        self.data, self.length = bytearray(), None
+
+    def receive_available(self):
+        now = self.channel.clock()
+        if now >= self.end or self.started is not None and now >= self.started+self.frame_seconds:
+            raise IpcDeadline("INCREMENTAL_REQUEST_EXPIRED")
+        ready, _, _ = self.channel.select_fn([self.channel.stream], [], [], 0)
+        if not ready:
+            return None
+        target = 4 if self.length is None else self.length+4
+        try:
+            block = self.channel.stream.recv(target-len(self.data))
+        except (BlockingIOError, InterruptedError):
+            return None
+        if not block:
+            raise EOFError("IPC_TRUNCATED_FRAME")
+        if self.started is None:
+            self.started = now
+        self.data.extend(block)
+        if self.length is None and len(self.data) == 4:
+            self.length = _HEADER.unpack(self.data)[0]
+            if not 0 < self.length <= self.maximum:
+                raise IpcFraming("IPC_OVERSIZED_OR_EMPTY_FRAME")
+        if self.length is not None and len(self.data) == self.length+4:
+            payload = bytes(self.data[4:])
+            self.data, self.length, self.started = bytearray(), None, None
+            return payload
+        return None

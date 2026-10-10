@@ -98,6 +98,26 @@ class OwnedScopeSet:
         return not self.uncertain
 
 
+class CleanupAuditAuthority:
+    """Server-side capability derived from the authenticated supervisor channel.
+
+    Never decoded from RPC. Only the observer's pinned service assembly binds
+    this to its exact configuration and a retained bootstrap incarnation.
+    Controller and guardian channels cannot request or borrow this authority.
+    """
+    def __init__(self, configuration, peer, contract):
+        if (configuration.role != "observer" or configuration.context != contract.context
+                or peer.identity != configuration.bootstrap or peer.verify() is not True
+                or peer.identity.uids != (0,)*4):
+            raise ExecutionDenied("AUDIT_SUPERVISOR_BINDING_REQUIRED")
+        self.context, self.peer, self.contract = configuration.context, peer, contract
+        contract.audit_authority = self
+
+    def valid(self, contract):
+        return (self.contract is contract and contract.audit_authority is self
+                and self.context == contract.context and self.peer.verify() is True)
+
+
 class ReviewedExecutionContract:
     """One immutable session, signed policy and external kernel-enforcement API.
 
@@ -117,6 +137,7 @@ class ReviewedExecutionContract:
         self.enforce_child, self.inspect_actor, self.clock = enforce_child, inspect_actor, clock
         self.used_roles = set()
         self.permit = None
+        self.audit_authority = None
         self.children = {}
         self.poisoned = False
 
@@ -154,14 +175,20 @@ class ReviewedExecutionContract:
                 raise ExecutionDenied("INCOMPLETE_OR_PERMISSIVE_ROOT_POLICY")
         return True
 
-    def before_spawn(self, spec, deadline):
+    def before_spawn(self, spec, deadline, *, audit_authority=None):
         self.verify()
+        audit = (isinstance(audit_authority, CleanupAuditAuthority)
+                 and spec.role == "read-command" and audit_authority.valid(self))
+        if audit_authority is not None and not audit:
+            raise ExecutionDenied("WRONG_CLEANUP_AUDIT_AUTHORITY")
+        cleanup = spec.role == "guardian-command" or audit
         from probe_a_integrated_bootstrap import AttemptPermit
-        if (not isinstance(self.permit, AttemptPermit) or self.permit.context != self.context
-                or not self.permit.active(cleanup=spec.role == "guardian-command")):
+        from probe_a_native_ledger import ExistingAttemptGrant
+        if (not isinstance(self.permit, (AttemptPermit, ExistingAttemptGrant)) or self.permit.context != self.context
+                or not self.permit.active(cleanup=cleanup)):
             raise ExecutionDenied("EXTERNAL_ACTIVE_ATTEMPT_REQUIRED")
-        self.context.check_time(self.clock(), cleanup=spec.role == "guardian-command")
-        if (deadline > (self.context.end if spec.role == "guardian-command" else self.context.cutoff)
+        self.context.check_time(self.clock(), cleanup=cleanup)
+        if (deadline > (self.context.end if cleanup else self.context.cutoff)
                 or spec.group is not self.scopes.groups[spec.role]
                 or spec.role in ("guardian", "observer", "controller") and spec.role in self.used_roles):
             raise ExecutionDenied("ROLE_REPLAY_OR_DEADLINE_EXTENSION")
@@ -172,6 +199,9 @@ class ReviewedExecutionContract:
                                      *emergency_deny_commands(self.context.plan), emergency_barrier_command(self.context.plan))}
             from probe_a_os_boundary import SAVE4, SAVE6, VERSION4, VERSION6
             safe |= {SAVE4, SAVE6, VERSION4, VERSION6}
+            if audit:
+                from probe_a_linux_launcher import command_catalog
+                safe = command_catalog(self.context.plan, "read-command")
             if spec.argv not in safe:
                 raise ExecutionDenied("WORK_DURING_RESERVED_CLEANUP")
         self.used_roles.add(spec.role)

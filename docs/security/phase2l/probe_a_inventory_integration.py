@@ -18,6 +18,16 @@ REQUIREMENTS = {"clone3": True, "clone_into_cgroup": True, "pidfd": True,
                 "sealed_memfd": True, "scm_credentials": True, "nss_network_denied": True}
 
 
+def validate_parents(path, records):
+    paths = ["/"]+["/"+"/".join(path.split("/")[1:n]) for n in range(2,len(path.split("/")))]
+    if (type(records) is not list or len(records) != len(paths)
+            or any(type(r) is not dict or set(r) != {"path","device","inode","uid","gid","mode"}
+                or r["path"] != p or any(type(r[k]) is not int or r[k] < 0 for k in ("device","inode","uid","gid","mode"))
+                or r["uid"] != 0 or not stat.S_ISDIR(r["mode"]) or r["mode"] & 0o022
+                for r,p in zip(records,paths))):
+        raise InventoryDenied("ORDINARY_ASSET_OR_TARGET_ANCESTRY_UNCONTROLLED")
+
+
 class IntegratedInventory:
     """External verifier authenticates the entire closure, aliases and metadata.
 
@@ -48,11 +58,13 @@ class IntegratedInventory:
         if set(d["metadata"]) != files or set(d["dependencies"]) != files:
             raise InventoryDenied("METADATA_OR_DEPENDENCY_CLOSURE_INCOMPLETE")
         for path, metadata in d["metadata"].items():
-            if (type(metadata) is not dict or set(metadata) != {"device", "inode", "uid", "gid", "mode", "size"}
-                    or any(type(n) is not int or n < 0 for n in metadata.values())
+            if (type(metadata) is not dict or set(metadata) not in ({"device", "inode", "uid", "gid", "mode", "size"}, {"device", "inode", "uid", "gid", "mode", "size", "parents"})
+                    or any(type(metadata[k]) is not int or metadata[k] < 0 for k in ("device", "inode", "uid", "gid", "mode", "size"))
                     or metadata["uid"] != 0 or metadata["mode"] & 0o022
                     or not stat.S_ISREG(metadata["mode"])):
                 raise InventoryDenied("UNCONTROLLED_RUNTIME_ASSET")
+            if "parents" in metadata:
+                validate_parents(path, metadata["parents"])
         for alias, record in d["aliases"].items():
             if (type(record) is not dict or set(record) != {"target", "device", "inode", "uid", "gid", "mode", "parents"}
                     or any(type(record[k]) is not int or record[k] < 0 for k in ("device", "inode", "uid", "gid", "mode"))
@@ -144,7 +156,7 @@ class IntegratedInventory:
         st = os.fstat(spec.executable_fd)
         expected = self.document["metadata"].get(target)
         if expected is None or {"device":st.st_dev,"inode":st.st_ino,"uid":st.st_uid,"gid":st.st_gid,
-            "mode":st.st_mode,"size":st.st_size} != expected:
+            "mode":st.st_mode,"size":st.st_size} != {k:v for k,v in expected.items() if k != "parents"}:
             raise InventoryDenied("EXECUTABLE_DESCRIPTOR_INODE_OR_METADATA_MISMATCH")
         # Reuse exact retained-FD/role/argv/group checks, but authenticate a
         # separate authorization domain. The external issuer must additionally

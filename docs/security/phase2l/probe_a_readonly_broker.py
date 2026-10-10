@@ -139,6 +139,14 @@ class NativeReadCommands:
             if argv not in self.allowed or spec.role != "read-command":
                 raise BrokerDenied("OBSERVER_CANNOT_INHERIT_GUARDIAN_WRITE_EXECUTOR")
 
+    def for_audit(self, configuration, peer):
+        from probe_a_execution_contract import CleanupAuditAuthority
+        authority = CleanupAuditAuthority(configuration, peer, self.capture.spawner.contract)
+        capture = NativeBoundedCapture(self.capture.specs, spawner=self.capture.spawner,
+            plan=configuration.context.plan, activated=self.capture.activated,
+            approval=self.capture.approval, clock=self.capture.clock, audit_authority=authority)
+        return NativeReadCommands(configuration.context.plan, capture=capture, inventory=self.inventory)
+
     def __call__(self, argv, deadline):
         if type(argv) is not tuple or argv not in self.allowed:
             raise BrokerDenied("OBSERVER_WRITE_OR_UNKNOWN_COMMAND")

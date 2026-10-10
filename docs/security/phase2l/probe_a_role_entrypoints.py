@@ -127,7 +127,8 @@ class RoleServices:
     def _observe(self, config, startup, descriptors, clock):
         from probe_a_readonly_broker import ReadOnlyBroker, MAX_FRAME, MAX_REQUEST
         identities = {"controller": startup.controller, "audit": config.bootstrap}
-        owned, channels, brokers = [], {}, {}
+        from probe_a_ipc import IncrementalRequest
+        owned, channels, brokers, frames = [], {}, {}, {}
         try:
             for name, expected in identities.items():
                 peer = ProcessBinding(expected.pid); owned.append(peer)
@@ -135,20 +136,28 @@ class RoleServices:
                     raise SessionDenied("OBSERVER_CALLER_IDENTITY_MISMATCH")
                 channels[name] = authenticated_channel(descriptors[name], peer, clock)
                 b = self.observer_broker
-                brokers[name] = ReadOnlyBroker(config.context.plan, command=b.command,
+                command = b.command.for_audit(config, peer) if name == "audit" else b.command
+                frames[name] = IncrementalRequest(channels[name],
+                    end=config.context.end if name == "audit" else config.context.cutoff)
+                brokers[name] = ReadOnlyBroker(config.context.plan, command=command,
                     read_resource=b.read_resource, observer_identity=config.identity,
                     expected_peer=expected, inventory_id=config.context.inventory,
-                    end=config.context.end, clock=clock)
+                    end=config.context.end if name == "audit" else config.context.cutoff, clock=clock)
             while channels and clock() < config.context.end:
                 readable, _, _ = select.select([c.stream for c in channels.values()], [], [],
                                               min(0.05, config.context.end-clock()))
-                for name, channel in tuple(channels.items()):
-                    if channel.stream not in readable: continue
+                for name in ("audit", "controller"):
+                    if name not in channels: continue
+                    channel = channels[name]
                     if name == "controller" and clock() >= config.context.cutoff:
                         channel.close(); del channels[name]; continue
                     try:
-                        request = channel.recv_bytes(MAX_REQUEST, deadline=min(config.context.end, clock()+8))
-                        channel.send_bytes(brokers[name].handle(request), deadline=min(config.context.end, clock()+8))
+                        request = frames[name].receive_available()
+                        if request is None: continue
+                        # Controller responses cannot occupy the audit reserve.
+                        bound = 8 if name == "audit" else 0.05
+                        channel.send_bytes(brokers[name].handle(request),
+                            deadline=min(brokers[name].end, clock()+bound))
                     except BaseException:
                         channel.close(); del channels[name]
                         if name == "audit": raise  # no independent audit authority

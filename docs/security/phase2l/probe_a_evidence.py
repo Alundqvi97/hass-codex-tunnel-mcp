@@ -31,6 +31,8 @@ class EvidencePackage:
     missing: tuple
     defects: tuple
     result: str = "BLOCKED_NO_TRUSTED_RUNTIME_PASS"
+    work: str = "not-started"
+    cleanup: str = "not-observed"
 
     def __post_init__(self):
         if self.result != "BLOCKED_NO_TRUSTED_RUNTIME_PASS":
@@ -59,11 +61,11 @@ class EvidenceComposer:
         self.receipts, self.sequence, self.kind, self.defects = {}, {}, None, []
         self.sealed_receipts, self.worker_identities = {}, set()
         self.last_time = -1
+        self.quarantined = set()
+        self.work_outcome = "not-started"
 
     def append(self, raw, signature=None):
         try:
-            if self.defects:
-                raise EvidenceDenied("UNCERTAIN_EVIDENCE_CANNOT_BE_REUSED")
             record = decode(raw, 300000)
             fields = {"v", "kind", "context", "inventory", "source", "authority", "collector",
                       "sequence", "time", "fact", "value"}
@@ -74,12 +76,15 @@ class EvidenceComposer:
                     or type(record["authority"]) is not str or record["authority"] not in ("observer", "supervisor", "offline")
                     or record["fact"] not in FACTS or record["fact"] in self.receipts
                     or type(record["sequence"]) is not int
-                    or record["sequence"] != self.sequence.get(record["authority"], 0)+1
+                    or (record["sequence"] <= self.sequence.get(record["authority"], 0)
+                        or record["fact"] not in POST and record["sequence"] != self.sequence.get(record["authority"], 0)+1)
                     or type(record["time"]) not in (int, float)
                     or not max(0, self.last_time) <= record["time"] < self.context.end
                     or record["fact"] not in POST and record["time"] >= self.context.cutoff):
                 raise EvidenceDenied("EVIDENCE_CONTEXT_REPLAY_OR_SCHEMA")
             kind, authority = record["kind"], record["authority"]
+            if authority in self.quarantined:
+                raise EvidenceDenied("COMPROMISED_AUTHORITY_CANNOT_BE_REHABILITATED")
             if self.kind is not None and self.kind != kind:
                 raise EvidenceDenied("SYNTHETIC_SOURCE_KERNEL_PROVENANCE_MIX")
             if kind == "INDEPENDENT_KERNEL":
@@ -92,22 +97,37 @@ class EvidenceComposer:
                     raise EvidenceDenied("UNTRUSTED_OR_SELF_OBSERVED_KERNEL_CLAIM")
             elif authority != "offline" or signature is not None or record["collector"] != "offline-test":
                 raise EvidenceDenied("SYNTHETIC_EVIDENCE_CLAIMING_REAL_PROVENANCE")
-            # Strict ordering, including all cases before any cleanup receipt.
-            index = FACTS.index(record["fact"])
-            if any(fact not in self.receipts for fact in FACTS[:index]):
+            # Work remains ordered. Cleanup has its own causal domain and may
+            # survive failed or absent work; restoration still needs baseline.
+            fact = record["fact"]
+            required = FACTS[:FACTS.index(fact)] if fact not in POST else ()
+            if fact == "firewall-restored": required = ("firewall-before",)
+            # Synthetic receipts still demonstrate shutdown order explicitly.
+            if kind != "INDEPENDENT_KERNEL" and fact in POST[4:]:
+                required = POST[:POST.index(fact)]
+            if any(prior not in self.receipts for prior in required):
                 raise EvidenceDenied("INCOMPLETE_OR_REORDERED_EVIDENCE")
-            self._check(record["fact"], record["value"])
+            if record["sequence"] > self.sequence.get(authority,0)+1:
+                self.defects.append("UNOBSERVED_SEQUENCE_GAP:"+authority)
+            self._check(record["fact"], record["value"], kind=kind)
             self.kind = kind
             self.sequence[authority] = record["sequence"]
             self.receipts[record["fact"]] = record
             self.sealed_receipts[record["fact"]] = raw
             self.last_time = record["time"]
             return True
-        except BaseException:
+        except BaseException as error:
+            if str(error) != "INCOMPLETE_OR_REORDERED_EVIDENCE" and "record" in locals() and type(record) is dict:
+                authority = record.get("authority")
+                if type(authority) is str: self.quarantined.add(authority)
             self.defects.append("BLOCKED_INVALID_INDEPENDENT_EVIDENCE")
             raise
 
-    def _check(self, fact, value):
+    def _check(self, fact, value, *, kind="SYNTHETIC_TEST"):
+        if kind == "INDEPENDENT_KERNEL" and fact in POST and fact != "firewall-restored":
+            from probe_a_native_evidence import validate_cleanup_measurement
+            return validate_cleanup_measurement(fact,value,self)
+
         if fact == "plan-inventory":
             if value != {"context": self.context.identifier, "inventory": self.context.inventory,
                          "source": self.context.source_commit}:
@@ -131,7 +151,7 @@ class EvidenceComposer:
         elif fact.startswith("case:"):
             case, family, index = next(c for c in CASES if fact == "case:"+c[0])
             if (type(value) is not dict or set(value) != {"family", "before", "after", "behavior", "identity", "group", "peer", "rules"}
-                    or value["family"] != family or value["behavior"] != case
+                    or value["family"] != family or (kind != "INDEPENDENT_KERNEL" and value["behavior"] != case)
                     or value["group"] != self.groups.get("worker")):
                 raise EvidenceDenied("NETWORK_CASE_OR_ACTUAL_WORKER_UNOBSERVED")
             worker = identity_from(value["identity"])
@@ -148,6 +168,11 @@ class EvidenceComposer:
                     raise EvidenceDenied("ROOT_PEER_IDENTITY_UNOBSERVED")
             elif value["peer"] is not None:
                 raise EvidenceDenied("UNEXPECTED_ROOT_PEER")
+            from probe_a_native_evidence import counters, validate_network_measurement
+            counters(value["before"],family); counters(value["after"],family)
+            if kind == "INDEPENDENT_KERNEL":
+                peer_identity = identity_from(value["peer"]["identity"]) if case == "loopback-established" else None
+                validate_network_measurement(case,value["behavior"],self.context,worker,peer_identity)
             require_counter_delta(tuple(value["before"]), tuple(value["after"]), index)
             expect_active(*value["rules"], *self.receipts["firewall-before"]["value"], self.context.plan, final=True)
             self.worker_identities.add((worker.pid, worker.starttime))
@@ -165,6 +190,13 @@ class EvidenceComposer:
         elif value is not True:
             raise EvidenceDenied("TERMINATION_OR_RESIDUAL_RESOURCES_UNOBSERVED")
 
+    def note_work(self, outcome):
+        if outcome not in ("not-started", "partial", "failed", "cancelled", "completed"):
+            raise EvidenceDenied("UNKNOWN_WORK_OUTCOME")
+        if self.work_outcome in ("failed", "cancelled") and outcome == "completed":
+            raise EvidenceDenied("FAILED_WORK_CANNOT_BE_PROMOTED")
+        self.work_outcome = outcome
+
     def package(self):
         if any(canonical(r) != self.sealed_receipts[f] for f, r in self.receipts.items()):
             raise EvidenceDenied("VERIFIED_EVIDENCE_CHANGED_AFTER_COLLECTION")
@@ -173,7 +205,12 @@ class EvidenceComposer:
         if missing and provenance == "INDEPENDENT_KERNEL": provenance = "INCOMPLETE_RUNTIME_EVIDENCE"
         if self.defects and provenance == "INDEPENDENT_KERNEL": provenance = "INCOMPLETE_RUNTIME_EVIDENCE"
         return EvidencePackage(provenance, self.context.identifier,
-            tuple(canonical(self.receipts[f]) for f in FACTS if f in self.receipts), missing, tuple(self.defects))
+            tuple(canonical(self.receipts[f]) for f in FACTS if f in self.receipts), missing, tuple(self.defects),
+            work=self.work_outcome if self.work_outcome != "not-started" else (
+                "completed" if all("case:"+c[0] in self.receipts for c in CASES) else
+                "partial" if any(f.startswith("case:") for f in self.receipts) else "not-started"),
+            cleanup="uncertain" if any(not d.startswith("UNOBSERVED:") or d[11:] in POST for d in self.defects) else "verified" if all(f in self.receipts for f in POST)
+                    else "incomplete" if any(f in self.receipts for f in POST) else "not-observed")
 
 
 class IndependentEvidenceAudit:
@@ -185,7 +222,7 @@ class IndependentEvidenceAudit:
     post-cleanup reads cannot reconstruct it. No collector or key is bundled.
     """
     def __init__(self, composer=None, *, context=None, groups=None, verify_collector=None,
-                 authorities=None, collect=None):
+                 authorities=None, collect=None, journal=None):
         if composer is not None and not isinstance(composer, EvidenceComposer):
             raise EvidenceDenied("INDEPENDENT_EVIDENCE_COMPOSER_REQUIRED")
         if composer is None and context is None:
@@ -194,24 +231,57 @@ class IndependentEvidenceAudit:
         self.groups = composer.groups if composer is not None else decode(canonical(groups or {}))
         self.verify_collector, self.authorities = verify_collector, authorities
         self.composer, self.collect, self.failed = composer, collect, False
+        self.journal = journal
 
-    def _through(self, stop):
-        if self.failed or not callable(self.collect):
+    def _through(self, stop, *, cleanup=False):
+        if not callable(self.collect) or self.composer is None:
             self.failed = True
             raise EvidenceDenied("INDEPENDENT_KERNEL_COLLECTOR_MISSING")
-        try:
-            for fact in FACTS[:FACTS.index(stop)+1]:
-                if fact in self.composer.receipts: continue
+        if self.failed and not cleanup:
+            raise EvidenceDenied("FAILED_BASELINE_CANNOT_RELEASE_WORK")
+        failed = False
+        facts = FACTS[:FACTS.index(stop)+1]
+        for fact in facts:
+            if fact in self.composer.receipts: continue
+            try:
                 pair = self.collect(fact, self.composer.context.identifier)
                 if type(pair) is not tuple or len(pair) != 2:
                     raise EvidenceDenied("INDEPENDENT_COLLECTOR_RECEIPT_MISSING")
                 self.composer.append(*pair)
-            if self.composer.kind != "INDEPENDENT_KERNEL":
-                raise EvidenceDenied("SYNTHETIC_JOURNAL_CANNOT_RELEASE_RUNTIME")
+            except BaseException:
+                self.failed = failed = True
+                # Missing work is not fabricated and cannot suppress unrelated
+                # later cleanup facts. Invalid authority remains quarantined.
+                if not cleanup: raise
+                marker = "UNOBSERVED:"+fact
+                if marker not in self.composer.defects: self.composer.defects.append(marker)
+        if self.composer.kind != "INDEPENDENT_KERNEL":
+            self.failed = True
+            raise EvidenceDenied("SYNTHETIC_JOURNAL_CANNOT_RELEASE_RUNTIME")
+        return not failed and not self.composer.defects
+
+    def partial_package(self):
+        if self.composer is None:
+            return EvidencePackage("INCOMPLETE_RUNTIME_EVIDENCE", self.context.identifier,
+                (), FACTS, ("ACTOR_HANDOFF_OR_COLLECTOR_UNAVAILABLE",))
+        return self.composer.package()
+
+    def persist_partial(self):
+        package = self.partial_package()
+        from probe_a_native_evidence import UnsignedObservationJournal
+        if not isinstance(self.journal, UnsignedObservationJournal):
+            return False  # exact source assembly gap, never pretend durable
+        record = {"context":package.context, "type":"partial-evidence-package",
+            "provenance":package.provenance, "work":package.work, "cleanup":package.cleanup,
+            "missing":list(package.missing), "defects":list(package.defects),
+            "receipt_digests":[digest(decode(r,300000)) for r in package.receipts],
+            "result":package.result}
+        try:
+            self.journal.append(record)
             return True
         except BaseException:
             self.failed = True
-            raise
+            return False
 
     def before_controller(self, coordinator):
         if self.composer is None:
@@ -225,11 +295,11 @@ class IndependentEvidenceAudit:
 
     def observe_after(self):
         # Called only after the supervisor has reaped guardian/controller.
-        return self._through("guardian-reaped")
+        return self._through("guardian-reaped", cleanup=True)
 
     def after_observer_shutdown(self):
-        self._through("no-residuals")
-        package = self.composer.package()
-        if package.missing or package.defects:
-            raise EvidenceDenied("INCOMPLETE_INDEPENDENT_RUNTIME_PACKAGE")
-        return package  # result is STILL BLOCKED_NO_TRUSTED_RUNTIME_PASS
+        try:
+            self._through("no-residuals", cleanup=True)
+        except BaseException:
+            self.failed = True
+        return self.partial_package()  # ALWAYS blocked, including partial exits

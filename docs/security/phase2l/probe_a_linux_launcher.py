@@ -291,7 +291,7 @@ class NativeAtomicSpawner:
         self.syscalls = LinuxSyscalls() if syscalls is None else syscalls
         self.clock = clock
 
-    def spawn(self, spec, *, deadline, activated=False, approval=None, stdout_fd=None, pending=None):
+    def spawn(self, spec, *, deadline, activated=False, approval=None, stdout_fd=None, pending=None, audit_authority=None):
         if (activated is not True or self.inventory is None or os.geteuid() != 0
                 or type(deadline) not in (int, float) or not math.isfinite(deadline)
                 or not 0 < deadline - self.clock() <= 240):
@@ -302,7 +302,7 @@ class NativeAtomicSpawner:
         from probe_a_execution_contract import ReviewedExecutionContract
         if (not isinstance(self.contract, ReviewedExecutionContract)
                 or self.contract.inventory is not self.inventory
-                or self.contract.before_spawn(spec, deadline) is not True):
+                or self.contract.before_spawn(spec, deadline, audit_authority=audit_authority) is not True):
             raise LaunchDenied("REVIEWED_OS_CONFINEMENT_CONTRACT_REQUIRED")
         if pending is not None:
             from probe_a_session import PendingRoleConfiguration
@@ -386,7 +386,8 @@ class NativeBoundedCapture:
     cannot supply a successful observation. No subprocess/Popen fallback.
     """
     def __init__(self, specs, *, spawner, plan=None, activated=False, approval=None,
-                 clock=time.monotonic):
+                 clock=time.monotonic, audit_authority=None):
+        self.audit_authority = audit_authority
         self.specs = dict(specs)
         if plan is None or validate_plan(plan) != "OFFLINE_SAFE_SCOPED_PLAN_NOT_KERNEL_VERIFIED":
             raise LaunchDenied("CAPTURE_REQUIRES_REVIEWED_PLAN")
@@ -429,7 +430,8 @@ class NativeBoundedCapture:
             read, write = os.pipe2(os.O_CLOEXEC)
             os.set_blocking(read, False)
             child = self.spawner.spawn(spec, deadline=end, activated=self.activated,
-                                       approval=self.approval, stdout_fd=write)
+                                       approval=self.approval, stdout_fd=write,
+                                       audit_authority=self.audit_authority)
             os.close(write)
             write = None
             if on_spawn is not None:
@@ -538,18 +540,27 @@ class TrustedActorBootstrap:
                 os._exit(76)
             raise
 
-    def launch_integrated(self, *, factory, permit, evidence_audit=None, activated=False, approval=None):
-        from probe_a_integrated_bootstrap import IntegratedBootstrap
-        if self.used:
-            raise LaunchDenied("ACTOR_BOOTSTRAP_ALREADY_CONSUMED")
-        if activated is not True:
-            raise LaunchDenied("ACTOR_BOOTSTRAP_DISABLED")
-        if factory.context.end != self.end or factory.context.cutoff != self.cutoff:
-            raise LaunchDenied("BOOTSTRAP_FACTORY_DEADLINE_MISMATCH")
-        self.used = True
-        return IntegratedBootstrap(spawner=self.spawner, factory=factory,
-                                   permit=permit, clock=self.clock).launch(
-                                       activated=activated, approval=approval, evidence_audit=evidence_audit)
+    def launch_integrated(self, *, factory=None, permit=None, evidence_audit=None, activated=False, approval=None):
+        # Disabled/unprivileged calls are harmless. EVERYTHING after the
+        # activated-root boundary, including import and property evaluation,
+        # belongs to the irreversible handler; constructor failures count too.
+        if activated is not True or os.geteuid() != 0:
+            raise LaunchDenied("ACTOR_BOOTSTRAP_DISABLED_OR_UNPRIVILEGED")
+        try:
+            if self.used:
+                raise LaunchDenied("ACTOR_BOOTSTRAP_ALREADY_CONSUMED")
+            self.used = True
+            from probe_a_integrated_bootstrap import IntegratedBootstrap, AttemptPermit
+            if not isinstance(permit, AttemptPermit) or permit.claim() is not True:
+                raise LaunchDenied("ONE_ATTEMPT_CLAIM_REQUIRED_BEFORE_FACTORY_PREPARATION")
+            receipt = permit._bootstrap_receipt
+            if factory.context.end != self.end or factory.context.cutoff != self.cutoff:
+                raise LaunchDenied("BOOTSTRAP_FACTORY_DEADLINE_MISMATCH")
+            return IntegratedBootstrap(spawner=self.spawner, factory=factory,
+                                       permit=permit, clock=self.clock, bootstrap_receipt=receipt).launch(
+                activated=True, approval=approval, evidence_audit=evidence_audit)
+        except BaseException:
+            os._exit(76)
 
 
 class IndependentSupervisor:
@@ -565,11 +576,17 @@ class IndependentSupervisor:
             raise LaunchDenied("INDEPENDENT_ACTORS_REQUIRED")
         self.actors, self.end, self.cutoff, self.clock = dict(actors), end, cutoff, clock
 
-    def _finish(self, result):
+    def _finish(self, result, *, expired=False):
         # Observer cannot attest its own disappearance. The bootstrap owns
         # pidfd shutdown/reaping and exact actor-group readback after auditing.
         try:
+            if expired:
+                return result  # no new privileged observation/mutation after end
+            if self.clock() >= self.end:
+                return "BLOCKED_GUARDIAN_OR_DESCENDANT_CLEANUP_UNCERTAIN"
             observer = self.actors["observer"]
+            if self.clock() < self.end:
+                observer.group.kill_all()  # includes detached observer descendants
             if not observer.exited():
                 observer.signal(signal.SIGKILL)
             while not observer.exited() and self.clock() < self.end:
@@ -590,6 +607,14 @@ class IndependentSupervisor:
             return result
         except BaseException:
             return "BLOCKED_ACTOR_SHUTDOWN_UNCERTAIN"
+        finally:
+            evidence = getattr(self, "evidence_audit", None)
+            if evidence is not None:
+                try:
+                    self.evidence_persisted = evidence.persist_partial()
+                    self.evidence_package = evidence.partial_package()
+                except BaseException:
+                    self.evidence_package = None  # explicitly unavailable, never PASS
 
     def run(self, *, close_controller_channel, observe_after, cancelled=lambda: False,
             activated=False):
@@ -611,10 +636,15 @@ class IndependentSupervisor:
                 pass
             try:
                 controller = self.actors["controller"]
+                if self.clock() < self.end: controller.group.kill_all()
                 if not controller.exited(): controller.signal(signal.SIGKILL)
                 guardian = self.actors["guardian"]
                 while not guardian.exited() and self.clock() < self.end:
                     select.select([guardian.pidfd], [], [], min(0.05, self.end-self.clock()))
+            except BaseException:
+                pass
+            try:
+                observe_after()
             except BaseException:
                 pass
             return self._finish("BLOCKED_SUPERVISOR_INTERRUPTED")
@@ -638,6 +668,7 @@ class IndependentSupervisor:
                 stopped = True
                 reason = "UNVERIFIED_ABORT_OR_DEADLINE"
                 close_controller_channel()  # EOF triggers the existing guardian journal.
+                if self.clock() < self.end: controller.group.kill_all()
                 if not controller.exited():
                     controller.signal(signal.SIGKILL)
                 # Killing the controller closes the actual socket endpoint.
@@ -648,10 +679,14 @@ class IndependentSupervisor:
                 guardian.reap()
                 controller.reap()
                 # Only the independent broker may observe AFTER guardian reaping.
-                if (guardian.exitcode != 0 or observer.exited()
-                        or observe_after() is not True):
+                observed = False
+                try:
+                    observed = observe_after() is True
+                except Exception:
+                    pass
+                if (guardian.exitcode != 0 or observer.exited() or not observed):
                     return self._finish("BLOCKED_INDEPENDENT_POST_GUARDIAN_OBSERVATION")
                 return self._finish(reason + "_NOT_PROBE_PASS")
             select.select([h.pidfd for h in self.actors.values() if not h.exited()],
                           [], [], min(0.05, max(0, self.end - self.clock())))
-        return self._finish("BLOCKED_GUARDIAN_OR_DESCENDANT_CLEANUP_UNCERTAIN")
+        return self._finish("BLOCKED_GUARDIAN_OR_DESCENDANT_CLEANUP_UNCERTAIN", expired=True)

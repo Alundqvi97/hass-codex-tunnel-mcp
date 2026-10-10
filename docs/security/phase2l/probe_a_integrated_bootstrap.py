@@ -31,6 +31,7 @@ class AttemptPermit:
         self.signature, self.verify, self.consume = signature, verify, consume
         self.boot_identity, self.clock, self.used = boot_identity, clock, False
         self.granted = False
+        self._bootstrap_receipt = None
 
     def claim(self):
         if (self.used or canonical(self.record) != self.record_bytes
@@ -49,7 +50,14 @@ class AttemptPermit:
         if self.consume(self.context.session, digest(self.record), self.record["boot"]) is not True:
             raise SessionDenied("REPLAY_OR_UNCERTAIN_AUTHORIZATION_LEDGER")
         self.granted = True
+        self._bootstrap_receipt = object()
         return self.active()
+
+    def consume_bootstrap_receipt(self, receipt):
+        if receipt is None or receipt is not self._bootstrap_receipt or not self.active():
+            raise SessionDenied("BOOTSTRAP_CLAIM_HANDOFF_REPLAY_OR_SUBSTITUTION")
+        self._bootstrap_receipt = None
+        return True
 
     def active(self, *, cleanup=False):
         return (self.used and self.granted and canonical(self.record) == self.record_bytes
@@ -110,27 +118,34 @@ class ReviewedActorFactory:
 
 class IntegratedBootstrap:
     """Extension of the existing launcher, not a second process architecture."""
-    def __init__(self, *, spawner, factory, permit, clock=time.monotonic):
+    def __init__(self, *, spawner, factory, permit, clock=time.monotonic, bootstrap_receipt=None):
         if not isinstance(spawner, NativeAtomicSpawner) or not isinstance(factory, ReviewedActorFactory):
             raise SessionDenied("EXISTING_ATOMIC_LAUNCHER_REQUIRED")
         self.spawner, self.factory, self.permit, self.clock = spawner, factory, permit, clock
         self.used = False
+        self.bootstrap_receipt = bootstrap_receipt
 
     def launch(self, *, activated=False, approval=None, evidence_audit=None):
-        if activated is not True or self.used or os.geteuid() != 0:
-            raise SessionDenied("INTEGRATED_BOOTSTRAP_DISABLED_OR_CONSUMED")
-        self.used = True
+        if activated is not True or os.geteuid() != 0:
+            raise SessionDenied("INTEGRATED_BOOTSTRAP_DISABLED_OR_UNPRIVILEGED")
         actors, bindings, allocations = {}, {}, []
-        contract = self.spawner.contract
         try:
+            if self.used: raise SessionDenied("INTEGRATED_BOOTSTRAP_CONSUMED")
+            self.used = True
+            contract = self.spawner.contract
             context = self.factory.context
             from probe_a_evidence import IndependentEvidenceAudit
             if (not isinstance(evidence_audit, IndependentEvidenceAudit) or evidence_audit.context != context
                     or evidence_audit.groups != {r:list(g.identity) for r,g in contract.scopes.groups.items()}):
                 raise SessionDenied("INDEPENDENT_LIFECYCLE_EVIDENCE_AUDIT_REQUIRED")
             deadline_pair(context.end, context.cutoff, self.clock())
-            if (not isinstance(self.permit, AttemptPermit) or self.permit.context != context
-                    or self.permit.claim() is not True or contract.context != context
+            if not isinstance(self.permit, AttemptPermit) or self.permit.context != context:
+                raise SessionDenied("EXTERNAL_BOOTSTRAP_GATES_REQUIRED")
+            if self.bootstrap_receipt is None:
+                if self.permit.claim() is not True: raise SessionDenied("BOOTSTRAP_CLAIM_REQUIRED")
+                self.bootstrap_receipt = self.permit._bootstrap_receipt
+            if (self.permit.consume_bootstrap_receipt(self.bootstrap_receipt) is not True
+                    or contract.context != context
                     or contract.verify() is not True or contract.scopes.preflight() is not True):
                 raise SessionDenied("EXTERNAL_BOOTSTRAP_GATES_REQUIRED")
             contract.permit = self.permit
@@ -171,6 +186,11 @@ class IntegratedBootstrap:
             supervisor.evidence_audit = evidence_audit
             return supervisor
         except BaseException:
+            try:
+                if isinstance(evidence_audit, IndependentEvidenceAudit):
+                    evidence_audit.persist_partial()
+            except BaseException:
+                pass
             # Guardian retains EOF/deadline cleanup independently of this parent.
             # No interrupted privileged bootstrap returns to caller Python.
             os._exit(76)
