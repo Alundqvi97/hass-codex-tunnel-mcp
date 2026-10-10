@@ -104,9 +104,15 @@ process.once('SIGTERM', () => {
     if (!issueMessage.includes('Save this credential privately now')) throw new Error('owner connection issuance failed: '+issueMessage);
     const credentials = (await page.locator('hass-codex-admin').textContent()).match(/hca_[A-Za-z0-9_-]{43}/g);
     if (!credentials || credentials.length !== 1) throw new Error('one-time scoped credential missing');
+    const connection = issueMessage.match(/^Connection ([a-f0-9]{32})\./);
+    if (!connection) throw new Error('issued connection identity missing');
     checkpoint('revoke-connection');
     await page.getByRole('button', {name:'Manage connections', exact:true}).click();
-    await page.getByRole('button', {name:'Revoke this connection', exact:true}).last().click();
+    const issuedCard = page.locator('section').filter({hasText:connection[1]});
+    await issuedCard.getByRole('button', {name:'Revoke this connection', exact:true}).click();
+    // Click dispatch is not the asynchronous native revocation acknowledgment.
+    // Wait for the actual owner's response to remove this exact connection card.
+    await issuedCard.waitFor({state:'detached'});
     if ((await page.locator('hass-codex-admin').textContent()).includes(credentials[0])) throw new Error('credential remained in panel');
     const revokedStatus = await page.evaluate(async ({base, credential}) => (await fetch(base+'/api/hass_codex_admin/mcp', {method:'POST', headers:{Authorization:'Bearer '+credential}, body:'{}'})).status, {base, credential:credentials[0]});
     if (revokedStatus !== 401) throw new Error('revoked credential accepted');
